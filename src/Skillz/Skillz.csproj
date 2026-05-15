@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <AssemblyName>skillz</AssemblyName>
+    <RootNamespace>Skillz</RootNamespace>
+    <RollForward>Major</RollForward>
+    <PublishAot>true</PublishAot>
+    <OptimizationPreference>Size</OptimizationPreference>
+    <RuntimeIdentifiers>linux-x64;linux-arm64;linux-musl-x64;osx-x64;osx-arm64;win-x64;win-arm64</RuntimeIdentifiers>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <IsPackable>false</IsPackable>
+    <PackageId>Skillz.Cli</PackageId>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Skillz.Tests" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" />
+    <PackageReference Include="Spectre.Console" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="Microsoft.Extensions.FileSystemGlobbing" />
+    <PackageReference Include="YamlDotNet" />
+    <PackageReference Include="CliWrap" />
+    <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference Include="Roslynator.Formatting.Analyzers" PrivateAssets="all" Condition="'$(Configuration)' == 'Debug'" />
+  </ItemGroup>
+</Project>
