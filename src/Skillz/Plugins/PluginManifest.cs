@@ -13,16 +13,22 @@ internal sealed class PluginManifest : IPluginManifest
     {
         var searchDirs = new List<string>();
 
-        await TryReadMarketplaceAsync(basePath, (pluginBase, skills, _) =>
-            AddPluginSkillPaths(basePath, pluginBase, skills, searchDirs));
+        await TryReadMarketplaceAsync(
+            basePath,
+            (pluginBase, skills, _) => AddPluginSkillPaths(basePath, pluginBase, skills, searchDirs));
 
-        await TryReadPluginJsonAsync(basePath, (skills, _) =>
-            AddPluginSkillPaths(basePath, basePath, skills, searchDirs));
+        await TryReadPluginJsonAsync(
+            basePath,
+            (skills, _) => AddPluginSkillPaths(basePath, basePath, skills, searchDirs));
 
         return searchDirs;
     }
 
-    private static void AddPluginSkillPaths(string basePath, string pluginBase, List<string>? skills, List<string> searchDirs)
+    private static void AddPluginSkillPaths(
+        string basePath,
+        string pluginBase,
+        List<string>? skills,
+        List<string> searchDirs)
     {
         if (!PathContainment.IsContainedIn(pluginBase, basePath))
         {
@@ -54,9 +60,7 @@ internal sealed class PluginManifest : IPluginManifest
         searchDirs.Add(Path.Combine(pluginBase, "skills"));
     }
 
-    internal static async Task TryReadMarketplaceAsync(
-        string basePath,
-        Action<string, List<string>?, string?> onPlugin)
+    internal static async Task TryReadMarketplaceAsync(string basePath, Action<string, List<string>?, string?> onPlugin)
     {
         var marketplacePath = Path.Combine(basePath, ".claude-plugin", "marketplace.json");
         MarketplaceManifest? manifest;
@@ -126,9 +130,7 @@ internal sealed class PluginManifest : IPluginManifest
         }
     }
 
-    internal static async Task TryReadPluginJsonAsync(
-        string basePath,
-        Action<List<string>?, string?> onPlugin)
+    internal static async Task TryReadPluginJsonAsync(string basePath, Action<List<string>?, string?> onPlugin)
     {
         var pluginPath = Path.Combine(basePath, ".claude-plugin", "plugin.json");
         SinglePluginManifest? manifest;

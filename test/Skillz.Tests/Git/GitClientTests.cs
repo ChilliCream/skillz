@@ -12,12 +12,9 @@ public class GitClientTests
         var fakeRepo = Path.Combine(Path.GetTempPath(), $"skillz-fake-{Guid.NewGuid():N}");
         var targetDir = Path.Combine(Path.GetTempPath(), $"skillz-test-{Guid.NewGuid():N}");
 
-        var ex = await Assert.ThrowsAsync<GitCloneException>(
-            () => client.CloneAsync(
-                fakeRepo,
-                targetDir,
-                @ref: null,
-                TestContext.Current.CancellationToken));
+        var ex = await Assert.ThrowsAsync<GitCloneException>(() =>
+            client.CloneAsync(fakeRepo, targetDir, @ref: null, TestContext.Current.CancellationToken)
+        );
 
         Assert.Equal(fakeRepo, ex.Url);
         Assert.False(Directory.Exists(targetDir));
@@ -30,12 +27,9 @@ public class GitClientTests
         var fakeRepo = Path.Combine(Path.GetTempPath(), $"skillz-fake-{Guid.NewGuid():N}");
         var targetDir = Path.Combine(Path.GetTempPath(), $"skillz-test-{Guid.NewGuid():N}");
 
-        await Assert.ThrowsAsync<GitCloneException>(
-            () => client.CloneAsync(
-                fakeRepo,
-                targetDir,
-                @ref: null,
-                TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<GitCloneException>(() =>
+            client.CloneAsync(fakeRepo, targetDir, @ref: null, TestContext.Current.CancellationToken)
+        );
 
         Assert.False(Directory.Exists(targetDir));
     }
@@ -49,12 +43,9 @@ public class GitClientTests
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => client.CloneAsync(
-                fakeRepo,
-                targetDir,
-                @ref: null,
-                cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            client.CloneAsync(fakeRepo, targetDir, @ref: null, cts.Token)
+        );
     }
 
     [Fact]
@@ -63,9 +54,7 @@ public class GitClientTests
         var client = new GitClient();
         var fakeRepo = Path.Combine(Path.GetTempPath(), $"skillz-fake-{Guid.NewGuid():N}");
 
-        var result = await client.GetDefaultBranchAsync(
-            fakeRepo,
-            TestContext.Current.CancellationToken);
+        var result = await client.GetDefaultBranchAsync(fakeRepo, TestContext.Current.CancellationToken);
 
         Assert.Null(result);
     }

@@ -2,18 +2,17 @@ namespace Skillz.Commands;
 
 internal abstract record CommandResult
 {
-    private CommandResult()
-    {
-    }
+    private CommandResult() { }
 
-    public int ExitCode => this switch
-    {
-        Success => ExitCodeConstants.Success,
-        Failure f => f.Code,
-        Cancelled => ExitCodeConstants.Cancelled,
-        DisplayHelp => ExitCodeConstants.Success,
-        _ => ExitCodeConstants.Failure,
-    };
+    public int ExitCode
+        => this switch
+        {
+            Success => ExitCodeConstants.Success,
+            Failure f => f.Code,
+            Cancelled => ExitCodeConstants.Cancelled,
+            DisplayHelp => ExitCodeConstants.Success,
+            _ => ExitCodeConstants.Failure
+        };
 
     public sealed record Success : CommandResult;
 

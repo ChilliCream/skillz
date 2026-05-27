@@ -12,18 +12,14 @@ public class SourceParserTests
     public void GitLab_CustomDomain_DeepSubgroupPath()
     {
         var result = SourceParser.ParseInternal("https://git.corp.com/group/subgroup/project/-/tree/main/src");
-        Assert.Equal(
-            new ParsedSource.GitLab("https://git.corp.com/group/subgroup/project.git", "main", "src"),
-            result);
+        Assert.Equal(new ParsedSource.GitLab("https://git.corp.com/group/subgroup/project.git", "main", "src"), result);
     }
 
     [Fact]
     public void GitLab_TreeWithBranchNoPath()
     {
         var result = SourceParser.ParseInternal("https://gitlab.example.com/org/repo/-/tree/v1.0");
-        Assert.Equal(
-            new ParsedSource.GitLab("https://gitlab.example.com/org/repo.git", "v1.0"),
-            result);
+        Assert.Equal(new ParsedSource.GitLab("https://gitlab.example.com/org/repo.git", "v1.0"), result);
     }
 
     [Fact]
@@ -84,9 +80,7 @@ public class SourceParserTests
     public void GitHub_FullUrlWithTreeAndPath()
     {
         var result = SourceParser.ParseInternal("https://github.com/owner/repo/tree/main/path");
-        Assert.Equal(
-            new ParsedSource.GitHub("https://github.com/owner/repo.git", "main", "path"),
-            result);
+        Assert.Equal(new ParsedSource.GitHub("https://github.com/owner/repo.git", "main", "path"), result);
     }
 
     [Fact]
@@ -388,9 +382,7 @@ public class SourceParserTests
     public void Git_SshFormatWithBranch()
     {
         var result = SourceParser.ParseInternal("git@github.com:owner/repo.git#feature/install");
-        Assert.Equal(
-            new ParsedSource.Git("git@github.com:owner/repo.git", "feature/install"),
-            result);
+        Assert.Equal(new ParsedSource.Git("git@github.com:owner/repo.git", "feature/install"), result);
     }
 
     [Fact]
@@ -404,9 +396,7 @@ public class SourceParserTests
     public void Git_HttpsWithBranch()
     {
         var result = SourceParser.ParseInternal("https://git.example.com/owner/repo.git#release-2026");
-        Assert.Equal(
-            new ParsedSource.Git("https://git.example.com/owner/repo.git", "release-2026"),
-            result);
+        Assert.Equal(new ParsedSource.Git("https://git.example.com/owner/repo.git", "release-2026"), result);
     }
 
     [Fact]
@@ -661,8 +651,7 @@ public class SourceParserTests
     [Fact]
     public void Subpath_GitHubTreeRejectsTraversal()
     {
-        Assert.Throws<CliException>(
-            () => SourceParser.ParseInternal("https://github.com/owner/repo/tree/main/../etc"));
+        Assert.Throws<CliException>(() => SourceParser.ParseInternal("https://github.com/owner/repo/tree/main/../etc"));
     }
 
     [Fact]
@@ -676,8 +665,9 @@ public class SourceParserTests
     [Fact]
     public void Subpath_GitLabTreeRejectsTraversal()
     {
-        Assert.Throws<CliException>(
-            () => SourceParser.ParseInternal("https://gitlab.com/owner/repo/-/tree/main/../etc"));
+        Assert.Throws<CliException>(() =>
+            SourceParser.ParseInternal("https://gitlab.com/owner/repo/-/tree/main/../etc")
+        );
     }
 
     [Fact]
@@ -691,8 +681,7 @@ public class SourceParserTests
     [Fact]
     public void Subpath_GitHubShorthandRejectsTraversal()
     {
-        Assert.Throws<CliException>(
-            () => SourceParser.ParseInternal("owner/repo/../etc"));
+        Assert.Throws<CliException>(() => SourceParser.ParseInternal("owner/repo/../etc"));
     }
 
     [Fact]

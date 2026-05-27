@@ -79,13 +79,18 @@ internal sealed partial class SourceParser : ISourceParser
         var githubPrefixMatch = GitHubPrefixRegex().Match(input);
         if (githubPrefixMatch.Success)
         {
-            return ParseInternal(AppendFragmentRef(githubPrefixMatch.Groups[1].Value, fragmentRef, fragmentSkillFilter));
+            return ParseInternal(
+                AppendFragmentRef(githubPrefixMatch.Groups[1].Value, fragmentRef, fragmentSkillFilter));
         }
 
         var gitlabPrefixMatch = GitLabPrefixRegex().Match(input);
         if (gitlabPrefixMatch.Success)
         {
-            return ParseInternal(AppendFragmentRef($"https://gitlab.com/{gitlabPrefixMatch.Groups[1].Value}", fragmentRef, fragmentSkillFilter));
+            return ParseInternal(
+                AppendFragmentRef(
+                    $"https://gitlab.com/{gitlabPrefixMatch.Groups[1].Value}",
+                    fragmentRef,
+                    fragmentSkillFilter));
         }
 
         var githubTreeWithPathMatch = GitHubTreeWithPathRegex().Match(input);
@@ -118,9 +123,7 @@ internal sealed partial class SourceParser : ISourceParser
             var owner = githubRepoMatch.Groups[1].Value;
             var repo = githubRepoMatch.Groups[2].Value;
             var cleanRepo = TrailingGitRegex().Replace(repo, string.Empty);
-            return new ParsedSource.GitHub(
-                Url: $"https://github.com/{owner}/{cleanRepo}.git",
-                Ref: fragmentRef);
+            return new ParsedSource.GitHub(Url: $"https://github.com/{owner}/{cleanRepo}.git", Ref: fragmentRef);
         }
 
         var gitlabTreeWithPathMatch = GitLabTreeWithPathRegex().Match(input);
@@ -161,14 +164,15 @@ internal sealed partial class SourceParser : ISourceParser
             var repoPath = gitlabRepoMatch.Groups[1].Value;
             if (repoPath.Contains('/', StringComparison.Ordinal))
             {
-                return new ParsedSource.GitLab(
-                    Url: $"https://gitlab.com/{repoPath}.git",
-                    Ref: fragmentRef);
+                return new ParsedSource.GitLab(Url: $"https://gitlab.com/{repoPath}.git", Ref: fragmentRef);
             }
         }
 
         var atSkillMatch = AtSkillRegex().Match(input);
-        if (atSkillMatch.Success && !input.Contains(':', StringComparison.Ordinal) && !input.StartsWith('.') && !input.StartsWith('/'))
+        if (atSkillMatch.Success
+            && !input.Contains(':', StringComparison.Ordinal)
+            && !input.StartsWith('.')
+            && !input.StartsWith('/'))
         {
             var owner = atSkillMatch.Groups[1].Value;
             var repo = atSkillMatch.Groups[2].Value;
@@ -180,7 +184,10 @@ internal sealed partial class SourceParser : ISourceParser
         }
 
         var shorthandMatch = ShorthandRegex().Match(input);
-        if (shorthandMatch.Success && !input.Contains(':', StringComparison.Ordinal) && !input.StartsWith('.') && !input.StartsWith('/'))
+        if (shorthandMatch.Success
+            && !input.Contains(':', StringComparison.Ordinal)
+            && !input.StartsWith('.')
+            && !input.StartsWith('/'))
         {
             var owner = shorthandMatch.Groups[1].Value;
             var repo = shorthandMatch.Groups[2].Value;
@@ -344,8 +351,6 @@ internal sealed partial class SourceParser : ISourceParser
             return input;
         }
 
-        return !string.IsNullOrEmpty(skillFilter)
-            ? $"{input}#{refValue}@{skillFilter}"
-            : $"{input}#{refValue}";
+        return !string.IsNullOrEmpty(skillFilter) ? $"{input}#{refValue}@{skillFilter}" : $"{input}#{refValue}";
     }
 }

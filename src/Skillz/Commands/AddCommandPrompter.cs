@@ -41,16 +41,13 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
 
         var choices = sorted.Select(s =>
         {
-            var hint = s.Description.Length > 60
-                ? s.Description[..57] + "..."
-                : s.Description;
+            var hint = s.Description.Length > 60 ? s.Description[..57] + "..." : s.Description;
             return ($"{s.InstallName} - {hint}", s);
         });
 
-        return await _interaction.MultiSelectAsync(
-            "Select skills to install",
-            choices,
-            cancellationToken).ConfigureAwait(false);
+        return await _interaction
+            .MultiSelectAsync("Select skills to install", choices, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<string>> SelectAgentsAsync(
@@ -71,7 +68,8 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             if (lastUsed is { Count: > 0 })
             {
                 defaults = lastUsed.Where(a => available.Contains(a, StringComparer.Ordinal)).ToList();
-                if (defaults.Count == 0) defaults = null;
+                if (defaults.Count == 0)
+                    defaults = null;
             }
         }
         catch
@@ -80,9 +78,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
         }
 
         // If no last-used, fall back to common defaults
-        defaults ??= available
-            .Where(a => a is "claude-code" or "opencode" or "codex")
-            .ToList();
+        defaults ??= available.Where(a => a is "claude-code" or "opencode" or "codex").ToList();
 
         var choices = available.Select(a =>
         {
@@ -90,10 +86,9 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             return ($"{config.DisplayName} ({a})", a);
         });
 
-        var selected = await _interaction.MultiSelectAsync(
-            "Which agents do you want to install to?",
-            choices,
-            cancellationToken).ConfigureAwait(false);
+        var selected = await _interaction
+            .MultiSelectAsync("Which agents do you want to install to?", choices, cancellationToken)
+            .ConfigureAwait(false);
 
         // Save selection for next time
         if (selected.Count > 0)
@@ -119,10 +114,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             ("Global (install in home directory)", true)
         };
 
-        return await _interaction.SelectAsync(
-            "Installation scope",
-            choices,
-            cancellationToken).ConfigureAwait(false);
+        return await _interaction.SelectAsync("Installation scope", choices, cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<InstallMode> SelectInstallModeAsync(CancellationToken cancellationToken = default)
@@ -133,10 +125,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             ("Copy to all agents", InstallMode.Copy)
         };
 
-        return await _interaction.SelectAsync(
-            "Installation method",
-            choices,
-            cancellationToken).ConfigureAwait(false);
+        return await _interaction.SelectAsync("Installation method", choices, cancellationToken).ConfigureAwait(false);
     }
 
     public Task<bool> ConfirmInstallationAsync(

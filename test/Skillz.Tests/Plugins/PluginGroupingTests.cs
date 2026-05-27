@@ -32,7 +32,9 @@ public class PluginGroupingTests : IDisposable
     [Fact]
     public async Task MapsSkillPathsToPluginNames()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "plugins": [
                 {
@@ -63,7 +65,9 @@ public class PluginGroupingTests : IDisposable
     [Fact]
     public async Task HandlesNestedPluginSources()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "plugins": [
                 {
@@ -84,7 +88,9 @@ public class PluginGroupingTests : IDisposable
     [Fact]
     public async Task MapsSkillsFromPluginJson()
     {
-        WriteManifest(".claude-plugin/plugin.json", """
+        WriteManifest(
+            ".claude-plugin/plugin.json",
+            """
             {
               "name": "single-plugin",
               "skills": ["./skills/one", "./skills/two"]
@@ -103,7 +109,9 @@ public class PluginGroupingTests : IDisposable
     [Fact]
     public async Task SkipsPluginsWithoutName()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "plugins": [
                 { "source": "./", "skills": ["./skills/orphan"] }
@@ -119,7 +127,9 @@ public class PluginGroupingTests : IDisposable
     [Fact]
     public async Task SkipsTraversalAttempts()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "plugins": [
                 {

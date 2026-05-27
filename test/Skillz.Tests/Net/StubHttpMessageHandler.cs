@@ -8,19 +8,24 @@ namespace Skillz.Tests.Net;
 internal sealed class StubHttpMessageHandler : HttpMessageHandler
 {
     private readonly Queue<Func<HttpRequestMessage, HttpResponseMessage>> _responses = new();
-    private readonly Dictionary<string, Func<HttpRequestMessage, HttpResponseMessage>> _routes = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Func<HttpRequestMessage, HttpResponseMessage>> _routes = new(
+        StringComparer.Ordinal);
 
     public List<HttpRequestMessage> Requests { get; } = new();
 
     public int CallCount => Requests.Count;
 
-    public void AddRoute(string url, string body, string contentType = "application/json", HttpStatusCode status = HttpStatusCode.OK)
+    public void AddRoute(
+        string url,
+        string body,
+        string contentType = "application/json",
+        HttpStatusCode status = HttpStatusCode.OK)
     {
         _routes[url] = _ =>
         {
             var response = new HttpResponseMessage(status)
             {
-                Content = new StringContent(body, Encoding.UTF8, contentType),
+                Content = new StringContent(body, Encoding.UTF8, contentType)
             };
             return response;
         };
@@ -32,10 +37,7 @@ internal sealed class StubHttpMessageHandler : HttpMessageHandler
         {
             var content = new ByteArrayContent(body);
             content.Headers.ContentType = new MediaTypeHeaderValue(contentType);
-            return new HttpResponseMessage(status)
-            {
-                Content = content,
-            };
+            return new HttpResponseMessage(status) { Content = content };
         };
     }
 
@@ -50,7 +52,7 @@ internal sealed class StubHttpMessageHandler : HttpMessageHandler
         {
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new StringContent(json, Encoding.UTF8, "application/json"),
+                Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
             return response;
         });
@@ -62,7 +64,10 @@ internal sealed class StubHttpMessageHandler : HttpMessageHandler
         {
             var response = new HttpResponseMessage(HttpStatusCode.Forbidden)
             {
-                Content = new StringContent("{\"message\":\"API rate limit exceeded\"}", Encoding.UTF8, "application/json"),
+                Content = new StringContent(
+                    "{\"message\":\"API rate limit exceeded\"}",
+                    Encoding.UTF8,
+                    "application/json")
             };
             response.Headers.TryAddWithoutValidation("x-ratelimit-remaining", "0");
             return response;
@@ -75,7 +80,7 @@ internal sealed class StubHttpMessageHandler : HttpMessageHandler
         {
             var response = new HttpResponseMessage(HttpStatusCode.Forbidden)
             {
-                Content = new StringContent("{\"message\":\"Not Found\"}", Encoding.UTF8, "application/json"),
+                Content = new StringContent("{\"message\":\"Not Found\"}", Encoding.UTF8, "application/json")
             };
             response.Headers.TryAddWithoutValidation("x-ratelimit-remaining", "59");
             return response;

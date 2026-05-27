@@ -9,8 +9,7 @@ internal sealed class SkillzRootCommand : RootCommand
         RemoveCommand remove,
         ListCommand list,
         InitCommand init,
-        UpdateCommand update)
-        : base("Skillz - AI agent skill manager")
+        UpdateCommand update) : base("Skillz - AI agent skill manager")
     {
         Subcommands.Add(add);
         Subcommands.Add(remove);

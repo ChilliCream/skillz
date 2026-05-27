@@ -32,7 +32,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task DiscoversSearchDirs_FromMarketplaceJson()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "plugins": [
                 {
@@ -53,7 +55,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RespectsMetadataPluginRoot()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "metadata": { "pluginRoot": "./plugins" },
               "plugins": [
@@ -75,7 +79,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task DiscoversSearchDirs_FromPluginJson()
     {
-        WriteManifest(".claude-plugin/plugin.json", """
+        WriteManifest(
+            ".claude-plugin/plugin.json",
+            """
             {
               "name": "single-plugin",
               "skills": ["./skills/single-skill"]
@@ -91,7 +97,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task SkipsRemoteSourceObjects()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "plugins": [
                 {
@@ -129,7 +137,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RejectsTraversalViaSource()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "plugins": [
                 { "source": "../../../etc", "skills": ["./passwd"] }
@@ -145,7 +155,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RejectsTraversalViaSkillPath()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "plugins": [
                 { "source": "./legit", "skills": ["../../../outside/skill"] }
@@ -161,7 +173,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RejectsAbsolutePathsInSkills()
     {
-        WriteManifest(".claude-plugin/plugin.json", """
+        WriteManifest(
+            ".claude-plugin/plugin.json",
+            """
             {
               "skills": ["/etc/passwd", "/tmp/malicious-skill"]
             }
@@ -177,7 +191,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RejectsSourceWithoutDotSlashPrefix()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "plugins": [
                 { "source": "bare-plugin", "skills": ["./skills/skill1"] },
@@ -198,7 +214,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RejectsPluginRootWithoutDotSlashPrefix()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "metadata": { "pluginRoot": "custom-plugins" },
               "plugins": [
@@ -215,7 +233,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RejectsSkillPathWithoutDotSlashPrefix()
     {
-        WriteManifest(".claude-plugin/plugin.json", """
+        WriteManifest(
+            ".claude-plugin/plugin.json",
+            """
             {
               "skills": ["invalid-loc/bare-skill", "./valid-loc/valid-skill"]
             }
@@ -233,7 +253,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RootLevelPlugin_WithoutSource_AddsConventionalDir()
     {
-        WriteManifest(".claude-plugin/marketplace.json", """
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
             {
               "plugins": [
                 { "name": "root-plugin", "skills": ["./skills/root-skill"] }
@@ -250,7 +272,9 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task PluginJson_WithoutSkillsField_StillAddsConventionalDir()
     {
-        WriteManifest(".claude-plugin/plugin.json", """
+        WriteManifest(
+            ".claude-plugin/plugin.json",
+            """
             {
               "name": "plugin-without-skills-field"
             }

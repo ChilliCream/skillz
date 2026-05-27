@@ -68,9 +68,15 @@ internal static class CliTestHelper
         services.AddSingleton<TestRemoveCommandPrompter>();
         services.AddSingleton<IRemoveCommandPrompter>(sp => sp.GetRequiredService<TestRemoveCommandPrompter>());
 
-        services.AddSingleton<IProvider>(sp => new GitHubProvider(sp.GetRequiredService<IGitClient>(), sp.GetRequiredService<ISkillDiscovery>()));
-        services.AddSingleton<IProvider>(sp => new GitLabProvider(sp.GetRequiredService<IGitClient>(), sp.GetRequiredService<ISkillDiscovery>()));
-        services.AddSingleton<IProvider>(sp => new GitProvider(sp.GetRequiredService<IGitClient>(), sp.GetRequiredService<ISkillDiscovery>()));
+        services.AddSingleton<IProvider>(sp => new GitHubProvider(
+            sp.GetRequiredService<IGitClient>(),
+            sp.GetRequiredService<ISkillDiscovery>()));
+        services.AddSingleton<IProvider>(sp => new GitLabProvider(
+            sp.GetRequiredService<IGitClient>(),
+            sp.GetRequiredService<ISkillDiscovery>()));
+        services.AddSingleton<IProvider>(sp => new GitProvider(
+            sp.GetRequiredService<IGitClient>(),
+            sp.GetRequiredService<ISkillDiscovery>()));
         services.AddSingleton<IProvider>(sp => new LocalProvider(sp.GetRequiredService<ISkillDiscovery>()));
         services.AddSingleton<IProviderRegistry, ProviderRegistry>();
 

@@ -27,6 +27,10 @@
     <PackageReference Include="YamlDotNet" />
     <PackageReference Include="CliWrap" />
     <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" Condition="'$(Configuration)' == 'Debug'" />
-    <PackageReference Include="Roslynator.Formatting.Analyzers" PrivateAssets="all" Condition="'$(Configuration)' == 'Debug'" />
+    <PackageReference
+      Include="Roslynator.Formatting.Analyzers"
+      PrivateAssets="all"
+      Condition="'$(Configuration)' == 'Debug'"
+    />
   </ItemGroup>
 </Project>

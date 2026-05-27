@@ -53,7 +53,9 @@ public class WellKnownProviderTests
     public async Task Fetches_Legacy_V1_Index_From_AgentSkills_Path()
     {
         var handler = new StubHttpMessageHandler();
-        handler.AddRoute("https://example.com/.well-known/agent-skills/index.json", """
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            """
             {
               "skills": [
                 {
@@ -73,7 +75,8 @@ public class WellKnownProviderTests
 
         var skills = await provider.FetchSkillsAsync(
             new ParsedSource.WellKnown("https://example.com"),
-            options: null, cancellationToken: TestContext.Current.CancellationToken);
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         var skill = Assert.Single(skills);
         Assert.Equal("legacy-skill", skill.InstallName);
@@ -89,7 +92,9 @@ public class WellKnownProviderTests
         var handler = new StubHttpMessageHandler();
         handler.AddRouteNotFound("https://code.claude.com/docs/.well-known/agent-skills/index.json");
         handler.AddRouteNotFound("https://code.claude.com/.well-known/agent-skills/index.json");
-        handler.AddRoute("https://code.claude.com/docs/.well-known/skills/index.json", """
+        handler.AddRoute(
+            "https://code.claude.com/docs/.well-known/skills/index.json",
+            """
             {
               "skills": [
                 { "name": "claude", "description": "Claude Code.", "files": ["SKILL.md"] }
@@ -105,7 +110,8 @@ public class WellKnownProviderTests
 
         var skills = await provider.FetchSkillsAsync(
             new ParsedSource.WellKnown("https://code.claude.com/docs"),
-            options: null, cancellationToken: TestContext.Current.CancellationToken);
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         var skill = Assert.Single(skills);
         Assert.Equal("claude", skill.InstallName);
@@ -116,7 +122,9 @@ public class WellKnownProviderTests
     public async Task Supports_V2_SkillMd_Entries_With_Digest_Verification()
     {
         var handler = new StubHttpMessageHandler();
-        handler.AddRoute("https://example.com/.well-known/agent-skills/index.json", $$"""
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            $$"""
             {
               "$schema": "{{SchemaV2}}",
               "skills": [
@@ -139,7 +147,8 @@ public class WellKnownProviderTests
 
         var skills = await provider.FetchSkillsAsync(
             new ParsedSource.WellKnown("https://example.com"),
-            options: null, cancellationToken: TestContext.Current.CancellationToken);
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         var skill = Assert.Single(skills);
         Assert.Equal("code-review", skill.InstallName);
@@ -152,7 +161,9 @@ public class WellKnownProviderTests
     {
         var badDigest = $"sha256:{new string('0', 64)}";
         var handler = new StubHttpMessageHandler();
-        handler.AddRoute("https://example.com/.well-known/agent-skills/index.json", $$"""
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            $$"""
             {
               "$schema": "{{SchemaV2}}",
               "skills": [
@@ -172,7 +183,8 @@ public class WellKnownProviderTests
 
         var skills = await provider.FetchSkillsAsync(
             new ParsedSource.WellKnown("https://example.com"),
-            options: null, cancellationToken: TestContext.Current.CancellationToken);
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(skills);
     }
@@ -181,7 +193,9 @@ public class WellKnownProviderTests
     public async Task Does_Not_Process_Unknown_Schemas()
     {
         var handler = new StubHttpMessageHandler();
-        handler.AddRoute("https://example.com/.well-known/agent-skills/index.json", """
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            """
             {
               "$schema": "https://schemas.agentskills.io/discovery/9.9.9/schema.json",
               "skills": []
@@ -192,7 +206,8 @@ public class WellKnownProviderTests
 
         var skills = await provider.FetchSkillsAsync(
             new ParsedSource.WellKnown("https://example.com"),
-            options: null, cancellationToken: TestContext.Current.CancellationToken);
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(skills);
     }
@@ -207,7 +222,8 @@ public class WellKnownProviderTests
 
         var skills = await provider.FetchSkillsAsync(
             new ParsedSource.WellKnown("https://example.com"),
-            options: null, cancellationToken: TestContext.Current.CancellationToken);
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(skills);
     }
@@ -216,15 +232,14 @@ public class WellKnownProviderTests
     public async Task Returns_Empty_When_Index_Json_Is_Invalid()
     {
         var handler = new StubHttpMessageHandler();
-        handler.AddRoute(
-            "https://example.com/.well-known/agent-skills/index.json",
-            "{ not valid json");
+        handler.AddRoute("https://example.com/.well-known/agent-skills/index.json", "{ not valid json");
 
         var provider = new WellKnownProvider(new FakeHttpClientFactory(handler));
 
         var skills = await provider.FetchSkillsAsync(
             new ParsedSource.WellKnown("https://example.com"),
-            options: null, cancellationToken: TestContext.Current.CancellationToken);
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(skills);
     }
@@ -233,7 +248,9 @@ public class WellKnownProviderTests
     public async Task Rejects_Legacy_Entries_With_Unsafe_File_Paths()
     {
         var handler = new StubHttpMessageHandler();
-        handler.AddRoute("https://example.com/.well-known/agent-skills/index.json", """
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            """
             {
               "skills": [
                 {
@@ -249,7 +266,8 @@ public class WellKnownProviderTests
 
         var skills = await provider.FetchSkillsAsync(
             new ParsedSource.WellKnown("https://example.com"),
-            options: null, cancellationToken: TestContext.Current.CancellationToken);
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(skills);
     }
@@ -258,7 +276,9 @@ public class WellKnownProviderTests
     public async Task Rejects_Legacy_Entries_Missing_SkillMd()
     {
         var handler = new StubHttpMessageHandler();
-        handler.AddRoute("https://example.com/.well-known/agent-skills/index.json", """
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            """
             {
               "skills": [
                 {
@@ -274,7 +294,8 @@ public class WellKnownProviderTests
 
         var skills = await provider.FetchSkillsAsync(
             new ParsedSource.WellKnown("https://example.com"),
-            options: null, cancellationToken: TestContext.Current.CancellationToken);
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Empty(skills);
     }
@@ -287,6 +308,8 @@ public class WellKnownProviderTests
         await Assert.ThrowsAsync<ArgumentException>(() =>
             provider.FetchSkillsAsync(
                 new ParsedSource.GitHub("https://github.com/foo/bar.git"),
-                options: null, cancellationToken: TestContext.Current.CancellationToken));
+                options: null,
+                cancellationToken: TestContext.Current.CancellationToken)
+        );
     }
 }

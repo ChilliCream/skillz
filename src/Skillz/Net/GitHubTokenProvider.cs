@@ -29,7 +29,8 @@ internal sealed class GitHubTokenProvider : IGitHubTokenProvider
             var result = await Cli.Wrap("gh")
                 .WithArguments(new[] { "auth", "token" })
                 .WithValidation(CommandResultValidation.ZeroExitCode)
-                .ExecuteBufferedAsync(cancellationToken).ConfigureAwait(false);
+                .ExecuteBufferedAsync(cancellationToken)
+                .ConfigureAwait(false);
 
             var token = result.StandardOutput.Trim();
             return string.IsNullOrEmpty(token) ? null : token;

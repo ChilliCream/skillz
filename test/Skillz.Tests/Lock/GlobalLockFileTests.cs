@@ -28,9 +28,7 @@ public class GlobalLockFileTests : IDisposable
                 Directory.Delete(_tempDir, recursive: true);
             }
         }
-        catch
-        {
-        }
+        catch { }
     }
 
     private static DateTime FixedNow => new(2025, 1, 15, 12, 0, 0, DateTimeKind.Utc);
@@ -58,7 +56,7 @@ public class GlobalLockFileTests : IDisposable
                 Source = "org/repo",
                 SourceType = "github",
                 SourceUrl = "https://github.com/org/repo.git",
-                SkillFolderHash = "abc",
+                SkillFolderHash = "abc"
             },
             TestContext.Current.CancellationToken);
 
@@ -80,13 +78,25 @@ public class GlobalLockFileTests : IDisposable
 
         await lockFile.AddEntryAsync(
             "my-skill",
-            new SkillLockEntry { Source = "org/repo", SourceType = "github", SourceUrl = "u", SkillFolderHash = "1" },
+            new SkillLockEntry
+            {
+                Source = "org/repo",
+                SourceType = "github",
+                SourceUrl = "u",
+                SkillFolderHash = "1"
+            },
             TestContext.Current.CancellationToken);
 
         current = secondTime;
         await lockFile.AddEntryAsync(
             "my-skill",
-            new SkillLockEntry { Source = "org/repo", SourceType = "github", SourceUrl = "u", SkillFolderHash = "2" },
+            new SkillLockEntry
+            {
+                Source = "org/repo",
+                SourceType = "github",
+                SourceUrl = "u",
+                SkillFolderHash = "2"
+            },
             TestContext.Current.CancellationToken);
 
         var entry = await lockFile.GetEntryAsync("my-skill", TestContext.Current.CancellationToken);
@@ -102,7 +112,13 @@ public class GlobalLockFileTests : IDisposable
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
         await lockFile.AddEntryAsync(
             "my-skill",
-            new SkillLockEntry { Source = "org/repo", SourceType = "github", SourceUrl = "u", SkillFolderHash = "h" },
+            new SkillLockEntry
+            {
+                Source = "org/repo",
+                SourceType = "github",
+                SourceUrl = "u",
+                SkillFolderHash = "h"
+            },
             TestContext.Current.CancellationToken);
 
         var removed = await lockFile.RemoveEntryAsync("my-skill", TestContext.Current.CancellationToken);
@@ -158,10 +174,7 @@ public class GlobalLockFileTests : IDisposable
     {
         var lockPath = _xdgPaths.GetGlobalLockPath();
         Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
-        await File.WriteAllTextAsync(
-            lockPath,
-            "{ this is not json",
-            TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(lockPath, "{ this is not json", TestContext.Current.CancellationToken);
 
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
         var result = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
@@ -188,9 +201,9 @@ public class GlobalLockFileTests : IDisposable
                     SkillPath = "skills/round-trip",
                     SkillFolderHash = "deadbeef",
                     InstalledAt = "2025-01-15T12:00:00Z",
-                    UpdatedAt = "2025-01-15T12:00:00Z",
-                },
-            },
+                    UpdatedAt = "2025-01-15T12:00:00Z"
+                }
+            }
         };
 
         await lockFile.WriteAsync(input, TestContext.Current.CancellationToken);
@@ -211,9 +224,7 @@ public class GlobalLockFileTests : IDisposable
     {
         var stateDir = Path.Combine(_tempDir, "state");
 
-        Assert.Equal(
-            Path.Combine(stateDir, "skills", ".skill-lock.json"),
-            _xdgPaths.GetGlobalLockPath());
+        Assert.Equal(Path.Combine(stateDir, "skills", ".skill-lock.json"), _xdgPaths.GetGlobalLockPath());
     }
 
     [Fact]
@@ -223,9 +234,7 @@ public class GlobalLockFileTests : IDisposable
         Directory.CreateDirectory(home);
         var paths = new XdgPaths(home, _ => null);
 
-        Assert.Equal(
-            Path.Combine(home, ".agents", ".skill-lock.json"),
-            paths.GetGlobalLockPath());
+        Assert.Equal(Path.Combine(home, ".agents", ".skill-lock.json"), paths.GetGlobalLockPath());
     }
 
     [Fact]
@@ -237,7 +246,13 @@ public class GlobalLockFileTests : IDisposable
 
         await lockFile.AddEntryAsync(
             "first-skill",
-            new SkillLockEntry { Source = "org/repo", SourceType = "github", SourceUrl = "u", SkillFolderHash = "h" },
+            new SkillLockEntry
+            {
+                Source = "org/repo",
+                SourceType = "github",
+                SourceUrl = "u",
+                SkillFolderHash = "h"
+            },
             TestContext.Current.CancellationToken);
 
         Assert.True(File.Exists(paths.GetGlobalLockPath()));

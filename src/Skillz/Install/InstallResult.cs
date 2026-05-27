@@ -15,7 +15,4 @@ internal sealed record InstallResult(
     bool Skipped = false,
     string? Error = null);
 
-internal sealed record InstallOptions(
-    bool Global = false,
-    string? Cwd = null,
-    InstallMode Mode = InstallMode.Symlink);
+internal sealed record InstallOptions(bool Global = false, string? Cwd = null, InstallMode Mode = InstallMode.Symlink);

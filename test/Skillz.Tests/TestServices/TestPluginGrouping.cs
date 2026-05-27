@@ -8,7 +8,9 @@ internal sealed class TestPluginGrouping : IPluginGrouping
 
     public Task<Dictionary<string, string>> GetPluginGroupingsAsync(string basePath)
     {
-        var result = OnGetPluginGroupings is not null ? OnGetPluginGroupings(basePath) : new Dictionary<string, string>(StringComparer.Ordinal);
+        var result = OnGetPluginGroupings is not null
+            ? OnGetPluginGroupings(basePath)
+            : new Dictionary<string, string>(StringComparer.Ordinal);
         return Task.FromResult(result);
     }
 }

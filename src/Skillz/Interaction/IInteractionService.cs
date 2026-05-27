@@ -24,13 +24,22 @@ internal interface IInteractionService
 
     Task StatusAsync(string status, Func<Task> action);
 
-    Task<string> PromptAsync(string message, string? defaultValue = null, CancellationToken cancellationToken = default);
+    Task<string> PromptAsync(
+        string message,
+        string? defaultValue = null,
+        CancellationToken cancellationToken = default);
 
     Task<bool> ConfirmAsync(string message, bool defaultValue = false, CancellationToken cancellationToken = default);
 
-    Task<T> SelectAsync<T>(string message, IEnumerable<(string Label, T Value)> choices, CancellationToken cancellationToken = default)
+    Task<T> SelectAsync<T>(
+        string message,
+        IEnumerable<(string Label, T Value)> choices,
+        CancellationToken cancellationToken = default)
         where T : notnull;
 
-    Task<IReadOnlyList<T>> MultiSelectAsync<T>(string message, IEnumerable<(string Label, T Value)> choices, CancellationToken cancellationToken = default)
+    Task<IReadOnlyList<T>> MultiSelectAsync<T>(
+        string message,
+        IEnumerable<(string Label, T Value)> choices,
+        CancellationToken cancellationToken = default)
         where T : notnull;
 }

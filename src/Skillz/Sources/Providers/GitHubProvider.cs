@@ -25,16 +25,13 @@ internal sealed class GitHubProvider : IProvider
     {
         if (source is not ParsedSource.GitHub github)
         {
-            throw new ArgumentException(
-                $"GitHubProvider cannot handle {source.GetType().Name}.",
-                nameof(source));
+            throw new ArgumentException($"GitHubProvider cannot handle {source.GetType().Name}.", nameof(source));
         }
 
         var tempDir = Path.Combine(Path.GetTempPath(), "skillz-" + Guid.NewGuid().ToString("N"));
         try
         {
-            await _gitClient.CloneAsync(github.Url, tempDir, github.Ref, cancellationToken)
-                .ConfigureAwait(false);
+            await _gitClient.CloneAsync(github.Url, tempDir, github.Ref, cancellationToken).ConfigureAwait(false);
 
             var includeInternal = !string.IsNullOrEmpty(github.SkillFilter) || (options?.IncludeInternal ?? false);
             var discoveryOpts = new SkillDiscoveryOptions(

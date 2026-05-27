@@ -11,13 +11,14 @@ internal sealed class TestInteractionService : IInteractionService
 
     public TestInteractionService()
     {
-        _console = AnsiConsole.Create(new AnsiConsoleSettings
-        {
-            Ansi = AnsiSupport.No,
-            ColorSystem = ColorSystemSupport.NoColors,
-            Interactive = InteractionSupport.No,
-            Out = new AnsiConsoleOutput(_writer)
-        });
+        _console = AnsiConsole.Create(
+            new AnsiConsoleSettings
+            {
+                Ansi = AnsiSupport.No,
+                ColorSystem = ColorSystemSupport.NoColors,
+                Interactive = InteractionSupport.No,
+                Out = new AnsiConsoleOutput(_writer)
+            });
     }
 
     public IAnsiConsole Console => _console;
@@ -88,19 +89,28 @@ internal sealed class TestInteractionService : IInteractionService
         return action();
     }
 
-    public Task<string> PromptAsync(string message, string? defaultValue = null, CancellationToken cancellationToken = default)
+    public Task<string> PromptAsync(
+        string message,
+        string? defaultValue = null,
+        CancellationToken cancellationToken = default)
     {
         var result = OnPrompt is not null ? OnPrompt(message, defaultValue) : defaultValue ?? string.Empty;
         return Task.FromResult(result);
     }
 
-    public Task<bool> ConfirmAsync(string message, bool defaultValue = false, CancellationToken cancellationToken = default)
+    public Task<bool> ConfirmAsync(
+        string message,
+        bool defaultValue = false,
+        CancellationToken cancellationToken = default)
     {
         var result = OnConfirm is not null ? OnConfirm(message, defaultValue) : defaultValue;
         return Task.FromResult(result);
     }
 
-    public Task<T> SelectAsync<T>(string message, IEnumerable<(string Label, T Value)> choices, CancellationToken cancellationToken = default)
+    public Task<T> SelectAsync<T>(
+        string message,
+        IEnumerable<(string Label, T Value)> choices,
+        CancellationToken cancellationToken = default)
         where T : notnull
     {
         var pairs = choices.ToList();
@@ -114,7 +124,10 @@ internal sealed class TestInteractionService : IInteractionService
         return Task.FromResult(pairs.First(c => c.Label == selectedLabel).Value);
     }
 
-    public Task<IReadOnlyList<T>> MultiSelectAsync<T>(string message, IEnumerable<(string Label, T Value)> choices, CancellationToken cancellationToken = default)
+    public Task<IReadOnlyList<T>> MultiSelectAsync<T>(
+        string message,
+        IEnumerable<(string Label, T Value)> choices,
+        CancellationToken cancellationToken = default)
         where T : notnull
     {
         var pairs = choices.ToList();

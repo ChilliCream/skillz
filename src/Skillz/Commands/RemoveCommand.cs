@@ -14,8 +14,7 @@ internal sealed class RemoveCommand(
     IProjectLockFile projectLock,
     IGlobalLockFile globalLock,
     IAgentEnvironmentDetector detector,
-    ConsoleEnvironment consoleEnvironment)
-    : BaseCommand("remove", "Remove installed skills")
+    ConsoleEnvironment consoleEnvironment) : BaseCommand("remove", "Remove installed skills")
 {
     private readonly Argument<string[]> _skillsArgument = new("skills")
     {
@@ -53,7 +52,9 @@ internal sealed class RemoveCommand(
         Options.Add(_allOption);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    protected override async Task<CommandResult> ExecuteAsync(
+        ParseResult parseResult,
+        CancellationToken cancellationToken)
     {
         var requestedSkills = parseResult.GetValue(_skillsArgument) ?? Array.Empty<string>();
         var global = parseResult.GetValue(_globalOption);
@@ -81,7 +82,10 @@ internal sealed class RemoveCommand(
             return new CommandResult.Success();
         }
 
-        var nonInteractive = yes || all || consoleEnvironment.IsInputRedirected
+        var nonInteractive =
+            yes
+            || all
+            || consoleEnvironment.IsInputRedirected
             || (await detector.DetectAgentAsync().ConfigureAwait(false)).IsAgent;
 
         IReadOnlyList<string> selected;
@@ -91,8 +95,9 @@ internal sealed class RemoveCommand(
         }
         else if (requestedSkills.Length > 0)
         {
-            selected = installed.Where(s => requestedSkills.Any(r =>
-                string.Equals(r, s, StringComparison.OrdinalIgnoreCase))).ToList();
+            selected = installed
+                .Where(s => requestedSkills.Any(r => string.Equals(r, s, StringComparison.OrdinalIgnoreCase)))
+                .ToList();
 
             if (selected.Count == 0)
             {
@@ -115,9 +120,7 @@ internal sealed class RemoveCommand(
             }
         }
 
-        var targetAgents = agents.Length > 0
-            ? (IReadOnlyList<string>)agents
-            : registry.ListAgentTypes();
+        var targetAgents = agents.Length > 0 ? (IReadOnlyList<string>)agents : registry.ListAgentTypes();
 
         if (!nonInteractive)
         {
@@ -132,47 +135,46 @@ internal sealed class RemoveCommand(
         var failures = new List<(string Skill, string Error)>();
         var removed = 0;
 
-        await interaction.StatusAsync("Removing skills...", async () =>
-        {
-            foreach (var skillName in selected)
-            {
-                try
+        await interaction
+            .StatusAsync("Removing skills...", async () => { foreach (var skillName in selected)
                 {
-                    var canonicalPath = installer.GetCanonicalPath(skillName, global, cwd);
-
-                    foreach (var agentType in targetAgents)
+                    try
                     {
-                        var installPath = installer.GetInstallPath(skillName, agentType, global, cwd);
-                        if (string.Equals(installPath, canonicalPath, GetPathComparison()))
+                        var canonicalPath = installer.GetCanonicalPath(skillName, global, cwd);
+
+                        foreach (var agentType in targetAgents)
                         {
-                            continue;
+                            var installPath = installer.GetInstallPath(skillName, agentType, global, cwd);
+                            if (string.Equals(installPath, canonicalPath, GetPathComparison()))
+                            {
+                                continue;
+                            }
+
+                            TryDeletePath(installPath);
                         }
 
-                        TryDeletePath(installPath);
-                    }
+                        if (!IsCanonicalStillUsed(installer, registry, skillName, global, cwd, targetAgents))
+                        {
+                            TryDeletePath(canonicalPath);
+                        }
 
-                    if (!IsCanonicalStillUsed(installer, registry, skillName, global, cwd, targetAgents))
-                    {
-                        TryDeletePath(canonicalPath);
-                    }
+                        if (global)
+                        {
+                            await globalLock.RemoveEntryAsync(skillName, cancellationToken).ConfigureAwait(false);
+                        }
+                        else
+                        {
+                            await projectLock.RemoveEntryAsync(skillName, cwd, cancellationToken).ConfigureAwait(false);
+                        }
 
-                    if (global)
-                    {
-                        await globalLock.RemoveEntryAsync(skillName, cancellationToken).ConfigureAwait(false);
+                        removed++;
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        await projectLock.RemoveEntryAsync(skillName, cwd, cancellationToken).ConfigureAwait(false);
+                        failures.Add((skillName, ex.Message));
                     }
-
-                    removed++;
-                }
-                catch (Exception ex)
-                {
-                    failures.Add((skillName, ex.Message));
-                }
-            }
-        }).ConfigureAwait(false);
+                } })
+            .ConfigureAwait(false);
 
         if (removed > 0)
         {

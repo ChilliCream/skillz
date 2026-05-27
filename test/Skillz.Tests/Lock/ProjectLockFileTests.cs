@@ -23,9 +23,7 @@ public class ProjectLockFileTests : IDisposable
                 Directory.Delete(_tempDir, recursive: true);
             }
         }
-        catch
-        {
-        }
+        catch { }
     }
 
     [Fact]
@@ -153,10 +151,25 @@ public class ProjectLockFileTests : IDisposable
             Version = 1,
             Skills = new Dictionary<string, LocalSkillLockEntry>(StringComparer.Ordinal)
             {
-                ["zebra-skill"] = new() { Source = "org/z", SourceType = "github", ComputedHash = "zzz" },
-                ["alpha-skill"] = new() { Source = "org/a", SourceType = "github", ComputedHash = "aaa" },
-                ["middle-skill"] = new() { Source = "org/m", SourceType = "github", ComputedHash = "mmm" },
-            },
+                ["zebra-skill"] = new()
+                {
+                    Source = "org/z",
+                    SourceType = "github",
+                    ComputedHash = "zzz"
+                },
+                ["alpha-skill"] = new()
+                {
+                    Source = "org/a",
+                    SourceType = "github",
+                    ComputedHash = "aaa"
+                },
+                ["middle-skill"] = new()
+                {
+                    Source = "org/m",
+                    SourceType = "github",
+                    ComputedHash = "mmm"
+                }
+            }
         };
 
         await lockFile.WriteAsync(file, _tempDir, TestContext.Current.CancellationToken);
@@ -187,9 +200,9 @@ public class ProjectLockFileTests : IDisposable
                     SourceType = "github",
                     Ref = "main",
                     SkillPath = "skills/round-trip",
-                    ComputedHash = "deadbeef",
-                },
-            },
+                    ComputedHash = "deadbeef"
+                }
+            }
         };
 
         await lockFile.WriteAsync(input, _tempDir, TestContext.Current.CancellationToken);
@@ -211,7 +224,12 @@ public class ProjectLockFileTests : IDisposable
 
         await lockFile.AddEntryAsync(
             "new-skill",
-            new LocalSkillLockEntry { Source = "org/repo", SourceType = "github", ComputedHash = "hash123" },
+            new LocalSkillLockEntry
+            {
+                Source = "org/repo",
+                SourceType = "github",
+                ComputedHash = "hash123"
+            },
             _tempDir,
             TestContext.Current.CancellationToken);
 
@@ -227,12 +245,22 @@ public class ProjectLockFileTests : IDisposable
 
         await lockFile.AddEntryAsync(
             "my-skill",
-            new LocalSkillLockEntry { Source = "org/repo", SourceType = "github", ComputedHash = "old-hash" },
+            new LocalSkillLockEntry
+            {
+                Source = "org/repo",
+                SourceType = "github",
+                ComputedHash = "old-hash"
+            },
             _tempDir,
             TestContext.Current.CancellationToken);
         await lockFile.AddEntryAsync(
             "my-skill",
-            new LocalSkillLockEntry { Source = "org/repo", SourceType = "github", ComputedHash = "new-hash" },
+            new LocalSkillLockEntry
+            {
+                Source = "org/repo",
+                SourceType = "github",
+                ComputedHash = "new-hash"
+            },
             _tempDir,
             TestContext.Current.CancellationToken);
 
@@ -247,12 +275,22 @@ public class ProjectLockFileTests : IDisposable
 
         await lockFile.AddEntryAsync(
             "skill-a",
-            new LocalSkillLockEntry { Source = "org/a", SourceType = "github", ComputedHash = "aaa" },
+            new LocalSkillLockEntry
+            {
+                Source = "org/a",
+                SourceType = "github",
+                ComputedHash = "aaa"
+            },
             _tempDir,
             TestContext.Current.CancellationToken);
         await lockFile.AddEntryAsync(
             "skill-b",
-            new LocalSkillLockEntry { Source = "org/b", SourceType = "github", ComputedHash = "bbb" },
+            new LocalSkillLockEntry
+            {
+                Source = "org/b",
+                SourceType = "github",
+                ComputedHash = "bbb"
+            },
             _tempDir,
             TestContext.Current.CancellationToken);
 
@@ -268,14 +306,16 @@ public class ProjectLockFileTests : IDisposable
         var lockFile = new ProjectLockFile();
         await lockFile.AddEntryAsync(
             "my-skill",
-            new LocalSkillLockEntry { Source = "org/repo", SourceType = "github", ComputedHash = "h" },
+            new LocalSkillLockEntry
+            {
+                Source = "org/repo",
+                SourceType = "github",
+                ComputedHash = "h"
+            },
             _tempDir,
             TestContext.Current.CancellationToken);
 
-        var removed = await lockFile.RemoveEntryAsync(
-            "my-skill",
-            _tempDir,
-            TestContext.Current.CancellationToken);
+        var removed = await lockFile.RemoveEntryAsync("my-skill", _tempDir, TestContext.Current.CancellationToken);
 
         Assert.True(removed);
         var result = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
@@ -287,10 +327,7 @@ public class ProjectLockFileTests : IDisposable
     {
         var lockFile = new ProjectLockFile();
 
-        var removed = await lockFile.RemoveEntryAsync(
-            "no-such-skill",
-            _tempDir,
-            TestContext.Current.CancellationToken);
+        var removed = await lockFile.RemoveEntryAsync("no-such-skill", _tempDir, TestContext.Current.CancellationToken);
 
         Assert.False(removed);
     }
@@ -301,18 +338,17 @@ public class ProjectLockFileTests : IDisposable
         var lockFile = new ProjectLockFile();
         await lockFile.AddEntryAsync(
             "found-skill",
-            new LocalSkillLockEntry { Source = "org/repo", SourceType = "github", ComputedHash = "h" },
+            new LocalSkillLockEntry
+            {
+                Source = "org/repo",
+                SourceType = "github",
+                ComputedHash = "h"
+            },
             _tempDir,
             TestContext.Current.CancellationToken);
 
-        var hasFound = await lockFile.HasSkillAsync(
-            "found-skill",
-            _tempDir,
-            TestContext.Current.CancellationToken);
-        var hasMissing = await lockFile.HasSkillAsync(
-            "missing-skill",
-            _tempDir,
-            TestContext.Current.CancellationToken);
+        var hasFound = await lockFile.HasSkillAsync("found-skill", _tempDir, TestContext.Current.CancellationToken);
+        var hasMissing = await lockFile.HasSkillAsync("missing-skill", _tempDir, TestContext.Current.CancellationToken);
 
         Assert.True(hasFound);
         Assert.False(hasMissing);
@@ -358,10 +394,7 @@ public class ProjectLockFileTests : IDisposable
     {
         var skillDir = Path.Combine(_tempDir, "my-skill");
         Directory.CreateDirectory(Path.Combine(skillDir, "sub"));
-        await File.WriteAllTextAsync(
-            Path.Combine(skillDir, "SKILL.md"),
-            "root",
-            TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(Path.Combine(skillDir, "SKILL.md"), "root", TestContext.Current.CancellationToken);
         var nestedFile = Path.Combine(skillDir, "sub", "helper.md");
         await File.WriteAllTextAsync(nestedFile, "nested", TestContext.Current.CancellationToken);
 
@@ -409,7 +442,12 @@ public class ProjectLockFileTests : IDisposable
         var lockFile = new ProjectLockFile();
         await lockFile.AddEntryAsync(
             "skill-a",
-            new LocalSkillLockEntry { Source = "org/a", SourceType = "github", ComputedHash = "aaa" },
+            new LocalSkillLockEntry
+            {
+                Source = "org/a",
+                SourceType = "github",
+                ComputedHash = "aaa"
+            },
             _tempDir,
             TestContext.Current.CancellationToken);
 

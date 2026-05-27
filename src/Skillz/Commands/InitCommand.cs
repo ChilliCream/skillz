@@ -17,7 +17,9 @@ internal sealed class InitCommand(IInteractionService interaction)
         Arguments.Add(_nameArgument);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    protected override async Task<CommandResult> ExecuteAsync(
+        ParseResult parseResult,
+        CancellationToken cancellationToken)
     {
         var nameArg = parseResult.GetValue(_nameArgument);
 

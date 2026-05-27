@@ -11,8 +11,6 @@ internal static class TempDirCleanup
                 Directory.Delete(dir, recursive: true);
             }
         }
-        catch
-        {
-        }
+        catch { }
     }
 }

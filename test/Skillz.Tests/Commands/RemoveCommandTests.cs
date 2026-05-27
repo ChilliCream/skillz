@@ -48,17 +48,13 @@ public class RemoveCommandTests : IDisposable
 
     private void ConfigureInstaller(TestInstaller installer)
     {
-        installer.OnGetCanonicalSkillsDir = (_, cwd) =>
-            Path.Combine(cwd ?? _workspace, ".agents", "skills");
+        installer.OnGetCanonicalSkillsDir = (_, cwd) => Path.Combine(cwd ?? _workspace, ".agents", "skills");
 
-        installer.OnGetCanonicalPath = (name, _, cwd) =>
-            Path.Combine(cwd ?? _workspace, ".agents", "skills", name);
+        installer.OnGetCanonicalPath = (name, _, cwd) => Path.Combine(cwd ?? _workspace, ".agents", "skills", name);
 
-        installer.OnGetAgentBaseDir = (_, _, cwd) =>
-            Path.Combine(cwd ?? _workspace, ".agents", "skills");
+        installer.OnGetAgentBaseDir = (_, _, cwd) => Path.Combine(cwd ?? _workspace, ".agents", "skills");
 
-        installer.OnGetInstallPath = (name, _, _, cwd) =>
-            Path.Combine(cwd ?? _workspace, ".agents", "skills", name);
+        installer.OnGetInstallPath = (name, _, _, cwd) => Path.Combine(cwd ?? _workspace, ".agents", "skills", name);
     }
 
     [Fact]
@@ -137,7 +133,8 @@ public class RemoveCommandTests : IDisposable
         CreateSkill(canonical, "beta");
 
         var services = CliTestHelper.CreateServiceProvider(configure: s =>
-            s.AddSingleton<ConsoleEnvironment>(new TestConsoleEnvironment { InputRedirected = false }));
+            s.AddSingleton<ConsoleEnvironment>(new TestConsoleEnvironment { InputRedirected = false })
+        );
 
         var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
         ConfigureInstaller(installer);

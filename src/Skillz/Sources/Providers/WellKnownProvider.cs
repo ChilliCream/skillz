@@ -39,13 +39,10 @@ internal sealed partial class WellKnownProvider : IProvider
     {
         if (source is not ParsedSource.WellKnown wellKnown)
         {
-            throw new ArgumentException(
-                $"WellKnownProvider cannot handle {source.GetType().Name}.",
-                nameof(source));
+            throw new ArgumentException($"WellKnownProvider cannot handle {source.GetType().Name}.", nameof(source));
         }
 
-        var candidates = await FetchIndexCandidatesAsync(wellKnown.Url, cancellationToken)
-            .ConfigureAwait(false);
+        var candidates = await FetchIndexCandidatesAsync(wellKnown.Url, cancellationToken).ConfigureAwait(false);
 
         foreach (var candidate in candidates)
         {
@@ -94,17 +91,11 @@ internal sealed partial class WellKnownProvider : IProvider
         var urlsToTry = new List<(string IndexUrl, string ResolvedBaseUrl, string WellKnownPath)>();
         foreach (var wellKnownPath in s_wellKnownPaths)
         {
-            urlsToTry.Add((
-                $"{origin}{basePath}/{wellKnownPath}/{IndexFile}",
-                origin + basePath,
-                wellKnownPath));
+            urlsToTry.Add(($"{origin}{basePath}/{wellKnownPath}/{IndexFile}", origin + basePath, wellKnownPath));
 
             if (!string.IsNullOrEmpty(basePath))
             {
-                urlsToTry.Add((
-                    $"{origin}/{wellKnownPath}/{IndexFile}",
-                    origin,
-                    wellKnownPath));
+                urlsToTry.Add(($"{origin}/{wellKnownPath}/{IndexFile}", origin, wellKnownPath));
             }
         }
 
@@ -177,16 +168,17 @@ internal sealed partial class WellKnownProvider : IProvider
                     continue;
                 }
 
-                entries.Add(new NormalizedEntry(
-                    Version: "0.2.0",
-                    Name: entry.Name!,
-                    Description: entry.Description!,
-                    Type: entry.Type,
-                    ArtifactUrl: artifactUri.ToString(),
-                    Digest: entry.Digest,
-                    Files: null,
-                    BaseUrl: null,
-                    WellKnownPath: null));
+                entries.Add(
+                    new NormalizedEntry(
+                        Version: "0.2.0",
+                        Name: entry.Name!,
+                        Description: entry.Description!,
+                        Type: entry.Type,
+                        ArtifactUrl: artifactUri.ToString(),
+                        Digest: entry.Digest,
+                        Files: null,
+                        BaseUrl: null,
+                        WellKnownPath: null));
             }
 
             if (entries.Count == 0)
@@ -211,16 +203,17 @@ internal sealed partial class WellKnownProvider : IProvider
                 return null;
             }
 
-            legacyEntries.Add(new NormalizedEntry(
-                Version: "0.1.0",
-                Name: entry.Name!,
-                Description: entry.Description!,
-                Type: null,
-                ArtifactUrl: null,
-                Digest: null,
-                Files: entry.Files,
-                BaseUrl: legacyBaseUrl,
-                WellKnownPath: wellKnownPath));
+            legacyEntries.Add(
+                new NormalizedEntry(
+                    Version: "0.1.0",
+                    Name: entry.Name!,
+                    Description: entry.Description!,
+                    Type: null,
+                    ArtifactUrl: null,
+                    Digest: null,
+                    Files: entry.Files,
+                    BaseUrl: legacyBaseUrl,
+                    WellKnownPath: wellKnownPath));
         }
 
         return new IndexCandidate(legacyEntries, resolvedBaseUrl, wellKnownPath);
@@ -231,15 +224,11 @@ internal sealed partial class WellKnownProvider : IProvider
         var parsed = new Uri(indexUrl);
         var marker = $"/{wellKnownPath}/{IndexFile}";
         var pathname = parsed.AbsolutePath;
-        var trimmed = pathname.EndsWith(marker, StringComparison.Ordinal)
-            ? pathname[..^marker.Length]
-            : pathname;
+        var trimmed = pathname.EndsWith(marker, StringComparison.Ordinal) ? pathname[..^marker.Length] : pathname;
         return $"{parsed.Scheme}://{parsed.Authority}{trimmed}";
     }
 
-    private async Task<RemoteSkill?> FetchSkillByEntryAsync(
-        NormalizedEntry entry,
-        CancellationToken cancellationToken)
+    private async Task<RemoteSkill?> FetchSkillByEntryAsync(NormalizedEntry entry, CancellationToken cancellationToken)
     {
         var client = _httpClientFactory.CreateClient(HttpClientName);
 
@@ -278,18 +267,18 @@ internal sealed partial class WellKnownProvider : IProvider
 
             var content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
             var fm = FrontmatterParser.Parse(content);
-            if (!fm.Data.TryGetValue("name", out var nameObj) || nameObj is not string skillName
-                || !fm.Data.TryGetValue("description", out var descObj) || descObj is not string skillDesc)
+            if (!fm.Data.TryGetValue("name", out var nameObj)
+                || nameObj is not string skillName
+                || !fm.Data.TryGetValue("description", out var descObj)
+                || descObj is not string skillDesc)
             {
                 TempDirCleanup.SafeDelete(stagingRoot);
                 return null;
             }
 
             Directory.CreateDirectory(skillDir);
-            await File.WriteAllTextAsync(
-                Path.Combine(skillDir, "SKILL.md"),
-                content,
-                cancellationToken).ConfigureAwait(false);
+            await File.WriteAllTextAsync(Path.Combine(skillDir, "SKILL.md"), content, cancellationToken)
+                .ConfigureAwait(false);
 
             if (entry.Files is not null)
             {
@@ -308,15 +297,21 @@ internal sealed partial class WellKnownProvider : IProvider
                     var fileUrl = $"{skillBaseUrl}/{relativeFile}";
                     try
                     {
-                        using var fileResponse = await client.GetAsync(fileUrl, cancellationToken).ConfigureAwait(false);
+                        using var fileResponse = await client
+                            .GetAsync(fileUrl, cancellationToken)
+                            .ConfigureAwait(false);
                         if (!fileResponse.IsSuccessStatusCode)
                         {
                             continue;
                         }
 
-                        var bytes = await fileResponse.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+                        var bytes = await fileResponse
+                            .Content.ReadAsByteArrayAsync(cancellationToken)
+                            .ConfigureAwait(false);
                         var normalizedRelative = relativeFile.Replace('\\', '/');
-                        var destination = Path.Combine(skillDir, normalizedRelative.Replace('/', Path.DirectorySeparatorChar));
+                        var destination = Path.Combine(
+                            skillDir,
+                            normalizedRelative.Replace('/', Path.DirectorySeparatorChar));
 
                         if (!PathContainment.IsContainedIn(destination, skillDir))
                         {
@@ -331,12 +326,8 @@ internal sealed partial class WellKnownProvider : IProvider
 
                         await File.WriteAllBytesAsync(destination, bytes, cancellationToken).ConfigureAwait(false);
                     }
-                    catch (HttpRequestException)
-                    {
-                    }
-                    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
-                    {
-                    }
+                    catch (HttpRequestException) { }
+                    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { }
                 }
             }
 
@@ -389,8 +380,10 @@ internal sealed partial class WellKnownProvider : IProvider
 
             var content = Encoding.UTF8.GetString(bytes);
             var fm = FrontmatterParser.Parse(content);
-            if (!fm.Data.TryGetValue("name", out var nameObj) || nameObj is not string skillName
-                || !fm.Data.TryGetValue("description", out var descObj) || descObj is not string skillDesc)
+            if (!fm.Data.TryGetValue("name", out var nameObj)
+                || nameObj is not string skillName
+                || !fm.Data.TryGetValue("description", out var descObj)
+                || descObj is not string skillDesc)
             {
                 return null;
             }
@@ -436,7 +429,9 @@ internal sealed partial class WellKnownProvider : IProvider
             return false;
         }
 
-        if (name.StartsWith('-') || name.EndsWith('-') || name.Contains("--", StringComparison.Ordinal))
+        if (name.StartsWith('-')
+            || name.EndsWith('-')
+            || name.Contains("--", StringComparison.Ordinal))
         {
             return false;
         }
@@ -451,7 +446,9 @@ internal sealed partial class WellKnownProvider : IProvider
             return false;
         }
 
-        if (filePath.StartsWith('/') || filePath.StartsWith('\\') || filePath.Contains("..", StringComparison.Ordinal))
+        if (filePath.StartsWith('/')
+            || filePath.StartsWith('\\')
+            || filePath.Contains("..", StringComparison.Ordinal))
         {
             return false;
         }

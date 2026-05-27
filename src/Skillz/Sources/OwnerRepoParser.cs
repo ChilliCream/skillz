@@ -26,7 +26,7 @@ internal static partial class OwnerRepoParser
             ParsedSource.GitLab g => g.Url,
             ParsedSource.Git g => g.Url,
             ParsedSource.WellKnown w => w.Url,
-            _ => null,
+            _ => null
         };
 
         if (url is null)

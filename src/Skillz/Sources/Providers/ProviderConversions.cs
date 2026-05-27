@@ -27,19 +27,20 @@ internal static class ProviderConversions
                 skillPath = Path.GetRelativePath(cloneRoot, skillMd).Replace('\\', '/');
             }
 
-            result.Add(new RemoteSkill(
-                Name: skill.Name,
-                Description: skill.Description,
-                Content: content,
-                InstallName: skill.Name,
-                SourceUrl: skill.Path,
-                ProviderId: providerId,
-                SourceIdentifier: sourceIdentifier,
-                SkillPath: skillPath,
-                SourcePath: skill.Path,
-                Metadata: skill.Metadata,
-                CleanupPath: cleanupPath,
-                PluginName: skill.PluginName));
+            result.Add(
+                new RemoteSkill(
+                    Name: skill.Name,
+                    Description: skill.Description,
+                    Content: content,
+                    InstallName: skill.Name,
+                    SourceUrl: skill.Path,
+                    ProviderId: providerId,
+                    SourceIdentifier: sourceIdentifier,
+                    SkillPath: skillPath,
+                    SourcePath: skill.Path,
+                    Metadata: skill.Metadata,
+                    CleanupPath: cleanupPath,
+                    PluginName: skill.PluginName));
         }
 
         return result;

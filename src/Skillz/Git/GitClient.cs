@@ -15,7 +15,7 @@ internal sealed class GitClient : IGitClient
         "filter.lfs.required=false",
         "filter.lfs.smudge=",
         "filter.lfs.clean=",
-        "filter.lfs.process=",
+        "filter.lfs.process="
     ];
 
     public async Task<string> CloneAsync(
@@ -50,17 +50,16 @@ internal sealed class GitClient : IGitClient
         {
             await Cli.Wrap("git")
                 .WithArguments(args)
-                .WithEnvironmentVariables(env => env
-                    .Set("GIT_TERMINAL_PROMPT", "0")
-                    .Set("GIT_LFS_SKIP_SMUDGE", "1"))
+                .WithEnvironmentVariables(env => env.Set("GIT_TERMINAL_PROMPT", "0").Set("GIT_LFS_SKIP_SMUDGE", "1"))
                 .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdErrBuilder))
                 .WithValidation(CommandResultValidation.ZeroExitCode)
-                .ExecuteAsync(timeoutCts.Token).ConfigureAwait(false);
+                .ExecuteAsync(timeoutCts.Token)
+                .ConfigureAwait(false);
 
             return targetDir;
         }
-        catch (OperationCanceledException) when (
-            !cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
+        catch (OperationCanceledException)
+            when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
         {
             await SafeCleanupAsync(targetDir).ConfigureAwait(false);
             var seconds = (int)Math.Round(timeoutMs / 1000.0);
@@ -89,11 +88,10 @@ internal sealed class GitClient : IGitClient
         {
             var result = await Cli.Wrap("git")
                 .WithArguments(new[] { "ls-remote", "--symref", url, "HEAD" })
-                .WithEnvironmentVariables(env => env
-                    .Set("GIT_TERMINAL_PROMPT", "0")
-                    .Set("GIT_LFS_SKIP_SMUDGE", "1"))
+                .WithEnvironmentVariables(env => env.Set("GIT_TERMINAL_PROMPT", "0").Set("GIT_LFS_SKIP_SMUDGE", "1"))
                 .WithValidation(CommandResultValidation.ZeroExitCode)
-                .ExecuteBufferedAsync(cancellationToken).ConfigureAwait(false);
+                .ExecuteBufferedAsync(cancellationToken)
+                .ConfigureAwait(false);
 
             foreach (var line in result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
@@ -158,9 +156,7 @@ internal sealed class GitClient : IGitClient
                 Directory.Delete(dir, recursive: true);
             }
         }
-        catch
-        {
-        }
+        catch { }
 
         return Task.CompletedTask;
     }

@@ -67,7 +67,9 @@ internal sealed class AddCommand(IInteractionService interaction, AddCommandExec
         Options.Add(_listOption);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    protected override async Task<CommandResult> ExecuteAsync(
+        ParseResult parseResult,
+        CancellationToken cancellationToken)
     {
         var options = ParseOptions(parseResult);
 

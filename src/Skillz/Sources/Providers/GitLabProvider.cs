@@ -25,16 +25,13 @@ internal sealed class GitLabProvider : IProvider
     {
         if (source is not ParsedSource.GitLab gitlab)
         {
-            throw new ArgumentException(
-                $"GitLabProvider cannot handle {source.GetType().Name}.",
-                nameof(source));
+            throw new ArgumentException($"GitLabProvider cannot handle {source.GetType().Name}.", nameof(source));
         }
 
         var tempDir = Path.Combine(Path.GetTempPath(), "skillz-" + Guid.NewGuid().ToString("N"));
         try
         {
-            await _gitClient.CloneAsync(gitlab.Url, tempDir, gitlab.Ref, cancellationToken)
-                .ConfigureAwait(false);
+            await _gitClient.CloneAsync(gitlab.Url, tempDir, gitlab.Ref, cancellationToken).ConfigureAwait(false);
 
             var includeInternal = options?.IncludeInternal ?? false;
             var discoveryOpts = new SkillDiscoveryOptions(

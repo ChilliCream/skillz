@@ -25,16 +25,13 @@ internal sealed class GitProvider : IProvider
     {
         if (source is not ParsedSource.Git git)
         {
-            throw new ArgumentException(
-                $"GitProvider cannot handle {source.GetType().Name}.",
-                nameof(source));
+            throw new ArgumentException($"GitProvider cannot handle {source.GetType().Name}.", nameof(source));
         }
 
         var tempDir = Path.Combine(Path.GetTempPath(), "skillz-" + Guid.NewGuid().ToString("N"));
         try
         {
-            await _gitClient.CloneAsync(git.Url, tempDir, git.Ref, cancellationToken)
-                .ConfigureAwait(false);
+            await _gitClient.CloneAsync(git.Url, tempDir, git.Ref, cancellationToken).ConfigureAwait(false);
 
             var discoveryOpts = new SkillDiscoveryOptions(
                 IncludeInternal: options?.IncludeInternal ?? false,

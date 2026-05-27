@@ -42,9 +42,7 @@ public class InstallerTests : IDisposable
     {
         var sourceDir = Path.Combine(_root, "source-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(sourceDir);
-        File.WriteAllText(
-            Path.Combine(sourceDir, "SKILL.md"),
-            $"---\nname: {name}\ndescription: test\n---\n");
+        File.WriteAllText(Path.Combine(sourceDir, "SKILL.md"), $"---\nname: {name}\ndescription: test\n---\n");
 
         if (extraFiles is not null)
         {
@@ -146,12 +144,14 @@ public class InstallerTests : IDisposable
     public async Task CopyMode_ExcludesMetadataJsonAndGitDir_PreservesDotfiles()
     {
         var skillName = "copy-dotfile-skill";
-        var sourceDir = CreateSkillSource(skillName, new Dictionary<string, string>
-        {
-            [".prettierrc"] = "{ \"singleQuote\": true }\n",
-            ["metadata.json"] = "{\"private\":true}\n",
-            [".git/config"] = "[core]\n",
-        });
+        var sourceDir = CreateSkillSource(
+            skillName,
+            new Dictionary<string, string>
+            {
+                [".prettierrc"] = "{ \"singleQuote\": true }\n",
+                ["metadata.json"] = "{\"private\":true}\n",
+                [".git/config"] = "[core]\n"
+            });
         var skill = MakeSkill(skillName, sourceDir);
 
         var result = await _installer.InstallSkillForAgentAsync(
@@ -164,7 +164,11 @@ public class InstallerTests : IDisposable
 
         var installedDir = Path.Combine(_projectDir, ".agents", "skills", skillName);
         Assert.True(File.Exists(Path.Combine(installedDir, ".prettierrc")));
-        Assert.Equal("{ \"singleQuote\": true }\n", await File.ReadAllTextAsync(Path.Combine(installedDir, ".prettierrc"), TestContext.Current.CancellationToken));
+        Assert.Equal(
+            "{ \"singleQuote\": true }\n",
+            await File.ReadAllTextAsync(
+                Path.Combine(installedDir, ".prettierrc"),
+                TestContext.Current.CancellationToken));
         Assert.False(File.Exists(Path.Combine(installedDir, "metadata.json")));
         Assert.False(Directory.Exists(Path.Combine(installedDir, ".git")));
     }
@@ -288,7 +292,9 @@ public class InstallerTests : IDisposable
         var info = new DirectoryInfo(canonicalSkillDir);
         Assert.True((info.Attributes & FileAttributes.ReparsePoint) == 0);
 
-        var contents = await File.ReadAllTextAsync(Path.Combine(canonicalSkillDir, "SKILL.md"), TestContext.Current.CancellationToken);
+        var contents = await File.ReadAllTextAsync(
+            Path.Combine(canonicalSkillDir, "SKILL.md"),
+            TestContext.Current.CancellationToken);
         Assert.Contains($"name: {skillName}", contents);
     }
 

@@ -8,7 +8,11 @@ internal interface IProjectLockFile
 
     Task WriteAsync(LocalSkillLockFile lockFile, string? cwd = null, CancellationToken cancellationToken = default);
 
-    Task AddEntryAsync(string skillName, LocalSkillLockEntry entry, string? cwd = null, CancellationToken cancellationToken = default);
+    Task AddEntryAsync(
+        string skillName,
+        LocalSkillLockEntry entry,
+        string? cwd = null,
+        CancellationToken cancellationToken = default);
 
     Task<bool> RemoveEntryAsync(string skillName, string? cwd = null, CancellationToken cancellationToken = default);
 

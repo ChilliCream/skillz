@@ -23,9 +23,7 @@ internal sealed class XdgPaths : IXdgPaths
     private readonly Func<string, string?> _envReader;
 
     public XdgPaths()
-        : this(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Environment.GetEnvironmentVariable)
-    {
-    }
+        : this(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Environment.GetEnvironmentVariable) { }
 
     public XdgPaths(string home, Func<string, string?> envReader)
     {

@@ -13,8 +13,7 @@ internal sealed class UpdateCommand(
     IGlobalLockFile globalLockFile,
     IProjectLockFile projectLockFile,
     IBlobClient blobClient,
-    ConsoleEnvironment consoleEnvironment)
-    : BaseCommand(CommandName, "Check for and apply skill updates.")
+    ConsoleEnvironment consoleEnvironment) : BaseCommand(CommandName, "Check for and apply skill updates.")
 {
     public const string CommandName = "update";
 
@@ -26,20 +25,14 @@ internal sealed class UpdateCommand(
         Arity = ArgumentArity.ZeroOrMore
     };
 
-    private readonly Option<bool> _globalOption = new("--global", "-g")
-    {
-        Description = "Update global skills only."
-    };
+    private readonly Option<bool> _globalOption = new("--global", "-g") { Description = "Update global skills only." };
 
     private readonly Option<bool> _projectOption = new("--project", "-p")
     {
         Description = "Update project skills only."
     };
 
-    private readonly Option<bool> _yesOption = new("--yes", "-y")
-    {
-        Description = "Skip interactive prompts."
-    };
+    private readonly Option<bool> _yesOption = new("--yes", "-y") { Description = "Skip interactive prompts." };
 
     protected override void Configure()
     {
@@ -54,7 +47,9 @@ internal sealed class UpdateCommand(
         Options.Add(_yesOption);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    protected override async Task<CommandResult> ExecuteAsync(
+        ParseResult parseResult,
+        CancellationToken cancellationToken)
     {
         var skills = parseResult.GetValue(_skillsArgument);
         var skillFilter = skills is { Length: > 0 } ? skills : null;
@@ -138,14 +133,19 @@ internal sealed class UpdateCommand(
     {
         if (options.Skills is { Length: > 0 })
         {
-            if (options.Global) return UpdateScope.Global;
-            if (options.Project) return UpdateScope.Project;
+            if (options.Global)
+                return UpdateScope.Global;
+            if (options.Project)
+                return UpdateScope.Project;
             return UpdateScope.Both;
         }
 
-        if (options.Global && options.Project) return UpdateScope.Both;
-        if (options.Global) return UpdateScope.Global;
-        if (options.Project) return UpdateScope.Project;
+        if (options.Global && options.Project)
+            return UpdateScope.Both;
+        if (options.Global)
+            return UpdateScope.Global;
+        if (options.Project)
+            return UpdateScope.Project;
 
         if (options.Yes || consoleEnvironment.IsInputRedirected)
         {
@@ -154,15 +154,17 @@ internal sealed class UpdateCommand(
                 : UpdateScope.Global;
         }
 
-        var choice = await interaction.SelectAsync(
-            "Update scope",
-            new[]
-            {
-                ("Project (update skills in current directory)", UpdateScope.Project),
-                ("Global (update skills in home directory)", UpdateScope.Global),
-                ("Both (update all skills)", UpdateScope.Both)
-            },
-            cancellationToken).ConfigureAwait(false);
+        var choice = await interaction
+            .SelectAsync(
+                "Update scope",
+                new[]
+                {
+                    ("Project (update skills in current directory)", UpdateScope.Project),
+                    ("Global (update skills in home directory)", UpdateScope.Global),
+                    ("Both (update all skills)", UpdateScope.Both)
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
 
         return choice;
     }
@@ -227,7 +229,8 @@ internal sealed class UpdateCommand(
 
         foreach (var (name, entry) in lockFile.Skills)
         {
-            if (!MatchesSkillFilter(name, skillFilter)) continue;
+            if (!MatchesSkillFilter(name, skillFilter))
+                continue;
 
             if (string.IsNullOrEmpty(entry.SkillFolderHash) || string.IsNullOrEmpty(entry.SkillPath))
             {
@@ -241,7 +244,8 @@ internal sealed class UpdateCommand(
         for (var i = 0; i < checkable.Count; i++)
         {
             var (skillName, entry) = checkable[i];
-            var progressText = $"Checking global skill {i + 1}/{checkable.Count}: {TerminalSanitizer.SanitizeMetadata(skillName)}";
+            var progressText =
+                $"Checking global skill {i + 1}/{checkable.Count}: {TerminalSanitizer.SanitizeMetadata(skillName)}";
             if (!consoleEnvironment.IsInputRedirected && consoleEnvironment.IsTty)
             {
                 Console.Write($"\r\x1b[K{progressText}");
@@ -251,14 +255,22 @@ internal sealed class UpdateCommand(
                 interaction.WriteDim(progressText);
             }
 
-            var latestHash = await TryFetchSkillFolderHashAsync(entry.Source, entry.SkillPath!, entry.Ref, cancellationToken).ConfigureAwait(false);
-            if (latestHash is not null && !string.Equals(latestHash, entry.SkillFolderHash, StringComparison.Ordinal))
+            var latestHash = await TryFetchSkillFolderHashAsync(
+                    entry.Source,
+                    entry.SkillPath!,
+                    entry.Ref,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (latestHash is not null
+                && !string.Equals(latestHash, entry.SkillFolderHash, StringComparison.Ordinal))
             {
                 updates.Add((skillName, entry));
             }
         }
 
-        if (!consoleEnvironment.IsInputRedirected && consoleEnvironment.IsTty && checkable.Count > 0)
+        if (!consoleEnvironment.IsInputRedirected
+            && consoleEnvironment.IsTty
+            && checkable.Count > 0)
         {
             Console.Write("\r\x1b[K");
         }
@@ -311,7 +323,8 @@ internal sealed class UpdateCommand(
         var projectSkills = new List<(string Name, LocalSkillLockEntry Entry)>();
         foreach (var (name, entry) in localLock.Skills)
         {
-            if (!MatchesSkillFilter(name, skillFilter)) continue;
+            if (!MatchesSkillFilter(name, skillFilter))
+                continue;
             if (string.Equals(entry.SourceType, "node_modules", StringComparison.Ordinal)
                 || string.Equals(entry.SourceType, "local", StringComparison.Ordinal))
             {
@@ -376,7 +389,9 @@ internal sealed class UpdateCommand(
 
         try
         {
-            var tree = await blobClient.FetchTreeAsync(owner, repo, @ref, path: null, cancellationToken).ConfigureAwait(false);
+            var tree = await blobClient
+                .FetchTreeAsync(owner, repo, @ref, path: null, cancellationToken)
+                .ConfigureAwait(false);
             if (tree is null)
             {
                 return null;
@@ -427,7 +442,8 @@ internal sealed class UpdateCommand(
 
     private static bool MatchesSkillFilter(string name, string[]? filter)
     {
-        if (filter is null || filter.Length == 0) return true;
+        if (filter is null || filter.Length == 0)
+            return true;
         foreach (var f in filter)
         {
             if (string.Equals(name, f, StringComparison.OrdinalIgnoreCase))
@@ -440,22 +456,29 @@ internal sealed class UpdateCommand(
 
     private static string GetSkipReason(SkillLockEntry entry)
     {
-        if (string.Equals(entry.SourceType, "local", StringComparison.Ordinal)) return "Local path";
-        if (string.Equals(entry.SourceType, "git", StringComparison.Ordinal)) return "Git URL";
-        if (string.Equals(entry.SourceType, "well-known", StringComparison.Ordinal)) return "Well-known skill";
-        if (string.IsNullOrEmpty(entry.SkillFolderHash)) return "Private or deleted repo";
-        if (string.IsNullOrEmpty(entry.SkillPath)) return "No skill path recorded";
+        if (string.Equals(entry.SourceType, "local", StringComparison.Ordinal))
+            return "Local path";
+        if (string.Equals(entry.SourceType, "git", StringComparison.Ordinal))
+            return "Git URL";
+        if (string.Equals(entry.SourceType, "well-known", StringComparison.Ordinal))
+            return "Well-known skill";
+        if (string.IsNullOrEmpty(entry.SkillFolderHash))
+            return "Private or deleted repo";
+        if (string.IsNullOrEmpty(entry.SkillPath))
+            return "No skill path recorded";
         return "No version tracking";
     }
 
     private void PrintSkippedSkills(IReadOnlyList<SkippedSkill> skipped)
     {
-        if (skipped.Count == 0) return;
+        if (skipped.Count == 0)
+            return;
         interaction.WriteLine();
         interaction.WriteDim($"{skipped.Count} skill(s) cannot be checked automatically:");
         foreach (var skill in skipped)
         {
-            interaction.WriteMarkupLine($"  [grey85]*[/] {Markup.Escape(skill.Name)} [dim]({Markup.Escape(skill.Reason)})[/]");
+            interaction.WriteMarkupLine(
+                $"  [grey85]*[/] {Markup.Escape(skill.Name)} [dim]({Markup.Escape(skill.Reason)})[/]");
             var manual = FormatSourceInput(GetInstallSource(skill), skill.Ref);
             interaction.WriteDim($"    To update: skillz add {manual} -g -y");
         }
@@ -463,9 +486,11 @@ internal sealed class UpdateCommand(
 
     private void PrintLegacyProjectSkills(IReadOnlyList<(string Name, LocalSkillLockEntry Entry)> legacy)
     {
-        if (legacy.Count == 0) return;
+        if (legacy.Count == 0)
+            return;
         interaction.WriteLine();
-        interaction.WriteDim($"{legacy.Count} project skill(s) cannot be updated automatically (installed before skillPath tracking):");
+        interaction.WriteDim(
+            $"{legacy.Count} project skill(s) cannot be updated automatically (installed before skillPath tracking):");
         foreach (var (name, entry) in legacy)
         {
             var reinstall = FormatSourceInput(entry.Source, entry.Ref);

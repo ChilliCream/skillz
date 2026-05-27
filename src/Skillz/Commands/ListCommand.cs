@@ -11,8 +11,7 @@ internal sealed class ListCommand(
     IInstaller installer,
     IAgentRegistry registry,
     IInteractionService interaction,
-    CliExecutionContext executionContext)
-    : BaseCommand("list", "List installed skills")
+    CliExecutionContext executionContext) : BaseCommand("list", "List installed skills")
 {
     private readonly Option<bool> _globalOption = new(CommonOptionNames.Global, "-g")
     {
@@ -43,7 +42,9 @@ internal sealed class ListCommand(
         Options.Add(_jsonOption);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    protected override async Task<CommandResult> ExecuteAsync(
+        ParseResult parseResult,
+        CancellationToken cancellationToken)
     {
         var global = parseResult.GetValue(_globalOption);
         var agents = parseResult.GetValue(_agentOption) ?? Array.Empty<string>();
@@ -72,11 +73,14 @@ internal sealed class ListCommand(
 
         if (jsonOutput)
         {
-            var payload = skills.Select(s => new InstalledSkillJson(
-                s.Name,
-                s.CanonicalPath,
-                global ? "global" : "project",
-                s.Agents.Select(a => registry.TryGetConfig(a, out var c) && c is not null ? c.DisplayName : a).ToArray())).ToArray();
+            var payload = skills
+                .Select(s => new InstalledSkillJson(
+                    s.Name,
+                    s.CanonicalPath,
+                    global ? "global" : "project",
+                    s.Agents.Select(a => registry.TryGetConfig(a, out var c) && c is not null ? c.DisplayName : a)
+                        .ToArray()))
+                .ToArray();
 
             var json = JsonSerializer.Serialize(payload, JsonSourceGenerationContext.Default.InstalledSkillJsonArray);
             Console.WriteLine(json);
@@ -99,8 +103,9 @@ internal sealed class ListCommand(
 
         foreach (var skill in skills)
         {
-            var agentNames = skill.Agents.Select(a =>
-                registry.TryGetConfig(a, out var c) && c is not null ? c.DisplayName : a).ToList();
+            var agentNames = skill
+                .Agents.Select(a => registry.TryGetConfig(a, out var c) && c is not null ? c.DisplayName : a)
+                .ToList();
             string agentDisplay;
             if (agentNames.Count == 0)
             {
@@ -115,7 +120,8 @@ internal sealed class ListCommand(
                 agentDisplay = string.Join(", ", agentNames);
             }
 
-            interaction.WriteMarkupLine($"[cyan]{Markup.Escape(skill.Name)}[/] [dim]{Markup.Escape(ShortenPath(skill.CanonicalPath))}[/]");
+            interaction.WriteMarkupLine(
+                $"[cyan]{Markup.Escape(skill.Name)}[/] [dim]{Markup.Escape(ShortenPath(skill.CanonicalPath))}[/]");
             if (agentNames.Count == 0)
             {
                 interaction.WriteMarkupLine("  Agents: [yellow]not linked[/]");

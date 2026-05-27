@@ -22,10 +22,9 @@ internal sealed class ProjectLockFile : IProjectLockFile
         try
         {
             await using var stream = File.OpenRead(lockPath);
-            var parsed = await JsonSerializer.DeserializeAsync(
-                stream,
-                JsonSourceGenerationContext.Default.LocalSkillLockFile,
-                cancellationToken).ConfigureAwait(false);
+            var parsed = await JsonSerializer
+                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken)
+                .ConfigureAwait(false);
 
             if (parsed is null || parsed.Skills is null)
             {
@@ -53,25 +52,31 @@ internal sealed class ProjectLockFile : IProjectLockFile
         }
     }
 
-    public async Task WriteAsync(LocalSkillLockFile lockFile, string? cwd = null, CancellationToken cancellationToken = default)
+    public async Task WriteAsync(
+        LocalSkillLockFile lockFile,
+        string? cwd = null,
+        CancellationToken cancellationToken = default)
     {
         var lockPath = GetLockPath(cwd);
         var sorted = SortedCopy(lockFile);
 
-        await FileLock.WithLockAsync(
-            lockPath,
-            async () =>
-            {
-                var existing = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
-                if (existing.Version > CurrentVersion)
+        await FileLock
+            .WithLockAsync(
+                lockPath,
+                async () =>
                 {
-                    Console.Error.WriteLine($"Refusing to overwrite project lock file: on-disk version v{existing.Version} is newer than this skillz (v{CurrentVersion}).");
-                    return;
-                }
+                    var existing = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
+                    if (existing.Version > CurrentVersion)
+                    {
+                        Console.Error.WriteLine(
+                            $"Refusing to overwrite project lock file: on-disk version v{existing.Version} is newer than this skillz (v{CurrentVersion}).");
+                        return;
+                    }
 
-                await WriteInternalAsync(sorted, cwd, cancellationToken).ConfigureAwait(false);
-            },
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await WriteInternalAsync(sorted, cwd, cancellationToken).ConfigureAwait(false);
+                },
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task AddEntryAsync(
@@ -81,21 +86,24 @@ internal sealed class ProjectLockFile : IProjectLockFile
         CancellationToken cancellationToken = default)
     {
         var lockPath = GetLockPath(cwd);
-        await FileLock.WithLockAsync(
-            lockPath,
-            async () =>
-            {
-                var lockFile = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
-                if (lockFile.Version > CurrentVersion)
+        await FileLock
+            .WithLockAsync(
+                lockPath,
+                async () =>
                 {
-                    Console.Error.WriteLine($"Refusing to modify project lock file: on-disk version v{lockFile.Version} is newer than this skillz (v{CurrentVersion}).");
-                    return;
-                }
+                    var lockFile = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
+                    if (lockFile.Version > CurrentVersion)
+                    {
+                        Console.Error.WriteLine(
+                            $"Refusing to modify project lock file: on-disk version v{lockFile.Version} is newer than this skillz (v{CurrentVersion}).");
+                        return;
+                    }
 
-                lockFile.Skills[skillName] = entry;
-                await WriteInternalAsync(lockFile, cwd, cancellationToken).ConfigureAwait(false);
-            },
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+                    lockFile.Skills[skillName] = entry;
+                    await WriteInternalAsync(lockFile, cwd, cancellationToken).ConfigureAwait(false);
+                },
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<bool> RemoveEntryAsync(
@@ -105,24 +113,27 @@ internal sealed class ProjectLockFile : IProjectLockFile
     {
         var lockPath = GetLockPath(cwd);
         var removed = false;
-        await FileLock.WithLockAsync(
-            lockPath,
-            async () =>
-            {
-                var lockFile = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
-                if (lockFile.Version > CurrentVersion)
+        await FileLock
+            .WithLockAsync(
+                lockPath,
+                async () =>
                 {
-                    Console.Error.WriteLine($"Refusing to modify project lock file: on-disk version v{lockFile.Version} is newer than this skillz (v{CurrentVersion}).");
-                    return;
-                }
+                    var lockFile = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
+                    if (lockFile.Version > CurrentVersion)
+                    {
+                        Console.Error.WriteLine(
+                            $"Refusing to modify project lock file: on-disk version v{lockFile.Version} is newer than this skillz (v{CurrentVersion}).");
+                        return;
+                    }
 
-                removed = lockFile.Skills.Remove(skillName);
-                if (removed)
-                {
-                    await WriteInternalAsync(lockFile, cwd, cancellationToken).ConfigureAwait(false);
-                }
-            },
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+                    removed = lockFile.Skills.Remove(skillName);
+                    if (removed)
+                    {
+                        await WriteInternalAsync(lockFile, cwd, cancellationToken).ConfigureAwait(false);
+                    }
+                },
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
 
         return removed;
     }
@@ -197,10 +208,9 @@ internal sealed class ProjectLockFile : IProjectLockFile
         try
         {
             await using var stream = File.OpenRead(lockPath);
-            var parsed = await JsonSerializer.DeserializeAsync(
-                stream,
-                JsonSourceGenerationContext.Default.LocalSkillLockFile,
-                cancellationToken).ConfigureAwait(false);
+            var parsed = await JsonSerializer
+                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken)
+                .ConfigureAwait(false);
 
             if (parsed is null || parsed.Skills is null || parsed.Version < CurrentVersion)
             {
@@ -223,20 +233,15 @@ internal sealed class ProjectLockFile : IProjectLockFile
         }
     }
 
-    private async Task WriteInternalAsync(
-        LocalSkillLockFile lockFile,
-        string? cwd,
-        CancellationToken cancellationToken)
+    private async Task WriteInternalAsync(LocalSkillLockFile lockFile, string? cwd, CancellationToken cancellationToken)
     {
         var lockPath = GetLockPath(cwd);
         var sorted = SortedCopy(lockFile);
 
         await using var stream = File.Create(lockPath);
-        await JsonSerializer.SerializeAsync(
-            stream,
-            sorted,
-            JsonSourceGenerationContext.Default.LocalSkillLockFile,
-            cancellationToken).ConfigureAwait(false);
+        await JsonSerializer
+            .SerializeAsync(stream, sorted, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken)
+            .ConfigureAwait(false);
 
         await stream.WriteAsync("\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
     }
@@ -249,11 +254,7 @@ internal sealed class ProjectLockFile : IProjectLockFile
             sorted[key] = lockFile.Skills[key];
         }
 
-        return new LocalSkillLockFile
-        {
-            Version = lockFile.Version,
-            Skills = sorted
-        };
+        return new LocalSkillLockFile { Version = lockFile.Version, Skills = sorted };
     }
 
     private static LocalSkillLockFile CreateEmpty()

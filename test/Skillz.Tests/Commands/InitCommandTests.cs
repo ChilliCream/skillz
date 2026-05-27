@@ -46,7 +46,9 @@ public class InitCommandTests : IDisposable
 
         Assert.Equal(0, exitCode);
         Assert.True(File.Exists(Path.Combine(_workspace, "SKILL.md")));
-        var content = await File.ReadAllTextAsync(Path.Combine(_workspace, "SKILL.md"), TestContext.Current.CancellationToken);
+        var content = await File.ReadAllTextAsync(
+            Path.Combine(_workspace, "SKILL.md"),
+            TestContext.Current.CancellationToken);
         Assert.Contains("name:", content);
         Assert.Contains("description:", content);
     }

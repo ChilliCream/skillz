@@ -14,11 +14,9 @@ internal interface IAddCommandPrompter
         bool global,
         CancellationToken cancellationToken = default);
 
-    Task<bool> SelectGlobalScopeAsync(
-        CancellationToken cancellationToken = default);
+    Task<bool> SelectGlobalScopeAsync(CancellationToken cancellationToken = default);
 
-    Task<InstallMode> SelectInstallModeAsync(
-        CancellationToken cancellationToken = default);
+    Task<InstallMode> SelectInstallModeAsync(CancellationToken cancellationToken = default);
 
     Task<bool> ConfirmInstallationAsync(
         IReadOnlyList<RemoteSkill> skills,

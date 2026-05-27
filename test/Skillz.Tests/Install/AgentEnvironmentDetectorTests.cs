@@ -65,10 +65,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task DetectAgent_CursorEnv_ReturnsCursor()
     {
-        var env = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["CURSOR_TRACE_ID"] = "abc123"
-        };
+        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CURSOR_TRACE_ID"] = "abc123" };
         var (detector, _) = Create(env);
         var result = await detector.DetectAgentAsync();
 
@@ -79,10 +76,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task DetectAgent_ClaudeCodeEnv_ReturnsClaude()
     {
-        var env = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["CLAUDECODE"] = "1"
-        };
+        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CLAUDECODE"] = "1" };
         var (detector, _) = Create(env);
         var result = await detector.DetectAgentAsync();
 
@@ -93,10 +87,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task DetectAgent_CachesResult()
     {
-        var env = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["CURSOR_AGENT"] = "1"
-        };
+        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CURSOR_AGENT"] = "1" };
         var (detector, _) = Create(env);
 
         var first = await detector.DetectAgentAsync();
@@ -108,10 +99,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task IsRunningInAgent_TrueWhenAgentDetected()
     {
-        var env = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["REPL_ID"] = "id"
-        };
+        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["REPL_ID"] = "id" };
         var (detector, _) = Create(env);
 
         Assert.True(await detector.IsRunningInAgentAsync());
@@ -134,10 +122,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task GetAgentName_ReturnsNameWhenInAgent()
     {
-        var env = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["OPENCODE_CLIENT"] = "1"
-        };
+        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["OPENCODE_CLIENT"] = "1" };
         var (detector, _) = Create(env);
 
         Assert.Equal("opencode", await detector.GetAgentNameAsync());
@@ -154,10 +139,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task DetectInstalledAgents_DetectsClaudeCode()
     {
-        var existing = new HashSet<string>(StringComparer.Ordinal)
-        {
-            Path.Combine(Home, ".claude")
-        };
+        var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".claude") };
         var (detector, _) = Create(existingDirs: existing);
 
         var installed = await detector.DetectInstalledAgentsAsync();
@@ -167,10 +149,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task DetectInstalledAgents_DetectsCursor()
     {
-        var existing = new HashSet<string>(StringComparer.Ordinal)
-        {
-            Path.Combine(Home, ".cursor")
-        };
+        var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".cursor") };
         var (detector, _) = Create(existingDirs: existing);
 
         var installed = await detector.DetectInstalledAgentsAsync();
@@ -180,10 +159,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task DetectInstalledAgents_OpenClaw_DetectsViaAnyLegacyDir()
     {
-        var existing = new HashSet<string>(StringComparer.Ordinal)
-        {
-            Path.Combine(Home, ".clawdbot")
-        };
+        var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".clawdbot") };
         var (detector, _) = Create(existingDirs: existing);
 
         var installed = await detector.DetectInstalledAgentsAsync();
@@ -193,10 +169,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task DetectInstalledAgents_Replit_DetectsViaCwd()
     {
-        var existing = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "/my-project/.replit"
-        };
+        var existing = new HashSet<string>(StringComparer.Ordinal) { "/my-project/.replit" };
         var (detector, _) = Create(existingDirs: existing, cwd: "/my-project");
 
         var installed = await detector.DetectInstalledAgentsAsync();
@@ -206,10 +179,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task DetectInstalledAgents_Codex_DetectsViaCodexHome()
     {
-        var existing = new HashSet<string>(StringComparer.Ordinal)
-        {
-            Path.Combine(Home, ".codex")
-        };
+        var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".codex") };
         var (detector, _) = Create(existingDirs: existing);
 
         var installed = await detector.DetectInstalledAgentsAsync();
@@ -219,10 +189,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task DetectInstalledAgents_Codex_DetectsViaEtcCodex()
     {
-        var existing = new HashSet<string>(StringComparer.Ordinal)
-        {
-            "/etc/codex"
-        };
+        var existing = new HashSet<string>(StringComparer.Ordinal) { "/etc/codex" };
         var (detector, _) = Create(existingDirs: existing);
 
         var installed = await detector.DetectInstalledAgentsAsync();
@@ -232,10 +199,7 @@ public class AgentEnvironmentDetectorTests
     [Fact]
     public async Task DetectInstalledAgents_Universal_NeverDetected()
     {
-        var existing = new HashSet<string>(StringComparer.Ordinal)
-        {
-            Path.Combine(Home, ".agents", "skills")
-        };
+        var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".agents", "skills") };
         var (detector, _) = Create(existingDirs: existing);
 
         var installed = await detector.DetectInstalledAgentsAsync();

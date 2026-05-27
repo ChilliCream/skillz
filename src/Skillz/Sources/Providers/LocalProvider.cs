@@ -22,16 +22,12 @@ internal sealed class LocalProvider : IProvider
     {
         if (source is not ParsedSource.Local local)
         {
-            throw new ArgumentException(
-                $"LocalProvider cannot handle {source.GetType().Name}.",
-                nameof(source));
+            throw new ArgumentException($"LocalProvider cannot handle {source.GetType().Name}.", nameof(source));
         }
 
         if (!Directory.Exists(local.LocalPath))
         {
-            throw new CliException(
-                ExitCodeConstants.Failure,
-                $"Local path does not exist: {local.LocalPath}");
+            throw new CliException(ExitCodeConstants.Failure, $"Local path does not exist: {local.LocalPath}");
         }
 
         var discoveryOptions = new SkillDiscoveryOptions(

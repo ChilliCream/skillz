@@ -23,10 +23,7 @@ public class XdgPathsTests
     [Fact]
     public void GetConfigHome_HonorsXdgConfigHome()
     {
-        var env = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["XDG_CONFIG_HOME"] = "/custom/config"
-        };
+        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["XDG_CONFIG_HOME"] = "/custom/config" };
         var paths = Create(env);
         Assert.Equal("/custom/config", paths.GetConfigHome());
     }
@@ -41,10 +38,7 @@ public class XdgPathsTests
     [Fact]
     public void GetDataHome_HonorsXdgDataHome()
     {
-        var env = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["XDG_DATA_HOME"] = "/custom/data"
-        };
+        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["XDG_DATA_HOME"] = "/custom/data" };
         var paths = Create(env);
         Assert.Equal("/custom/data", paths.GetDataHome());
     }
@@ -59,10 +53,7 @@ public class XdgPathsTests
     [Fact]
     public void GetStateHome_HonorsXdgStateHome()
     {
-        var env = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["XDG_STATE_HOME"] = "/custom/state"
-        };
+        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["XDG_STATE_HOME"] = "/custom/state" };
         var paths = Create(env);
         Assert.Equal("/custom/state", paths.GetStateHome());
     }
@@ -70,10 +61,7 @@ public class XdgPathsTests
     [Fact]
     public void GetGlobalLockPath_UsesXdgStateHomeWhenSet()
     {
-        var env = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["XDG_STATE_HOME"] = "/custom/state"
-        };
+        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["XDG_STATE_HOME"] = "/custom/state" };
         var paths = Create(env);
         Assert.Equal(Path.Combine("/custom/state", "skills", ".skill-lock.json"), paths.GetGlobalLockPath());
     }
@@ -210,8 +198,12 @@ public class XdgAgentPathsTests
         };
         var registry = CreateRegistry(env);
 
-        Assert.Equal(Path.Combine("/custom/xdg-config", "opencode", "skills"), registry.GetConfig("opencode").GlobalSkillsDir);
-        Assert.Equal(Path.Combine("/custom/xdg-config", "goose", "skills"), registry.GetConfig("goose").GlobalSkillsDir);
+        Assert.Equal(
+            Path.Combine("/custom/xdg-config", "opencode", "skills"),
+            registry.GetConfig("opencode").GlobalSkillsDir);
+        Assert.Equal(
+            Path.Combine("/custom/xdg-config", "goose", "skills"),
+            registry.GetConfig("goose").GlobalSkillsDir);
         Assert.Equal(Path.Combine("/custom/xdg-config", "agents", "skills"), registry.GetConfig("amp").GlobalSkillsDir);
     }
 }

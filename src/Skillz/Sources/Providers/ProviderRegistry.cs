@@ -23,8 +23,7 @@ internal sealed class ProviderRegistry : IProviderRegistry
         {
             if (!seen.Add(provider.Id))
             {
-                throw new InvalidOperationException(
-                    $"Provider with id \"{provider.Id}\" already registered.");
+                throw new InvalidOperationException($"Provider with id \"{provider.Id}\" already registered.");
             }
         }
 
@@ -45,7 +44,6 @@ internal sealed class ProviderRegistry : IProviderRegistry
             }
         }
 
-        throw new InvalidOperationException(
-            $"No provider can handle ParsedSource of type {source.GetType().Name}.");
+        throw new InvalidOperationException($"No provider can handle ParsedSource of type {source.GetType().Name}.");
     }
 }

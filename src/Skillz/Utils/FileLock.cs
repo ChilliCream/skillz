@@ -26,13 +26,15 @@ internal static class FileLock
 
             try
             {
-                await using (new FileStream(
-                    lockPath,
-                    FileMode.CreateNew,
-                    FileAccess.Write,
-                    FileShare.None,
-                    bufferSize: 1,
-                    options: FileOptions.DeleteOnClose | FileOptions.Asynchronous))
+                await using (
+                    new FileStream(
+                        lockPath,
+                        FileMode.CreateNew,
+                        FileAccess.Write,
+                        FileShare.None,
+                        bufferSize: 1,
+                        options: FileOptions.DeleteOnClose | FileOptions.Asynchronous)
+                )
                 {
                     return await action().ConfigureAwait(false);
                 }
@@ -47,18 +49,15 @@ internal static class FileLock
                 try
                 {
                     var info = new FileInfo(lockPath);
-                    if (info.Exists && (DateTime.UtcNow - info.CreationTimeUtc).TotalMilliseconds > timeoutMs)
+                    if (info.Exists
+                        && (DateTime.UtcNow - info.CreationTimeUtc).TotalMilliseconds > timeoutMs)
                     {
                         File.Delete(lockPath);
                         continue;
                     }
                 }
-                catch (IOException)
-                {
-                }
-                catch (UnauthorizedAccessException)
-                {
-                }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
 
                 await Task.Delay(DefaultRetryDelayMs, cancellationToken).ConfigureAwait(false);
             }

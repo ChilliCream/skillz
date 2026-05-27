@@ -29,7 +29,12 @@ public class BlobClientTests
         var tokenProvider = new FakeGitHubTokenProvider(() => "should-not-be-called");
         var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
 
-        var result = await client.FetchTreeAsync("vercel", "skills", "main", path: null, TestContext.Current.CancellationToken);
+        var result = await client.FetchTreeAsync(
+            "vercel",
+            "skills",
+            "main",
+            path: null,
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal("deadbeef", result.Sha);
@@ -48,7 +53,12 @@ public class BlobClientTests
         var tokenProvider = new FakeGitHubTokenProvider(() => "ghp_fake_token");
         var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
 
-        var result = await client.FetchTreeAsync("vercel", "skills", "main", path: null, TestContext.Current.CancellationToken);
+        var result = await client.FetchTreeAsync(
+            "vercel",
+            "skills",
+            "main",
+            path: null,
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal("deadbeef", result.Sha);
@@ -71,7 +81,12 @@ public class BlobClientTests
         var tokenProvider = new FakeGitHubTokenProvider(() => "should-not-be-called");
         var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
 
-        var result = await client.FetchTreeAsync("private", "repo", @ref: null, path: null, TestContext.Current.CancellationToken);
+        var result = await client.FetchTreeAsync(
+            "private",
+            "repo",
+            @ref: null,
+            path: null,
+            TestContext.Current.CancellationToken);
 
         Assert.Null(result);
         Assert.Equal(0, tokenProvider.CallCount);
@@ -86,7 +101,12 @@ public class BlobClientTests
         var tokenProvider = new FakeGitHubTokenProvider(() => null);
         var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
 
-        var result = await client.FetchTreeAsync("vercel", "skills", "main", path: null, TestContext.Current.CancellationToken);
+        var result = await client.FetchTreeAsync(
+            "vercel",
+            "skills",
+            "main",
+            path: null,
+            TestContext.Current.CancellationToken);
 
         Assert.Null(result);
         Assert.Equal(1, tokenProvider.CallCount);
@@ -99,7 +119,8 @@ public class BlobClientTests
         var handler = new StubHttpMessageHandler();
         handler.EnqueueRateLimit();
         handler.EnqueueOk(SampleTreeJson);
-        handler.EnqueueOk("""
+        handler.EnqueueOk(
+            """
             {
               "sha": "cafef00d",
               "tree": []
@@ -109,8 +130,18 @@ public class BlobClientTests
         var tokenProvider = new FakeGitHubTokenProvider(() => "ghp_fake_token");
         var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
 
-        var first = await client.FetchTreeAsync("vercel", "skills", "main", path: null, TestContext.Current.CancellationToken);
-        var second = await client.FetchTreeAsync("vercel", "agent-skills", "main", path: null, TestContext.Current.CancellationToken);
+        var first = await client.FetchTreeAsync(
+            "vercel",
+            "skills",
+            "main",
+            path: null,
+            TestContext.Current.CancellationToken);
+        var second = await client.FetchTreeAsync(
+            "vercel",
+            "agent-skills",
+            "main",
+            path: null,
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(first);
         Assert.Equal("deadbeef", first.Sha);
@@ -136,7 +167,12 @@ public class BlobClientTests
         var tokenProvider = new FakeGitHubTokenProvider(() => null);
         var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
 
-        var result = await client.FetchTreeAsync("vercel", "skills", @ref: null, path: null, TestContext.Current.CancellationToken);
+        var result = await client.FetchTreeAsync(
+            "vercel",
+            "skills",
+            @ref: null,
+            path: null,
+            TestContext.Current.CancellationToken);
 
         Assert.NotNull(result);
         Assert.Equal("main", result.Branch);
@@ -154,7 +190,12 @@ public class BlobClientTests
         var tokenProvider = new FakeGitHubTokenProvider(() => null);
         var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
 
-        var content = await client.FetchFileAsync("vercel", "skills", "skills/foo/SKILL.md", "main", TestContext.Current.CancellationToken);
+        var content = await client.FetchFileAsync(
+            "vercel",
+            "skills",
+            "skills/foo/SKILL.md",
+            "main",
+            TestContext.Current.CancellationToken);
 
         Assert.Equal("hello world", content);
         Assert.Equal(
@@ -171,7 +212,12 @@ public class BlobClientTests
         var tokenProvider = new FakeGitHubTokenProvider(() => null);
         var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
 
-        var content = await client.FetchFileAsync("vercel", "skills", "missing.md", "main", TestContext.Current.CancellationToken);
+        var content = await client.FetchFileAsync(
+            "vercel",
+            "skills",
+            "missing.md",
+            "main",
+            TestContext.Current.CancellationToken);
 
         Assert.Null(content);
     }

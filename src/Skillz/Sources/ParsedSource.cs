@@ -2,11 +2,10 @@ namespace Skillz.Sources;
 
 internal abstract record ParsedSource
 {
-    private ParsedSource()
-    {
-    }
+    private ParsedSource() { }
 
-    public sealed record GitHub(string Url, string? Ref = null, string? Subpath = null, string? SkillFilter = null) : ParsedSource;
+    public sealed record GitHub(string Url, string? Ref = null, string? Subpath = null, string? SkillFilter = null)
+        : ParsedSource;
 
     public sealed record GitLab(string Url, string? Ref = null, string? Subpath = null) : ParsedSource;
 

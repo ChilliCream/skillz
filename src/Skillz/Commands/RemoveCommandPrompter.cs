@@ -21,15 +21,12 @@ internal sealed class RemoveCommandPrompter : IRemoveCommandPrompter
         }
 
         var choices = installed.Select(s => (s, s));
-        return await _interaction.MultiSelectAsync(
-            "Select skills to remove",
-            choices,
-            cancellationToken).ConfigureAwait(false);
+        return await _interaction
+            .MultiSelectAsync("Select skills to remove", choices, cancellationToken)
+            .ConfigureAwait(false);
     }
 
-    public Task<bool> ConfirmRemovalAsync(
-        IReadOnlyList<string> skills,
-        CancellationToken cancellationToken = default)
+    public Task<bool> ConfirmRemovalAsync(IReadOnlyList<string> skills, CancellationToken cancellationToken = default)
     {
         var skillNames = string.Join(", ", skills);
         var message = $"Are you sure you want to remove {skills.Count} skill(s) [{skillNames}]?";

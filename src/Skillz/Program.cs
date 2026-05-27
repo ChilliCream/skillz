@@ -31,19 +31,13 @@ internal static class Program
         };
         Console.CancelKeyPress += cancelKeyHandler;
 
-        EventHandler unloadHandler = (_, _) =>
+        EventHandler unloadHandler = (_, _) => { if (!cts.IsCancellationRequested)
         {
-            if (!cts.IsCancellationRequested)
-            {
-                cts.Cancel();
-            }
-        };
+            cts.Cancel();
+        } };
         AppDomain.CurrentDomain.ProcessExit += unloadHandler;
 
-        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings
-        {
-            Args = args
-        });
+        var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings { Args = args });
 
         builder.Services.AddSingleton(AnsiConsole.Console);
         builder.Services.AddSingleton<ConsoleEnvironment>();

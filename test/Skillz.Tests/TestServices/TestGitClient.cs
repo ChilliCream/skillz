@@ -8,11 +8,7 @@ internal sealed class TestGitClient : IGitClient
 
     public Func<string, string?>? OnGetDefaultBranch { get; set; }
 
-    public Task<string> CloneAsync(
-        string url,
-        string targetDir,
-        string? @ref,
-        CancellationToken cancellationToken)
+    public Task<string> CloneAsync(string url, string targetDir, string? @ref, CancellationToken cancellationToken)
     {
         var result = OnClone is not null ? OnClone(url, targetDir, @ref) : @ref ?? "main";
         return Task.FromResult(result);

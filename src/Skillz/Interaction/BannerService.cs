@@ -17,15 +17,7 @@ internal sealed class BannerService(
         "╚══════╝╚═╝  ╚═╝╚═╝╚══════╝╚══════╝╚══════╝"
     };
 
-    private static readonly string[] s_grays =
-    {
-        "grey78",
-        "grey74",
-        "grey69",
-        "grey62",
-        "grey58",
-        "grey50"
-    };
+    private static readonly string[] s_grays = { "grey78", "grey74", "grey69", "grey62", "grey58", "grey50" };
 
     public async Task ShowLogoAsync()
     {
@@ -54,12 +46,16 @@ internal sealed class BannerService(
         interaction.WriteLine();
         interaction.WriteDim("The open agent skills ecosystem");
         interaction.WriteLine();
-        interaction.WriteMarkupLine("  [dim]$[/] [grey78]skillz add[/] [dim]<package>[/]        [dim]Add a new skill[/]");
-        interaction.WriteMarkupLine("  [dim]$[/] [grey78]skillz remove[/]               [dim]Remove installed skills[/]");
+        interaction.WriteMarkupLine(
+            "  [dim]$[/] [grey78]skillz add[/] [dim]<package>[/]        [dim]Add a new skill[/]");
+        interaction.WriteMarkupLine(
+            "  [dim]$[/] [grey78]skillz remove[/]               [dim]Remove installed skills[/]");
         interaction.WriteMarkupLine("  [dim]$[/] [grey78]skillz list[/]                 [dim]List installed skills[/]");
         interaction.WriteLine();
-        interaction.WriteMarkupLine("  [dim]$[/] [grey78]skillz update[/]               [dim]Update installed skills[/]");
-        interaction.WriteMarkupLine("  [dim]$[/] [grey78]skillz init[/] [dim][[name]][/]          [dim]Create a new skill[/]");
+        interaction.WriteMarkupLine(
+            "  [dim]$[/] [grey78]skillz update[/]               [dim]Update installed skills[/]");
+        interaction.WriteMarkupLine(
+            "  [dim]$[/] [grey78]skillz init[/] [dim][[name]][/]          [dim]Create a new skill[/]");
         interaction.WriteLine();
     }
 

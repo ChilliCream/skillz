@@ -42,11 +42,8 @@ public class UpdateCommandTests : IDisposable
     {
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
-        globalLock.OnRead = () => new SkillLockFile
-        {
-            Version = 3,
-            Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
-        };
+        globalLock.OnRead = () =>
+            new SkillLockFile { Version = 3, Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal) };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -54,7 +51,9 @@ public class UpdateCommandTests : IDisposable
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("No global skills tracked", StringComparison.Ordinal));
+        Assert.Contains(
+            interaction.Output,
+            line => line.Contains("No global skills tracked", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -62,35 +61,37 @@ public class UpdateCommandTests : IDisposable
     {
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
-        globalLock.OnRead = () => new SkillLockFile
-        {
-            Version = 3,
-            Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
+        globalLock.OnRead = () =>
+            new SkillLockFile
             {
-                ["my-skill"] = new SkillLockEntry
+                Version = 3,
+                Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
                 {
-                    Source = "owner/repo",
-                    SourceType = "github",
-                    SourceUrl = "https://github.com/owner/repo",
-                    SkillFolderHash = "abc123",
-                    SkillPath = "skills/my-skill/SKILL.md"
+                    ["my-skill"] = new SkillLockEntry
+                    {
+                        Source = "owner/repo",
+                        SourceType = "github",
+                        SourceUrl = "https://github.com/owner/repo",
+                        SkillFolderHash = "abc123",
+                        SkillPath = "skills/my-skill/SKILL.md"
+                    }
                 }
-            }
-        };
+            };
 
         var blob = services.GetRequiredService<TestBlobClient>();
-        blob.OnFetchTree = (_, _, _, _) => new RepoTree(
-            "tree-sha",
-            "main",
-            new List<TreeEntry>
-            {
-                new TreeEntry
+        blob.OnFetchTree = (_, _, _, _) =>
+            new RepoTree(
+                "tree-sha",
+                "main",
+                new List<TreeEntry>
                 {
-                    Path = "skills/my-skill",
-                    Type = "tree",
-                    Sha = "abc123"
-                }
-            });
+                    new TreeEntry
+                    {
+                        Path = "skills/my-skill",
+                        Type = "tree",
+                        Sha = "abc123"
+                    }
+                });
         var interaction = services.GetRequiredService<TestInteractionService>();
 
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -106,35 +107,37 @@ public class UpdateCommandTests : IDisposable
     {
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
-        globalLock.OnRead = () => new SkillLockFile
-        {
-            Version = 3,
-            Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
+        globalLock.OnRead = () =>
+            new SkillLockFile
             {
-                ["my-skill"] = new SkillLockEntry
+                Version = 3,
+                Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
                 {
-                    Source = "owner/repo",
-                    SourceType = "github",
-                    SourceUrl = "https://github.com/owner/repo",
-                    SkillFolderHash = "abc123",
-                    SkillPath = "skills/my-skill/SKILL.md"
+                    ["my-skill"] = new SkillLockEntry
+                    {
+                        Source = "owner/repo",
+                        SourceType = "github",
+                        SourceUrl = "https://github.com/owner/repo",
+                        SkillFolderHash = "abc123",
+                        SkillPath = "skills/my-skill/SKILL.md"
+                    }
                 }
-            }
-        };
+            };
 
         var blob = services.GetRequiredService<TestBlobClient>();
-        blob.OnFetchTree = (_, _, _, _) => new RepoTree(
-            "new-tree-sha",
-            "main",
-            new List<TreeEntry>
-            {
-                new TreeEntry
+        blob.OnFetchTree = (_, _, _, _) =>
+            new RepoTree(
+                "new-tree-sha",
+                "main",
+                new List<TreeEntry>
                 {
-                    Path = "skills/my-skill",
-                    Type = "tree",
-                    Sha = "xyz789"
-                }
-            });
+                    new TreeEntry
+                    {
+                        Path = "skills/my-skill",
+                        Type = "tree",
+                        Sha = "xyz789"
+                    }
+                });
         var interaction = services.GetRequiredService<TestInteractionService>();
 
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -151,21 +154,22 @@ public class UpdateCommandTests : IDisposable
     {
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
-        globalLock.OnRead = () => new SkillLockFile
-        {
-            Version = 3,
-            Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
+        globalLock.OnRead = () =>
+            new SkillLockFile
             {
-                ["legacy"] = new SkillLockEntry
+                Version = 3,
+                Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
                 {
-                    Source = "owner/repo",
-                    SourceType = "github",
-                    SourceUrl = "https://github.com/owner/repo",
-                    SkillFolderHash = string.Empty,
-                    SkillPath = "skills/legacy/SKILL.md"
+                    ["legacy"] = new SkillLockEntry
+                    {
+                        Source = "owner/repo",
+                        SourceType = "github",
+                        SourceUrl = "https://github.com/owner/repo",
+                        SkillFolderHash = string.Empty,
+                        SkillPath = "skills/legacy/SKILL.md"
+                    }
                 }
-            }
-        };
+            };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -173,7 +177,9 @@ public class UpdateCommandTests : IDisposable
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("cannot be checked automatically", StringComparison.Ordinal));
+        Assert.Contains(
+            interaction.Output,
+            line => line.Contains("cannot be checked automatically", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -265,11 +271,8 @@ public class UpdateCommandTests : IDisposable
     {
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
-        globalLock.OnRead = () => new SkillLockFile
-        {
-            Version = 3,
-            Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
-        };
+        globalLock.OnRead = () =>
+            new SkillLockFile { Version = 3, Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal) };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -285,11 +288,8 @@ public class UpdateCommandTests : IDisposable
     {
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
-        globalLock.OnRead = () => new SkillLockFile
-        {
-            Version = 3,
-            Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
-        };
+        globalLock.OnRead = () =>
+            new SkillLockFile { Version = 3, Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal) };
         var projectLock = services.GetRequiredService<TestProjectLockFile>();
         projectLock.OnRead = _ => new LocalSkillLockFile
         {

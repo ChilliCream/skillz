@@ -220,7 +220,9 @@ public class AgentRegistryTests
     public void GetOpenClawGlobalSkillsDir_DefaultsToOpenClawWhenNothingExists()
     {
         const string home = "/tmp/home";
-        Assert.Equal(Path.Combine(home, ".openclaw", "skills"), AgentRegistry.GetOpenClawGlobalSkillsDir(home, _ => false));
+        Assert.Equal(
+            Path.Combine(home, ".openclaw", "skills"),
+            AgentRegistry.GetOpenClawGlobalSkillsDir(home, _ => false));
     }
 
     [Fact]
@@ -242,10 +244,7 @@ public class AgentRegistryTests
     public void CodexConfig_UsesCodexHomeEnvWhenSet()
     {
         const string home = "/home/test";
-        var envVars = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["CODEX_HOME"] = "/custom/codex"
-        };
+        var envVars = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CODEX_HOME"] = "/custom/codex" };
 
         var registry = new AgentRegistry(home, name => envVars.GetValueOrDefault(name), _ => false);
         var config = registry.GetConfig("codex");
@@ -257,10 +256,7 @@ public class AgentRegistryTests
     public void MistralVibeConfig_UsesVibeHomeEnvWhenSet()
     {
         const string home = "/home/test";
-        var envVars = new Dictionary<string, string?>(StringComparer.Ordinal)
-        {
-            ["VIBE_HOME"] = "/custom/vibe"
-        };
+        var envVars = new Dictionary<string, string?>(StringComparer.Ordinal) { ["VIBE_HOME"] = "/custom/vibe" };
 
         var registry = new AgentRegistry(home, name => envVars.GetValueOrDefault(name), _ => false);
         var config = registry.GetConfig("mistral-vibe");

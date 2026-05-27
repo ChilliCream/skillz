@@ -105,16 +105,13 @@ public class AddCommandTests : IDisposable
 
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
-            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[]
-            {
-                CreateSkill("alpha"),
-                CreateSkill("beta")
-            },
-            configureInstaller: i => i.OnInstallRemoteSkill = (skill, agent, _) =>
-            {
-                installed.Add((skill.InstallName, agent));
-                return new InstallResult(true, $"/installed/{skill.InstallName}");
-            });
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha"), CreateSkill("beta") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, agent, _) =>
+                {
+                    installed.Add((skill.InstallName, agent));
+                    return new InstallResult(true, $"/installed/{skill.InstallName}");
+                });
 
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
@@ -132,17 +129,14 @@ public class AddCommandTests : IDisposable
 
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
-            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[]
-            {
-                CreateSkill("alpha"),
-                CreateSkill("beta"),
-                CreateSkill("gamma")
-            },
-            configureInstaller: i => i.OnInstallRemoteSkill = (skill, _, _) =>
-            {
-                installed.Add(skill.InstallName);
-                return new InstallResult(true, $"/installed/{skill.InstallName}");
-            });
+            configureDiscovery: d =>
+                d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha"), CreateSkill("beta"), CreateSkill("gamma") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) =>
+                {
+                    installed.Add(skill.InstallName);
+                    return new InstallResult(true, $"/installed/{skill.InstallName}");
+                });
 
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code", "--skill", "beta"]);
@@ -162,8 +156,8 @@ public class AddCommandTests : IDisposable
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
-            configureInstaller: i => i.OnInstallRemoteSkill = (skill, _, _) =>
-                new InstallResult(true, $"/installed/{skill.InstallName}"),
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, $"/installed/{skill.InstallName}"),
             configureProjectLock: l => l.OnAddEntry = (name, _, _) => lockEntries.Add(name));
 
         var cmd = services.GetRequiredService<AddCommand>();
@@ -182,8 +176,8 @@ public class AddCommandTests : IDisposable
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => new ParsedSource.GitHub("https://github.com/owner/repo.git"),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
-            configureInstaller: i => i.OnInstallRemoteSkill = (skill, _, _) =>
-                new InstallResult(true, $"/installed/{skill.InstallName}"),
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, $"/installed/{skill.InstallName}"),
             configureGlobalLock: l => l.OnAddEntry = (name, _) => lockEntries.Add(name));
 
         var cmd = services.GetRequiredService<AddCommand>();
@@ -201,16 +195,13 @@ public class AddCommandTests : IDisposable
 
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
-            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[]
-            {
-                CreateSkill("alpha"),
-                CreateSkill("beta")
-            },
-            configureInstaller: i => i.OnInstallRemoteSkill = (skill, _, _) =>
-            {
-                installed.Add(skill.InstallName);
-                return new InstallResult(true, $"/installed/{skill.InstallName}");
-            });
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha"), CreateSkill("beta") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) =>
+                {
+                    installed.Add(skill.InstallName);
+                    return new InstallResult(true, $"/installed/{skill.InstallName}");
+                });
 
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--list"]);
@@ -232,21 +223,18 @@ public class AddCommandTests : IDisposable
 
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
-            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[]
-            {
-                CreateSkill("alpha"),
-                CreateSkill("beta")
-            },
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha"), CreateSkill("beta") },
             configurePrompter: p =>
             {
                 p.OnSelectSkills = skills => skills.Where(s => s.InstallName == "beta").ToList();
                 p.OnConfirmInstallation = (_, _) => true;
             },
-            configureInstaller: i => i.OnInstallRemoteSkill = (skill, _, _) =>
-            {
-                installed.Add(skill.InstallName);
-                return new InstallResult(true, $"/installed/{skill.InstallName}");
-            });
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) =>
+                {
+                    installed.Add(skill.InstallName);
+                    return new InstallResult(true, $"/installed/{skill.InstallName}");
+                });
 
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--agent", "claude-code"]);

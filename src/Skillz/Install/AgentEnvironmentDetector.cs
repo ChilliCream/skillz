@@ -4,22 +4,22 @@ namespace Skillz.Install;
 
 internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
 {
-    private static readonly ImmutableDictionary<string, string> s_agentNameToType =
-        new Dictionary<string, string>(StringComparer.Ordinal)
-        {
-            ["cursor"] = "cursor",
-            ["cursor-cli"] = "cursor",
-            ["claude"] = "claude-code",
-            ["cowork"] = "claude-code",
-            ["devin"] = "universal",
-            ["replit"] = "replit",
-            ["gemini"] = "gemini-cli",
-            ["codex"] = "codex",
-            ["antigravity"] = "antigravity",
-            ["augment-cli"] = "augment",
-            ["opencode"] = "opencode",
-            ["github-copilot"] = "github-copilot"
-        }.ToImmutableDictionary(StringComparer.Ordinal);
+    private static readonly ImmutableDictionary<string, string> s_agentNameToType = new Dictionary<string, string>(
+        StringComparer.Ordinal)
+    {
+        ["cursor"] = "cursor",
+        ["cursor-cli"] = "cursor",
+        ["claude"] = "claude-code",
+        ["cowork"] = "claude-code",
+        ["devin"] = "universal",
+        ["replit"] = "replit",
+        ["gemini"] = "gemini-cli",
+        ["codex"] = "codex",
+        ["antigravity"] = "antigravity",
+        ["augment-cli"] = "augment",
+        ["opencode"] = "opencode",
+        ["github-copilot"] = "github-copilot"
+    }.ToImmutableDictionary(StringComparer.Ordinal);
 
     private readonly IAgentRegistry _registry;
     private readonly string _home;
@@ -34,9 +34,7 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             Environment.GetEnvironmentVariable,
             Directory.Exists,
-            Directory.GetCurrentDirectory)
-    {
-    }
+            Directory.GetCurrentDirectory) { }
 
     public AgentEnvironmentDetector(
         IAgentRegistry registry,
@@ -163,7 +161,7 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
             "pochi" => _directoryExists(Path.Combine(_home, ".pochi")),
             "adal" => _directoryExists(Path.Combine(_home, ".adal")),
             "universal" => false,
-            _ => false,
+            _ => false
         };
     }
 
@@ -183,15 +181,13 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
         }
 
         // 2. Cursor
-        if (!string.IsNullOrEmpty(ResolveEnv("CURSOR_TRACE_ID"))
-            || !string.IsNullOrEmpty(ResolveEnv("CURSOR_AGENT")))
+        if (!string.IsNullOrEmpty(ResolveEnv("CURSOR_TRACE_ID")) || !string.IsNullOrEmpty(ResolveEnv("CURSOR_AGENT")))
         {
             return "cursor";
         }
 
         // 3. Claude Code
-        if (!string.IsNullOrEmpty(ResolveEnv("CLAUDECODE"))
-            || !string.IsNullOrEmpty(ResolveEnv("CLAUDE_CODE")))
+        if (!string.IsNullOrEmpty(ResolveEnv("CLAUDECODE")) || !string.IsNullOrEmpty(ResolveEnv("CLAUDE_CODE")))
         {
             return "claude";
         }
@@ -211,8 +207,7 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
         }
 
         // 6. Replit (skz keeps REPLIT_DEV_DOMAIN — our extension beyond TS)
-        if (!string.IsNullOrEmpty(ResolveEnv("REPL_ID"))
-            || !string.IsNullOrEmpty(ResolveEnv("REPLIT_DEV_DOMAIN")))
+        if (!string.IsNullOrEmpty(ResolveEnv("REPL_ID")) || !string.IsNullOrEmpty(ResolveEnv("REPLIT_DEV_DOMAIN")))
         {
             return "replit";
         }

@@ -5,28 +5,29 @@ namespace Skillz.Commands;
 
 internal abstract class BaseCommand : Command
 {
-    protected BaseCommand(string name, string? description = null)
-        : base(name, description)
+    protected BaseCommand(string name, string? description = null) : base(name, description)
     {
         Configure();
 
-        SetAction(async (parseResult, cancellationToken) =>
-        {
-            var result = await ExecuteAsync(parseResult, cancellationToken).ConfigureAwait(false);
-
-            if (result is CommandResult.DisplayHelp)
+        SetAction(
+            async (parseResult, cancellationToken) =>
             {
-                new HelpAction().Invoke(parseResult);
-                return ExitCodeConstants.Success;
-            }
+                var result = await ExecuteAsync(parseResult, cancellationToken).ConfigureAwait(false);
 
-            if (result is CommandResult.Failure { Message: { } message } && !string.IsNullOrWhiteSpace(message))
-            {
-                Console.Error.WriteLine(message);
-            }
+                if (result is CommandResult.DisplayHelp)
+                {
+                    new HelpAction().Invoke(parseResult);
+                    return ExitCodeConstants.Success;
+                }
 
-            return result.ExitCode;
-        });
+                if (result is CommandResult.Failure { Message: { } message }
+                    && !string.IsNullOrWhiteSpace(message))
+                {
+                    Console.Error.WriteLine(message);
+                }
+
+                return result.ExitCode;
+            });
     }
 
     protected virtual void Configure() { }

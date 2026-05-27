@@ -6,7 +6,5 @@ internal interface IRemoveCommandPrompter
         IReadOnlyList<string> installed,
         CancellationToken cancellationToken = default);
 
-    Task<bool> ConfirmRemovalAsync(
-        IReadOnlyList<string> skills,
-        CancellationToken cancellationToken = default);
+    Task<bool> ConfirmRemovalAsync(IReadOnlyList<string> skills, CancellationToken cancellationToken = default);
 }

@@ -38,9 +38,7 @@ internal sealed class BlobClient : IBlobClient
         CancellationToken cancellationToken)
     {
         var ownerRepo = $"{owner}/{repo}";
-        var branches = string.IsNullOrEmpty(@ref)
-            ? new[] { "HEAD", "main", "master" }
-            : new[] { @ref };
+        var branches = string.IsNullOrEmpty(@ref) ? new[] { "HEAD", "main", "master" } : new[] { @ref };
 
         var rateLimitedAtStart = IsRateLimited();
 
@@ -54,7 +52,8 @@ internal sealed class BlobClient : IBlobClient
 
             foreach (var branch in branches)
             {
-                var result = await FetchTreeBranchAsync(ownerRepo, branch, token, cancellationToken).ConfigureAwait(false);
+                var result = await FetchTreeBranchAsync(ownerRepo, branch, token, cancellationToken)
+                    .ConfigureAwait(false);
                 if (result.Tree is not null)
                 {
                     return ApplySubpath(result.Tree, path);
@@ -67,7 +66,8 @@ internal sealed class BlobClient : IBlobClient
         var rateLimited = false;
         foreach (var branch in branches)
         {
-            var result = await FetchTreeBranchAsync(ownerRepo, branch, token: null, cancellationToken).ConfigureAwait(false);
+            var result = await FetchTreeBranchAsync(ownerRepo, branch, token: null, cancellationToken)
+                .ConfigureAwait(false);
             if (result.Tree is not null)
             {
                 return ApplySubpath(result.Tree, path);
@@ -94,7 +94,8 @@ internal sealed class BlobClient : IBlobClient
 
         foreach (var branch in branches)
         {
-            var result = await FetchTreeBranchAsync(ownerRepo, branch, fallbackToken, cancellationToken).ConfigureAwait(false);
+            var result = await FetchTreeBranchAsync(ownerRepo, branch, fallbackToken, cancellationToken)
+                .ConfigureAwait(false);
             if (result.Tree is not null)
             {
                 return ApplySubpath(result.Tree, path);
@@ -166,11 +167,12 @@ internal sealed class BlobClient : IBlobClient
             using var response = await client.SendAsync(request, timeoutCts.Token).ConfigureAwait(false);
             if (response.IsSuccessStatusCode)
             {
-                await using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token).ConfigureAwait(false);
-                var data = await JsonSerializer.DeserializeAsync(
-                    stream,
-                    JsonSourceGenerationContext.Default.GitHubTreeResponse,
-                    timeoutCts.Token).ConfigureAwait(false);
+                await using var stream = await response
+                    .Content.ReadAsStreamAsync(timeoutCts.Token)
+                    .ConfigureAwait(false);
+                var data = await JsonSerializer
+                    .DeserializeAsync(stream, JsonSourceGenerationContext.Default.GitHubTreeResponse, timeoutCts.Token)
+                    .ConfigureAwait(false);
 
                 if (data is null)
                 {
@@ -181,8 +183,7 @@ internal sealed class BlobClient : IBlobClient
                 return new BranchFetchResult(tree, RateLimited: false);
             }
 
-            var rateLimited = response.StatusCode == HttpStatusCode.Forbidden
-                && GetRemaining(response) == "0";
+            var rateLimited = response.StatusCode == HttpStatusCode.Forbidden && GetRemaining(response) == "0";
             return new BranchFetchResult(null, rateLimited);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -220,8 +221,8 @@ internal sealed class BlobClient : IBlobClient
         }
 
         var prefix = path.EndsWith('/') ? path : path + "/";
-        var filtered = tree.Tree
-            .Where(e => e.Path.StartsWith(prefix, StringComparison.Ordinal) || e.Path == path)
+        var filtered = tree
+            .Tree.Where(e => e.Path.StartsWith(prefix, StringComparison.Ordinal) || e.Path == path)
             .ToList();
 
         return new RepoTree(tree.Sha, tree.Branch, filtered);

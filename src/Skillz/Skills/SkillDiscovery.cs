@@ -44,7 +44,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
         ".roo/skills",
         ".trae/skills",
         ".windsurf/skills",
-        ".zencoder/skills",
+        ".zencoder/skills"
     ];
 
     private readonly IPluginManifest _pluginManifest;
@@ -71,9 +71,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
                 $"""Invalid subpath: "{subpath}" resolves outside the repository directory. Subpath must not contain ".." segments that escape the base path.""");
         }
 
-        var searchPath = subpath is null
-            ? basePath
-            : Path.Combine(basePath, subpath);
+        var searchPath = subpath is null ? basePath : Path.Combine(basePath, subpath);
 
         var groupings = await _pluginGrouping.GetPluginGroupingsAsync(searchPath).ConfigureAwait(false);
 
@@ -83,9 +81,10 @@ internal sealed class SkillDiscovery : ISkillDiscovery
         if (HasSkillMd(searchPath))
         {
             var rootSkill = await ParseSkillMdAsync(
-                Path.Combine(searchPath, KnownConfigNames.SkillFileName),
-                options,
-                cancellationToken).ConfigureAwait(false);
+                    Path.Combine(searchPath, KnownConfigNames.SkillFileName),
+                    options,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
             if (rootSkill is not null)
             {
@@ -131,9 +130,10 @@ internal sealed class SkillDiscovery : ISkillDiscovery
                 }
 
                 var skill = await ParseSkillMdAsync(
-                    Path.Combine(skillDir, KnownConfigNames.SkillFileName),
-                    options,
-                    cancellationToken).ConfigureAwait(false);
+                        Path.Combine(skillDir, KnownConfigNames.SkillFileName),
+                        options,
+                        cancellationToken)
+                    .ConfigureAwait(false);
 
                 if (skill is null)
                 {
@@ -159,9 +159,10 @@ internal sealed class SkillDiscovery : ISkillDiscovery
             foreach (var skillDir in allSkillDirs)
             {
                 var skill = await ParseSkillMdAsync(
-                    Path.Combine(skillDir, KnownConfigNames.SkillFileName),
-                    options,
-                    cancellationToken).ConfigureAwait(false);
+                        Path.Combine(skillDir, KnownConfigNames.SkillFileName),
+                        options,
+                        cancellationToken)
+                    .ConfigureAwait(false);
 
                 if (skill is null)
                 {
@@ -300,7 +301,8 @@ internal sealed class SkillDiscovery : ISkillDiscovery
             }
         }
 
-        var isInternal = metadata is not null
+        var isInternal =
+            metadata is not null
             && metadata.TryGetValue("internal", out var internalFlag)
             && internalFlag is string s
             && (string.Equals(s, "true", StringComparison.OrdinalIgnoreCase));

@@ -72,21 +72,10 @@ public class SmokeTests
 
     private static async Task<BufferedCommandResult> RunSkillzAsync(string arguments, string? workingDirectory = null)
     {
-        var args = new[]
-        {
-            "run",
-            "--project",
-            ProjectPath,
-            "--framework",
-            "net9.0",
-            "--no-build",
-            "--"
-        }
-        .Concat(SplitArguments(arguments));
+        var args = new[] { "run", "--project", ProjectPath, "--framework", "net9.0", "--no-build", "--" }.Concat(
+            SplitArguments(arguments));
 
-        var command = Cli.Wrap("dotnet")
-            .WithArguments(args)
-            .WithValidation(CommandResultValidation.None);
+        var command = Cli.Wrap("dotnet").WithArguments(args).WithValidation(CommandResultValidation.None);
 
         if (workingDirectory is not null)
         {
@@ -117,14 +106,13 @@ public class SmokeTests
                 Directory.Delete(path, recursive: true);
             }
         }
-        catch
-        {
-        }
+        catch { }
     }
 
     private static string ResolveProjectPath([CallerFilePath] string? sourceFilePath = null)
     {
-        var dir = Path.GetDirectoryName(sourceFilePath)
+        var dir =
+            Path.GetDirectoryName(sourceFilePath)
             ?? throw new InvalidOperationException("Unable to resolve smoke test source directory.");
         return Path.GetFullPath(Path.Combine(dir, "..", "..", "src", "Skillz", "Skillz.csproj"));
     }

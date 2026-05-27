@@ -53,8 +53,7 @@ public class ListCommandTests : IDisposable
 
     private void ConfigureInstaller(TestInstaller installer)
     {
-        installer.OnGetCanonicalSkillsDir = (global, cwd) =>
-            Path.Combine(cwd ?? _workspace, ".agents", "skills");
+        installer.OnGetCanonicalSkillsDir = (global, cwd) => Path.Combine(cwd ?? _workspace, ".agents", "skills");
 
         installer.OnGetAgentBaseDir = (agentType, global, cwd) =>
         {

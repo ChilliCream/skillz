@@ -5,10 +5,7 @@ namespace Skillz.Install;
 
 internal sealed class Installer : IInstaller
 {
-    private static readonly HashSet<string> s_excludeFiles = new(StringComparer.Ordinal)
-    {
-        "metadata.json"
-    };
+    private static readonly HashSet<string> s_excludeFiles = new(StringComparer.Ordinal) { "metadata.json" };
 
     private static readonly HashSet<string> s_excludeDirs = new(StringComparer.Ordinal)
     {
@@ -22,9 +19,7 @@ internal sealed class Installer : IInstaller
     private readonly string _home;
 
     public Installer(IAgentRegistry registry)
-        : this(registry, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
-    {
-    }
+        : this(registry, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)) { }
 
     public Installer(IAgentRegistry registry, string home)
     {
@@ -120,12 +115,20 @@ internal sealed class Installer : IInstaller
 
         if (!PathContainment.IsContainedIn(canonicalDir, canonicalBase))
         {
-            return new InstallResult(false, agentDir, Mode: installMode, Error: "Invalid skill name: potential path traversal detected");
+            return new InstallResult(
+                false,
+                agentDir,
+                Mode: installMode,
+                Error: "Invalid skill name: potential path traversal detected");
         }
 
         if (!PathContainment.IsContainedIn(agentDir, agentBase))
         {
-            return new InstallResult(false, agentDir, Mode: installMode, Error: "Invalid skill name: potential path traversal detected");
+            return new InstallResult(
+                false,
+                agentDir,
+                Mode: installMode,
+                Error: "Invalid skill name: potential path traversal detected");
         }
 
         try
@@ -204,12 +207,20 @@ internal sealed class Installer : IInstaller
 
         if (!PathContainment.IsContainedIn(canonicalDir, canonicalBase))
         {
-            return new InstallResult(false, agentDir, Mode: installMode, Error: "Invalid skill name: potential path traversal detected");
+            return new InstallResult(
+                false,
+                agentDir,
+                Mode: installMode,
+                Error: "Invalid skill name: potential path traversal detected");
         }
 
         if (!PathContainment.IsContainedIn(agentDir, agentBase))
         {
-            return new InstallResult(false, agentDir, Mode: installMode, Error: "Invalid skill name: potential path traversal detected");
+            return new InstallResult(
+                false,
+                agentDir,
+                Mode: installMode,
+                Error: "Invalid skill name: potential path traversal detected");
         }
 
         try
@@ -268,7 +279,8 @@ internal sealed class Installer : IInstaller
                 else
                 {
                     var fallbackSkillMd = Path.Combine(agentDir, KnownConfigNames.SkillFileName);
-                    await File.WriteAllTextAsync(fallbackSkillMd, skill.Content, cancellationToken).ConfigureAwait(false);
+                    await File.WriteAllTextAsync(fallbackSkillMd, skill.Content, cancellationToken)
+                        .ConfigureAwait(false);
                 }
 
                 return new InstallResult(true, agentDir, canonicalDir, InstallMode.Symlink, SymlinkFailed: true);
@@ -353,7 +365,8 @@ internal sealed class Installer : IInstaller
 
                             if (resolved is DirectoryInfo dir)
                             {
-                                await CopyDirectoryAsync(dir.FullName, destPath, cancellationToken).ConfigureAwait(false);
+                                await CopyDirectoryAsync(dir.FullName, destPath, cancellationToken)
+                                    .ConfigureAwait(false);
                                 continue;
                             }
                         }
@@ -422,7 +435,9 @@ internal sealed class Installer : IInstaller
             try
             {
                 var info = new FileInfo(linkPath);
-                if (info.Exists || Directory.Exists(linkPath) || (info.Attributes & FileAttributes.ReparsePoint) != 0)
+                if (info.Exists
+                    || Directory.Exists(linkPath)
+                    || (info.Attributes & FileAttributes.ReparsePoint) != 0)
                 {
                     if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
                     {
@@ -563,9 +578,7 @@ internal sealed class Installer : IInstaller
 
     private static bool PathEquals(string a, string b)
     {
-        var comparison = OperatingSystem.IsLinux()
-            ? StringComparison.Ordinal
-            : StringComparison.OrdinalIgnoreCase;
+        var comparison = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
         return string.Equals(a, b, comparison);
     }
 

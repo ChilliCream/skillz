@@ -16,9 +16,7 @@ internal sealed class TestRemoveCommandPrompter : IRemoveCommandPrompter
         return Task.FromResult(result);
     }
 
-    public Task<bool> ConfirmRemovalAsync(
-        IReadOnlyList<string> skills,
-        CancellationToken cancellationToken = default)
+    public Task<bool> ConfirmRemovalAsync(IReadOnlyList<string> skills, CancellationToken cancellationToken = default)
     {
         var result = OnConfirmRemoval is null || OnConfirmRemoval(skills);
         return Task.FromResult(result);

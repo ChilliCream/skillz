@@ -11,10 +11,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
     private readonly IXdgPaths _xdgPaths;
     private readonly Func<DateTime> _utcNow;
 
-    public GlobalLockFile(IXdgPaths xdgPaths)
-        : this(xdgPaths, () => DateTime.UtcNow)
-    {
-    }
+    public GlobalLockFile(IXdgPaths xdgPaths) : this(xdgPaths, () => DateTime.UtcNow) { }
 
     public GlobalLockFile(IXdgPaths xdgPaths, Func<DateTime> utcNow)
     {
@@ -29,10 +26,9 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         try
         {
             await using var stream = File.OpenRead(lockPath);
-            var parsed = await JsonSerializer.DeserializeAsync(
-                stream,
-                JsonSourceGenerationContext.Default.SkillLockFile,
-                cancellationToken).ConfigureAwait(false);
+            var parsed = await JsonSerializer
+                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken)
+                .ConfigureAwait(false);
 
             if (parsed is null || parsed.Skills is null)
             {
@@ -46,7 +42,8 @@ internal sealed class GlobalLockFile : IGlobalLockFile
 
             if (parsed.Version > CurrentVersion)
             {
-                Console.Error.WriteLine($"Warning: Lock file was written by a newer version of skillz (v{parsed.Version}, this is v{CurrentVersion}). Data will be preserved but some fields may be ignored.");
+                Console.Error.WriteLine(
+                    $"Warning: Lock file was written by a newer version of skillz (v{parsed.Version}, this is v{CurrentVersion}). Data will be preserved but some fields may be ignored.");
                 return parsed;
             }
 
@@ -75,23 +72,29 @@ internal sealed class GlobalLockFile : IGlobalLockFile
             Directory.CreateDirectory(directory);
         }
 
-        await FileLock.WithLockAsync(
-            lockPath,
-            async () =>
-            {
-                var existing = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
-                if (existing.Version > CurrentVersion)
+        await FileLock
+            .WithLockAsync(
+                lockPath,
+                async () =>
                 {
-                    Console.Error.WriteLine($"Refusing to overwrite global lock file: on-disk version v{existing.Version} is newer than this skillz (v{CurrentVersion}).");
-                    return;
-                }
+                    var existing = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
+                    if (existing.Version > CurrentVersion)
+                    {
+                        Console.Error.WriteLine(
+                            $"Refusing to overwrite global lock file: on-disk version v{existing.Version} is newer than this skillz (v{CurrentVersion}).");
+                        return;
+                    }
 
-                await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
-            },
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
+                },
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
     }
 
-    public async Task AddEntryAsync(string skillName, SkillLockEntry entry, CancellationToken cancellationToken = default)
+    public async Task AddEntryAsync(
+        string skillName,
+        SkillLockEntry entry,
+        CancellationToken cancellationToken = default)
     {
         var lockPath = _xdgPaths.GetGlobalLockPath();
         var directory = Path.GetDirectoryName(lockPath);
@@ -100,29 +103,31 @@ internal sealed class GlobalLockFile : IGlobalLockFile
             Directory.CreateDirectory(directory);
         }
 
-        await FileLock.WithLockAsync(
-            lockPath,
-            async () =>
-            {
-                var lockFile = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
-                if (lockFile.Version > CurrentVersion)
+        await FileLock
+            .WithLockAsync(
+                lockPath,
+                async () =>
                 {
-                    return;
-                }
+                    var lockFile = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
+                    if (lockFile.Version > CurrentVersion)
+                    {
+                        return;
+                    }
 
-                var now = _utcNow().ToString("o");
+                    var now = _utcNow().ToString("o");
 
-                var installedAt = lockFile.Skills.TryGetValue(skillName, out var existing)
-                    ? existing.InstalledAt
-                    : now;
+                    var installedAt = lockFile.Skills.TryGetValue(skillName, out var existing)
+                        ? existing.InstalledAt
+                        : now;
 
-                entry.InstalledAt = installedAt;
-                entry.UpdatedAt = now;
-                lockFile.Skills[skillName] = entry;
+                    entry.InstalledAt = installedAt;
+                    entry.UpdatedAt = now;
+                    lockFile.Skills[skillName] = entry;
 
-                await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
-            },
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+                    await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
+                },
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public async Task<bool> RemoveEntryAsync(string skillName, CancellationToken cancellationToken = default)
@@ -135,24 +140,26 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         }
 
         var removed = false;
-        await FileLock.WithLockAsync(
-            lockPath,
-            async () =>
-            {
-                var lockFile = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
-                if (lockFile.Version > CurrentVersion)
+        await FileLock
+            .WithLockAsync(
+                lockPath,
+                async () =>
                 {
-                    removed = false;
-                    return;
-                }
+                    var lockFile = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
+                    if (lockFile.Version > CurrentVersion)
+                    {
+                        removed = false;
+                        return;
+                    }
 
-                removed = lockFile.Skills.Remove(skillName);
-                if (removed)
-                {
-                    await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
-                }
-            },
-            cancellationToken: cancellationToken).ConfigureAwait(false);
+                    removed = lockFile.Skills.Remove(skillName);
+                    if (removed)
+                    {
+                        await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
+                    }
+                },
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
 
         return removed;
     }
@@ -180,7 +187,9 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         }
     }
 
-    public async Task SaveLastSelectedAgentsAsync(IReadOnlyList<string> agents, CancellationToken cancellationToken = default)
+    public async Task SaveLastSelectedAgentsAsync(
+        IReadOnlyList<string> agents,
+        CancellationToken cancellationToken = default)
     {
         var lockPath = _xdgPaths.GetGlobalLockPath();
         var directory = Path.GetDirectoryName(lockPath);
@@ -191,20 +200,22 @@ internal sealed class GlobalLockFile : IGlobalLockFile
 
         try
         {
-            await FileLock.WithLockAsync(
-                lockPath,
-                async () =>
-                {
-                    var lockFile = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
-                    if (lockFile.Version > CurrentVersion)
+            await FileLock
+                .WithLockAsync(
+                    lockPath,
+                    async () =>
                     {
-                        return;
-                    }
+                        var lockFile = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
+                        if (lockFile.Version > CurrentVersion)
+                        {
+                            return;
+                        }
 
-                    lockFile.LastSelectedAgents = agents.ToList();
-                    await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
-                },
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                        lockFile.LastSelectedAgents = agents.ToList();
+                        await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
+                    },
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false);
         }
         catch
         {
@@ -219,10 +230,9 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         try
         {
             await using var stream = File.OpenRead(lockPath);
-            var parsed = await JsonSerializer.DeserializeAsync(
-                stream,
-                JsonSourceGenerationContext.Default.SkillLockFile,
-                cancellationToken).ConfigureAwait(false);
+            var parsed = await JsonSerializer
+                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken)
+                .ConfigureAwait(false);
 
             if (parsed is null || parsed.Skills is null)
             {
@@ -236,7 +246,8 @@ internal sealed class GlobalLockFile : IGlobalLockFile
 
             if (parsed.Version > CurrentVersion)
             {
-                Console.Error.WriteLine($"Warning: Lock file was written by a newer version of skillz (v{parsed.Version}, this is v{CurrentVersion}). Data will be preserved but some fields may be ignored.");
+                Console.Error.WriteLine(
+                    $"Warning: Lock file was written by a newer version of skillz (v{parsed.Version}, this is v{CurrentVersion}). Data will be preserved but some fields may be ignored.");
                 return parsed;
             }
 
@@ -267,11 +278,9 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         }
 
         await using var stream = File.Create(lockPath);
-        await JsonSerializer.SerializeAsync(
-            stream,
-            lockFile,
-            JsonSourceGenerationContext.Default.SkillLockFile,
-            cancellationToken).ConfigureAwait(false);
+        await JsonSerializer
+            .SerializeAsync(stream, lockFile, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private static SkillLockFile CreateEmpty()
