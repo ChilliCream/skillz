@@ -1,0 +1,6 @@
+.harness/
+.notes/
+bin/
+obj/
+artifacts/
+.work/

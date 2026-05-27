@@ -19,7 +19,6 @@ namespace Skillz;
 [JsonSerializable(typeof(LocalSkillLockFile))]
 [JsonSerializable(typeof(LocalSkillLockEntry))]
 [JsonSerializable(typeof(GitHubTreeResponse))]
-[JsonSerializable(typeof(SearchApiResponse))]
 [JsonSerializable(typeof(WellKnownIndex))]
 [JsonSerializable(typeof(InstalledSkillJson[]))]
 internal partial class JsonSourceGenerationContext : JsonSerializerContext;

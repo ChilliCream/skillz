@@ -20,6 +20,7 @@ internal sealed class GitHubProvider : IProvider
 
     public async Task<IReadOnlyList<RemoteSkill>> FetchSkillsAsync(
         ParsedSource source,
+        ProviderOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         if (source is not ParsedSource.GitHub github)
@@ -35,32 +36,21 @@ internal sealed class GitHubProvider : IProvider
             await _gitClient.CloneAsync(github.Url, tempDir, github.Ref, cancellationToken)
                 .ConfigureAwait(false);
 
-            var includeInternal = !string.IsNullOrEmpty(github.SkillFilter);
-            var options = new SkillDiscoveryOptions(IncludeInternal: includeInternal);
+            var includeInternal = !string.IsNullOrEmpty(github.SkillFilter) || (options?.IncludeInternal ?? false);
+            var discoveryOpts = new SkillDiscoveryOptions(
+                IncludeInternal: includeInternal,
+                FullDepth: options?.FullDepth ?? false);
 
             var skills = await _skillDiscovery
-                .DiscoverAsync(tempDir, github.Subpath, options, cancellationToken)
+                .DiscoverAsync(tempDir, github.Subpath, discoveryOpts, cancellationToken)
                 .ConfigureAwait(false);
 
-            return ProviderConversions.ToRemoteSkills(skills, Id, github.Url, tempDir);
-        }
-        finally
-        {
-            SafeCleanup(tempDir);
-        }
-    }
-
-    private static void SafeCleanup(string dir)
-    {
-        try
-        {
-            if (Directory.Exists(dir))
-            {
-                Directory.Delete(dir, recursive: true);
-            }
+            return ProviderConversions.ToRemoteSkills(skills, Id, github.Url, tempDir, cleanupPath: tempDir);
         }
         catch
         {
+            TempDirCleanup.SafeDelete(tempDir);
+            throw;
         }
     }
 }

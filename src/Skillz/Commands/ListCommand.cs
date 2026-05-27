@@ -1,42 +1,46 @@
 using System.CommandLine;
 using System.Text.Json;
-using Microsoft.Extensions.DependencyInjection;
 using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Skills;
+using Spectre.Console;
 
 namespace Skillz.Commands;
 
-internal sealed class ListCommand : BaseCommand
+internal sealed class ListCommand(
+    IInstaller installer,
+    IAgentRegistry registry,
+    IInteractionService interaction,
+    CliExecutionContext executionContext)
+    : BaseCommand("list", "List installed skills")
 {
-    private readonly IServiceProvider _services;
-    private readonly Option<bool> _globalOption;
-    private readonly Option<string[]> _agentOption;
-    private readonly Option<string?> _formatOption;
-
-    public ListCommand(IServiceProvider services)
-        : base("list", "List installed skills")
+    private readonly Option<bool> _globalOption = new(CommonOptionNames.Global, "-g")
     {
-        _services = services;
+        Description = "List global skills"
+    };
 
-        _globalOption = new Option<bool>(CommonOptionNames.Global, "-g")
-        {
-            Description = "List global skills"
-        };
+    private readonly Option<string[]> _agentOption = new(CommonOptionNames.Agent, "-a")
+    {
+        Description = "Filter by agent",
+        AllowMultipleArgumentsPerToken = true
+    };
+
+    private readonly Option<string?> _formatOption = new(CommonOptionNames.FormatJson)
+    {
+        Description = "Output format (text|json)"
+    };
+
+    private readonly Option<bool> _jsonOption = new("--json")
+    {
+        Description = "Output as JSON (alias for --format json)"
+    };
+
+    protected override void Configure()
+    {
         Options.Add(_globalOption);
-
-        _agentOption = new Option<string[]>(CommonOptionNames.Agent, "-a")
-        {
-            Description = "Filter by agent",
-            AllowMultipleArgumentsPerToken = true
-        };
         Options.Add(_agentOption);
-
-        _formatOption = new Option<string?>(CommonOptionNames.FormatJson)
-        {
-            Description = "Output format (text|json)"
-        };
         Options.Add(_formatOption);
+        Options.Add(_jsonOption);
     }
 
     protected override async Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
@@ -44,12 +48,8 @@ internal sealed class ListCommand : BaseCommand
         var global = parseResult.GetValue(_globalOption);
         var agents = parseResult.GetValue(_agentOption) ?? Array.Empty<string>();
         var format = parseResult.GetValue(_formatOption);
-        var jsonOutput = string.Equals(format, "json", StringComparison.OrdinalIgnoreCase);
-
-        var installer = _services.GetRequiredService<IInstaller>();
-        var registry = _services.GetRequiredService<IAgentRegistry>();
-        var interaction = _services.GetRequiredService<IInteractionService>();
-        var executionContext = _services.GetRequiredService<CliExecutionContext>();
+        var jsonFlag = parseResult.GetValue(_jsonOption);
+        var jsonOutput = jsonFlag || string.Equals(format, "json", StringComparison.OrdinalIgnoreCase);
 
         executionContext.IsJsonOutput = jsonOutput;
 
@@ -86,6 +86,10 @@ internal sealed class ListCommand : BaseCommand
         if (skills.Count == 0)
         {
             interaction.WriteDim(global ? "No global skills found." : "No project skills found.");
+            if (!global)
+            {
+                interaction.WriteDim("Try listing global skills with -g");
+            }
             return new CommandResult.Success();
         }
 
@@ -97,9 +101,29 @@ internal sealed class ListCommand : BaseCommand
         {
             var agentNames = skill.Agents.Select(a =>
                 registry.TryGetConfig(a, out var c) && c is not null ? c.DisplayName : a).ToList();
-            var agentDisplay = agentNames.Count > 0 ? string.Join(", ", agentNames) : "(not linked)";
-            interaction.WriteMarkupLine($"[cyan]{skill.Name}[/] [dim]{skill.CanonicalPath}[/]");
-            interaction.WriteDim($"  Agents: {agentDisplay}");
+            string agentDisplay;
+            if (agentNames.Count == 0)
+            {
+                agentDisplay = "not linked";
+            }
+            else if (agentNames.Count > 5)
+            {
+                agentDisplay = string.Join(", ", agentNames.Take(5)) + $" +{agentNames.Count - 5} more";
+            }
+            else
+            {
+                agentDisplay = string.Join(", ", agentNames);
+            }
+
+            interaction.WriteMarkupLine($"[cyan]{Markup.Escape(skill.Name)}[/] [dim]{Markup.Escape(ShortenPath(skill.CanonicalPath))}[/]");
+            if (agentNames.Count == 0)
+            {
+                interaction.WriteMarkupLine("  Agents: [yellow]not linked[/]");
+            }
+            else
+            {
+                interaction.WriteDim($"  Agents: {agentDisplay}");
+            }
         }
 
         return new CommandResult.Success();
@@ -114,8 +138,9 @@ internal sealed class ListCommand : BaseCommand
         CancellationToken cancellationToken)
     {
         var skills = new Dictionary<string, InstalledSkill>(StringComparer.Ordinal);
-
         var canonicalDir = installer.GetCanonicalSkillsDir(global, cwd);
+        var canonicalDirFull = Path.GetFullPath(canonicalDir);
+
         if (Directory.Exists(canonicalDir))
         {
             foreach (var entry in Directory.EnumerateDirectories(canonicalDir))
@@ -137,6 +162,8 @@ internal sealed class ListCommand : BaseCommand
             }
         }
 
+        var pathComparison = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+
         foreach (var agentType in agentFilter)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -152,6 +179,14 @@ internal sealed class ListCommand : BaseCommand
             }
 
             var agentDir = installer.GetAgentBaseDir(agentType, global, cwd);
+            var agentDirFull = Path.GetFullPath(agentDir);
+
+            // Skip if this agent's dir IS the canonical dir (universal agents)
+            if (string.Equals(agentDirFull, canonicalDirFull, pathComparison))
+            {
+                continue;
+            }
+
             if (!Directory.Exists(agentDir))
             {
                 continue;
@@ -186,7 +221,23 @@ internal sealed class ListCommand : BaseCommand
         }
 
         await Task.CompletedTask.ConfigureAwait(false);
-        return skills.Values.OrderBy(s => s.Name, StringComparer.Ordinal).ToList();
+        return skills.Values.ToList();
+    }
+
+    private static string ShortenPath(string path)
+    {
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrEmpty(home) && path.StartsWith(home, StringComparison.Ordinal))
+        {
+            return "~" + path[home.Length..];
+        }
+        var cwd = Directory.GetCurrentDirectory();
+        if (!string.IsNullOrEmpty(cwd) && path.StartsWith(cwd, StringComparison.Ordinal))
+        {
+            var relative = path[cwd.Length..];
+            return "." + (relative.Length == 0 ? "" : relative);
+        }
+        return path;
     }
 
     private sealed record InstalledSkill(string Name, string CanonicalPath, List<string> Agents);

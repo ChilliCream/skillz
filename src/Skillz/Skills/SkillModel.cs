@@ -17,4 +17,7 @@ internal record RemoteSkill(
     string ProviderId,
     string SourceIdentifier,
     string? SkillPath = null,
-    Dictionary<string, object>? Metadata = null);
+    string? SourcePath = null,
+    Dictionary<string, object>? Metadata = null,
+    string? CleanupPath = null,
+    string? PluginName = null);

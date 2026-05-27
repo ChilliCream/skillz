@@ -1,0 +1,80 @@
+using Skillz.Skills;
+using Xunit;
+
+namespace Skillz.Tests.Skills;
+
+public class SubpathValidatorTests
+{
+    [Theory]
+    [InlineData("skills/my-skill")]
+    [InlineData("path/to/skill")]
+    [InlineData("src")]
+    public void SanitizeSubpath_Allows_Normal_Subpaths(string input)
+    {
+        Assert.Equal(input, SubpathValidator.SanitizeSubpath(input));
+    }
+
+    [Theory]
+    [InlineData("../etc")]
+    [InlineData("../../etc/passwd")]
+    [InlineData("skills/../../etc")]
+    [InlineData("a/b/../../../etc")]
+    public void SanitizeSubpath_Rejects_DotDot_Segments(string input)
+    {
+        var ex = Assert.Throws<CliException>(() => SubpathValidator.SanitizeSubpath(input));
+        Assert.Contains("Unsafe subpath", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("..\\etc")]
+    [InlineData("..\\..\\secret")]
+    public void SanitizeSubpath_Rejects_Backslash_Traversal(string input)
+    {
+        var ex = Assert.Throws<CliException>(() => SubpathValidator.SanitizeSubpath(input));
+        Assert.Contains("Unsafe subpath", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(".hidden")]
+    [InlineData("file.txt")]
+    [InlineData("path/to/.config")]
+    [InlineData("..skill")]
+    [InlineData("skill..")]
+    public void SanitizeSubpath_Allows_Dots_That_Are_Not_Traversal(string input)
+    {
+        Assert.Equal(input, SubpathValidator.SanitizeSubpath(input));
+    }
+
+    [Theory]
+    [InlineData("/tmp/repo", "skills")]
+    [InlineData("/tmp/repo", "skills/my-skill")]
+    [InlineData("/tmp/repo", "a/b/c")]
+    public void IsSubpathSafe_Returns_True_For_Subpaths_Within_BasePath(string basePath, string subpath)
+    {
+        Assert.True(SubpathValidator.IsSubpathSafe(basePath, subpath));
+    }
+
+    [Theory]
+    [InlineData("/tmp/repo", "..")]
+    [InlineData("/tmp/repo", "../etc")]
+    [InlineData("/tmp/repo", "../../etc/passwd")]
+    [InlineData("/tmp/repo", "skills/../../..")]
+    public void IsSubpathSafe_Returns_False_For_Subpaths_Escaping_BasePath(string basePath, string subpath)
+    {
+        Assert.False(SubpathValidator.IsSubpathSafe(basePath, subpath));
+    }
+
+    [Fact]
+    public void IsSubpathSafe_Handles_Normalized_Traversal_Staying_Within()
+    {
+        Assert.True(SubpathValidator.IsSubpathSafe("/tmp/repo", "skills/../other"));
+    }
+
+    [Theory]
+    [InlineData("/tmp/repo", ".")]
+    [InlineData("/tmp/repo", "skills/..")]
+    public void IsSubpathSafe_Handles_Subpath_Resolving_To_BasePath(string basePath, string subpath)
+    {
+        Assert.True(SubpathValidator.IsSubpathSafe(basePath, subpath));
+    }
+}

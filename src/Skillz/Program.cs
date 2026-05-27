@@ -1,4 +1,3 @@
-using System.CommandLine;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Skillz.Commands;
@@ -19,6 +18,10 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
+        // Strip bare `--` tokens — skillz has no pass-through commands and System.CommandLine
+        // treats the terminator inconsistently with TS, which simply ignores it.
+        args = args.Where(a => a != "--").ToArray();
+
         using var cts = new CancellationTokenSource();
 
         ConsoleCancelEventHandler cancelKeyHandler = (_, eventArgs) =>
@@ -49,13 +52,11 @@ internal static class Program
         builder.Services.AddSingleton<BannerService>();
 
         builder.Services.AddHttpClient(BlobClient.HttpClientName);
-        builder.Services.AddHttpClient(SkillSearchClient.HttpClientName);
         builder.Services.AddHttpClient(WellKnownProvider.HttpClientName);
 
         builder.Services.AddSingleton<IGitClient, GitClient>();
         builder.Services.AddSingleton<IGitHubTokenProvider, GitHubTokenProvider>();
         builder.Services.AddSingleton<IBlobClient, BlobClient>();
-        builder.Services.AddSingleton<ISkillSearchClient, SkillSearchClient>();
 
         builder.Services.AddSingleton<IAgentRegistry, AgentRegistry>();
         builder.Services.AddSingleton<IAgentEnvironmentDetector, AgentEnvironmentDetector>();
@@ -80,25 +81,47 @@ internal static class Program
 
         builder.Services.AddSingleton<IAddCommandPrompter, AddCommandPrompter>();
         builder.Services.AddSingleton<IRemoveCommandPrompter, RemoveCommandPrompter>();
-        builder.Services.AddSingleton<IFindCommandPrompter, FindCommandPrompter>();
 
-        builder.Services.AddSingleton(BuildRootCommand);
+        builder.Services.AddTransient<AddCommandExecutor>();
+        builder.Services.AddTransient<AddCommand>();
+        builder.Services.AddTransient<RemoveCommand>();
+        builder.Services.AddTransient<ListCommand>();
+        builder.Services.AddTransient<InitCommand>();
+        builder.Services.AddTransient<UpdateCommand>();
+        builder.Services.AddTransient<SkillzRootCommand>();
 
         using var host = builder.Build();
         await host.StartAsync(cts.Token).ConfigureAwait(false);
 
         try
         {
-            var rootCommand = host.Services.GetRequiredService<RootCommand>();
+            var rootCommand = host.Services.GetRequiredService<SkillzRootCommand>();
 
             if (args.Length == 0)
             {
                 var banner = host.Services.GetRequiredService<BannerService>();
-                banner.ShowBanner();
+                await banner.ShowBannerAsync().ConfigureAwait(false);
+                return ExitCodeConstants.Success;
+            }
+
+            // Curated root help: short-circuit when user asks for top-level help only
+            if (args.Length == 1 && args[0] is "--help" or "-h" or "-?")
+            {
+                var banner = host.Services.GetRequiredService<BannerService>();
+                await banner.ShowLogoAsync().ConfigureAwait(false);
+                banner.ShowCuratedHelp();
                 return ExitCodeConstants.Success;
             }
 
             var parseResult = rootCommand.Parse(args);
+
+            var commandName = parseResult.CommandResult.Command.Name;
+            if (commandName is "add" or "init")
+            {
+                var banner = host.Services.GetRequiredService<BannerService>();
+                await banner.ShowLogoAsync().ConfigureAwait(false);
+            }
+
             return await parseResult.InvokeAsync(cancellationToken: cts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
@@ -121,22 +144,5 @@ internal static class Program
             AppDomain.CurrentDomain.ProcessExit -= unloadHandler;
             await host.StopAsync().ConfigureAwait(false);
         }
-    }
-
-    private static RootCommand BuildRootCommand(IServiceProvider services)
-    {
-        var root = new RootCommand("Skillz - AI agent skill manager");
-        root.Subcommands.Add(new AddCommand(services));
-        root.Subcommands.Add(new RemoveCommand(services));
-        root.Subcommands.Add(new ListCommand(services));
-        root.Subcommands.Add(new InitCommand(services));
-        RegisterExtraCommands(root, services);
-        return root;
-    }
-
-    private static void RegisterExtraCommands(RootCommand root, IServiceProvider services)
-    {
-        root.Subcommands.Add(ActivatorUtilities.CreateInstance<FindCommand>(services));
-        root.Subcommands.Add(ActivatorUtilities.CreateInstance<UpdateCommand>(services));
     }
 }

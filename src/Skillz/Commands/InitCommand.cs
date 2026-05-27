@@ -1,30 +1,24 @@
 using System.CommandLine;
-using Microsoft.Extensions.DependencyInjection;
 using Skillz.Interaction;
 
 namespace Skillz.Commands;
 
-internal sealed class InitCommand : BaseCommand
+internal sealed class InitCommand(IInteractionService interaction)
+    : BaseCommand("init", "Initialize a new skill (creates SKILL.md)")
 {
-    private readonly IServiceProvider _services;
-    private readonly Argument<string?> _nameArgument;
-
-    public InitCommand(IServiceProvider services)
-        : base("init", "Initialize a new skill (creates SKILL.md)")
+    private readonly Argument<string?> _nameArgument = new("name")
     {
-        _services = services;
+        Description = "Skill name (creates <name>/SKILL.md). Defaults to current directory.",
+        Arity = ArgumentArity.ZeroOrOne
+    };
 
-        _nameArgument = new Argument<string?>("name")
-        {
-            Description = "Skill name (creates <name>/SKILL.md). Defaults to current directory.",
-            Arity = ArgumentArity.ZeroOrOne
-        };
+    protected override void Configure()
+    {
         Arguments.Add(_nameArgument);
     }
 
     protected override async Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
-        var interaction = _services.GetRequiredService<IInteractionService>();
         var nameArg = parseResult.GetValue(_nameArgument);
 
         var cwd = Directory.GetCurrentDirectory();

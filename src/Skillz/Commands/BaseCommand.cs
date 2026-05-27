@@ -8,6 +8,8 @@ internal abstract class BaseCommand : Command
     protected BaseCommand(string name, string? description = null)
         : base(name, description)
     {
+        Configure();
+
         SetAction(async (parseResult, cancellationToken) =>
         {
             var result = await ExecuteAsync(parseResult, cancellationToken).ConfigureAwait(false);
@@ -26,6 +28,8 @@ internal abstract class BaseCommand : Command
             return result.ExitCode;
         });
     }
+
+    protected virtual void Configure() { }
 
     protected abstract Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken);
 }

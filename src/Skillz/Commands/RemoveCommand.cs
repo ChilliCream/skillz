@@ -1,57 +1,55 @@
 using System.CommandLine;
-using Microsoft.Extensions.DependencyInjection;
 using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Lock;
-using Skillz.Plugins;
 using Skillz.Skills;
 
 namespace Skillz.Commands;
 
-internal sealed class RemoveCommand : BaseCommand
+internal sealed class RemoveCommand(
+    IInstaller installer,
+    IAgentRegistry registry,
+    IInteractionService interaction,
+    IRemoveCommandPrompter prompter,
+    IProjectLockFile projectLock,
+    IGlobalLockFile globalLock,
+    IAgentEnvironmentDetector detector,
+    ConsoleEnvironment consoleEnvironment)
+    : BaseCommand("remove", "Remove installed skills")
 {
-    private readonly IServiceProvider _services;
-    private readonly Argument<string[]> _skillsArgument;
-    private readonly Option<bool> _globalOption;
-    private readonly Option<string[]> _agentOption;
-    private readonly Option<bool> _yesOption;
-    private readonly Option<bool> _allOption;
-
-    public RemoveCommand(IServiceProvider services)
-        : base("remove", "Remove installed skills")
+    private readonly Argument<string[]> _skillsArgument = new("skills")
     {
-        _services = services;
+        Description = "Skill names to remove",
+        Arity = ArgumentArity.ZeroOrMore
+    };
 
-        _skillsArgument = new Argument<string[]>("skills")
-        {
-            Description = "Skill names to remove",
-            Arity = ArgumentArity.ZeroOrMore
-        };
+    private readonly Option<bool> _globalOption = new(CommonOptionNames.Global, "-g")
+    {
+        Description = "Remove from global installation"
+    };
+
+    private readonly Option<string[]> _agentOption = new(CommonOptionNames.Agent, "-a")
+    {
+        Description = "Target agent(s)",
+        AllowMultipleArgumentsPerToken = true
+    };
+
+    private readonly Option<bool> _yesOption = new(CommonOptionNames.Yes, "-y")
+    {
+        Description = "Skip prompts (non-interactive)"
+    };
+
+    private readonly Option<bool> _allOption = new(CommonOptionNames.All)
+    {
+        Description = "Remove all installed skills"
+    };
+
+    protected override void Configure()
+    {
         Arguments.Add(_skillsArgument);
-
-        _globalOption = new Option<bool>(CommonOptionNames.Global, "-g")
-        {
-            Description = "Remove from global installation"
-        };
         Options.Add(_globalOption);
-
-        _agentOption = new Option<string[]>(CommonOptionNames.Agent, "-a")
-        {
-            Description = "Target agent(s)",
-            AllowMultipleArgumentsPerToken = true
-        };
         Options.Add(_agentOption);
-
-        _yesOption = new Option<bool>(CommonOptionNames.Yes, "-y")
-        {
-            Description = "Skip prompts (non-interactive)"
-        };
         Options.Add(_yesOption);
-
-        _allOption = new Option<bool>(CommonOptionNames.All)
-        {
-            Description = "Remove all installed skills"
-        };
         Options.Add(_allOption);
     }
 
@@ -62,15 +60,6 @@ internal sealed class RemoveCommand : BaseCommand
         var agents = parseResult.GetValue(_agentOption) ?? Array.Empty<string>();
         var yes = parseResult.GetValue(_yesOption);
         var all = parseResult.GetValue(_allOption);
-
-        var installer = _services.GetRequiredService<IInstaller>();
-        var registry = _services.GetRequiredService<IAgentRegistry>();
-        var interaction = _services.GetRequiredService<IInteractionService>();
-        var prompter = _services.GetRequiredService<IRemoveCommandPrompter>();
-        var projectLock = _services.GetRequiredService<IProjectLockFile>();
-        var globalLock = _services.GetRequiredService<IGlobalLockFile>();
-        var detector = _services.GetRequiredService<IAgentEnvironmentDetector>();
-        var consoleEnvironment = _services.GetRequiredService<ConsoleEnvironment>();
 
         if (agents.Length > 0)
         {
@@ -107,14 +96,14 @@ internal sealed class RemoveCommand : BaseCommand
 
             if (selected.Count == 0)
             {
-                interaction.WriteError($"No matching skills found for: {string.Join(", ", requestedSkills)}");
-                return new CommandResult.Failure(ExitCodeConstants.Failure);
+                interaction.WriteDim($"No matching skills found for: {string.Join(", ", requestedSkills)}");
+                return new CommandResult.Success();
             }
         }
         else if (nonInteractive)
         {
-            interaction.WriteError("No skills specified for removal.");
-            return new CommandResult.Failure(ExitCodeConstants.Failure);
+            interaction.WriteDim("No skills specified for removal.");
+            return new CommandResult.Success();
         }
         else
         {

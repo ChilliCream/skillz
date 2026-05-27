@@ -169,51 +169,120 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
 
     private string? DetectAgentNameFromEnvironment()
     {
+        // 1. Generic AI_AGENT (TS checks this first — raw agent name from the environment)
+        var aiAgent = ResolveEnv("AI_AGENT");
+        if (!string.IsNullOrEmpty(aiAgent))
+        {
+            // AI_AGENT may contain version suffix like "claude-code_2-1-143_agent"
+            // Extract just the agent name portion (before first underscore-digit)
+            var mapped = MapAiAgentValue(aiAgent);
+            if (mapped is not null)
+            {
+                return mapped;
+            }
+        }
+
+        // 2. Cursor
         if (!string.IsNullOrEmpty(ResolveEnv("CURSOR_TRACE_ID"))
             || !string.IsNullOrEmpty(ResolveEnv("CURSOR_AGENT")))
         {
             return "cursor";
         }
 
+        // 3. Claude Code
         if (!string.IsNullOrEmpty(ResolveEnv("CLAUDECODE"))
             || !string.IsNullOrEmpty(ResolveEnv("CLAUDE_CODE")))
         {
             return "claude";
         }
 
+        // 4. Claude Code cowork mode
+        if (!string.IsNullOrEmpty(ResolveEnv("CLAUDE_CODE_IS_COWORK")))
+        {
+            return "cowork";
+        }
+
+        // 5. Codex
+        if (!string.IsNullOrEmpty(ResolveEnv("CODEX_SANDBOX"))
+            || !string.IsNullOrEmpty(ResolveEnv("CODEX_CI"))
+            || !string.IsNullOrEmpty(ResolveEnv("CODEX_THREAD_ID")))
+        {
+            return "codex";
+        }
+
+        // 6. Replit (skz keeps REPLIT_DEV_DOMAIN — our extension beyond TS)
         if (!string.IsNullOrEmpty(ResolveEnv("REPL_ID"))
             || !string.IsNullOrEmpty(ResolveEnv("REPLIT_DEV_DOMAIN")))
         {
             return "replit";
         }
 
+        // 7. Gemini
         if (!string.IsNullOrEmpty(ResolveEnv("GEMINI_CLI")))
         {
             return "gemini";
         }
 
-        if (!string.IsNullOrEmpty(ResolveEnv("CODEX_AGENT"))
-            || !string.IsNullOrEmpty(ResolveEnv("CODEX_HOME")))
-        {
-            return "codex";
-        }
-
-        if (!string.IsNullOrEmpty(ResolveEnv("OPENCODE")))
+        // 8. OpenCode
+        if (!string.IsNullOrEmpty(ResolveEnv("OPENCODE_CLIENT")))
         {
             return "opencode";
         }
 
-        if (!string.IsNullOrEmpty(ResolveEnv("GITHUB_COPILOT_AGENT")))
+        // 9. GitHub Copilot
+        if (!string.IsNullOrEmpty(ResolveEnv("COPILOT_MODEL"))
+            || !string.IsNullOrEmpty(ResolveEnv("COPILOT_ALLOW_ALL"))
+            || !string.IsNullOrEmpty(ResolveEnv("COPILOT_GITHUB_TOKEN")))
         {
             return "github-copilot";
         }
 
-        if (!string.IsNullOrEmpty(ResolveEnv("ANTIGRAVITY")))
+        // 10. Antigravity
+        if (!string.IsNullOrEmpty(ResolveEnv("ANTIGRAVITY_AGENT")))
         {
             return "antigravity";
         }
 
+        // 11. Augment
+        if (!string.IsNullOrEmpty(ResolveEnv("AUGMENT_AGENT")))
+        {
+            return "augment-cli";
+        }
+
+        // 12. Devin (filesystem probe)
+        if (_directoryExists("/opt/.devin"))
+        {
+            return "devin";
+        }
+
         return null;
+    }
+
+    private static string? MapAiAgentValue(string value)
+    {
+        // AI_AGENT values can be raw names like "claude-code" or versioned like "claude-code_2-1-143_agent"
+        // Try exact match first, then try prefix before first underscore-followed-by-digit
+        if (s_agentNameToType.ContainsKey(value))
+        {
+            return value;
+        }
+
+        // Try stripping version suffix: find first "_" followed by digit
+        for (var i = 0; i < value.Length - 1; i++)
+        {
+            if (value[i] == '_' && char.IsAsciiDigit(value[i + 1]))
+            {
+                var prefix = value[..i];
+                if (s_agentNameToType.ContainsKey(prefix))
+                {
+                    return prefix;
+                }
+                break;
+            }
+        }
+
+        // Return raw value — GetAgentType will handle mapping or null
+        return value;
     }
 
     private string? ResolveEnv(string name)

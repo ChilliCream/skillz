@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Skillz.Plugins;
 using Skillz.Skills;
 
 namespace Skillz.Sources.Providers;
@@ -33,6 +34,7 @@ internal sealed partial class WellKnownProvider : IProvider
 
     public async Task<IReadOnlyList<RemoteSkill>> FetchSkillsAsync(
         ParsedSource source,
+        ProviderOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         if (source is not ParsedSource.WellKnown wellKnown)
@@ -259,6 +261,9 @@ internal sealed partial class WellKnownProvider : IProvider
         NormalizedEntry entry,
         CancellationToken cancellationToken)
     {
+        var stagingRoot = Path.Combine(Path.GetTempPath(), "skillz-" + Guid.NewGuid().ToString("N"));
+        var skillDir = Path.Combine(stagingRoot, entry.Name);
+
         try
         {
             var skillBaseUrl = $"{entry.BaseUrl!.TrimEnd('/')}/{entry.WellKnownPath}/{entry.Name}";
@@ -267,6 +272,7 @@ internal sealed partial class WellKnownProvider : IProvider
             using var response = await client.GetAsync(skillMdUrl, cancellationToken).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
             {
+                TempDirCleanup.SafeDelete(stagingRoot);
                 return null;
             }
 
@@ -275,7 +281,63 @@ internal sealed partial class WellKnownProvider : IProvider
             if (!fm.Data.TryGetValue("name", out var nameObj) || nameObj is not string skillName
                 || !fm.Data.TryGetValue("description", out var descObj) || descObj is not string skillDesc)
             {
+                TempDirCleanup.SafeDelete(stagingRoot);
                 return null;
+            }
+
+            Directory.CreateDirectory(skillDir);
+            await File.WriteAllTextAsync(
+                Path.Combine(skillDir, "SKILL.md"),
+                content,
+                cancellationToken).ConfigureAwait(false);
+
+            if (entry.Files is not null)
+            {
+                foreach (var relativeFile in entry.Files)
+                {
+                    if (string.Equals(relativeFile, "SKILL.md", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (!IsSafeLegacyFilePath(relativeFile))
+                    {
+                        continue;
+                    }
+
+                    var fileUrl = $"{skillBaseUrl}/{relativeFile}";
+                    try
+                    {
+                        using var fileResponse = await client.GetAsync(fileUrl, cancellationToken).ConfigureAwait(false);
+                        if (!fileResponse.IsSuccessStatusCode)
+                        {
+                            continue;
+                        }
+
+                        var bytes = await fileResponse.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+                        var normalizedRelative = relativeFile.Replace('\\', '/');
+                        var destination = Path.Combine(skillDir, normalizedRelative.Replace('/', Path.DirectorySeparatorChar));
+
+                        if (!PathContainment.IsContainedIn(destination, skillDir))
+                        {
+                            continue;
+                        }
+
+                        var parent = Path.GetDirectoryName(destination);
+                        if (!string.IsNullOrEmpty(parent))
+                        {
+                            Directory.CreateDirectory(parent);
+                        }
+
+                        await File.WriteAllBytesAsync(destination, bytes, cancellationToken).ConfigureAwait(false);
+                    }
+                    catch (HttpRequestException)
+                    {
+                    }
+                    catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
+                    {
+                    }
+                }
             }
 
             return new RemoteSkill(
@@ -285,15 +347,24 @@ internal sealed partial class WellKnownProvider : IProvider
                 InstallName: entry.Name,
                 SourceUrl: skillMdUrl,
                 ProviderId: Id,
-                SourceIdentifier: GetSourceIdentifier(entry.BaseUrl!));
+                SourceIdentifier: GetSourceIdentifier(entry.BaseUrl!),
+                SourcePath: skillDir,
+                CleanupPath: stagingRoot);
         }
         catch (HttpRequestException)
         {
+            TempDirCleanup.SafeDelete(stagingRoot);
             return null;
         }
         catch (TaskCanceledException)
         {
+            TempDirCleanup.SafeDelete(stagingRoot);
             return null;
+        }
+        catch
+        {
+            TempDirCleanup.SafeDelete(stagingRoot);
+            throw;
         }
     }
 

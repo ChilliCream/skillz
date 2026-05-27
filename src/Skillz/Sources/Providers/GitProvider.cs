@@ -20,6 +20,7 @@ internal sealed class GitProvider : IProvider
 
     public async Task<IReadOnlyList<RemoteSkill>> FetchSkillsAsync(
         ParsedSource source,
+        ProviderOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         if (source is not ParsedSource.Git git)
@@ -35,29 +36,20 @@ internal sealed class GitProvider : IProvider
             await _gitClient.CloneAsync(git.Url, tempDir, git.Ref, cancellationToken)
                 .ConfigureAwait(false);
 
+            var discoveryOpts = new SkillDiscoveryOptions(
+                IncludeInternal: options?.IncludeInternal ?? false,
+                FullDepth: options?.FullDepth ?? false);
+
             var skills = await _skillDiscovery
-                .DiscoverAsync(tempDir, subpath: null, options: null, cancellationToken)
+                .DiscoverAsync(tempDir, subpath: null, discoveryOpts, cancellationToken)
                 .ConfigureAwait(false);
 
-            return ProviderConversions.ToRemoteSkills(skills, Id, git.Url, tempDir);
-        }
-        finally
-        {
-            SafeCleanup(tempDir);
-        }
-    }
-
-    private static void SafeCleanup(string dir)
-    {
-        try
-        {
-            if (Directory.Exists(dir))
-            {
-                Directory.Delete(dir, recursive: true);
-            }
+            return ProviderConversions.ToRemoteSkills(skills, Id, git.Url, tempDir, cleanupPath: tempDir);
         }
         catch
         {
+            TempDirCleanup.SafeDelete(tempDir);
+            throw;
         }
     }
 }

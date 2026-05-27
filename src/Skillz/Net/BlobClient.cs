@@ -151,7 +151,7 @@ internal sealed class BlobClient : IBlobClient
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
-        request.Headers.UserAgent.ParseAdd("skills-cli");
+        request.Headers.UserAgent.ParseAdd("skillz-cli");
 
         if (!string.IsNullOrEmpty(token))
         {

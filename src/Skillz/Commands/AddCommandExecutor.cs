@@ -1,94 +1,134 @@
-using Microsoft.Extensions.DependencyInjection;
-using Skillz.Install;
-using Skillz.Interaction;
-using Skillz.Lock;
-using Skillz.Skills;
-using Skillz.Sources;
-using Skillz.Sources.Providers;
-
 namespace Skillz.Commands;
 
-internal sealed class AddCommandExecutor
+internal sealed class AddCommandExecutor(
+    ISourceParser sourceParser,
+    IProviderRegistry providerRegistry,
+    IInstaller installer,
+    IInteractionService interaction,
+    IAgentRegistry registry,
+    IAgentEnvironmentDetector detector,
+    IProjectLockFile projectLock,
+    IGlobalLockFile globalLock,
+    IAddCommandPrompter prompter,
+    ConsoleEnvironment consoleEnvironment)
 {
-    private readonly ISourceParser _sourceParser;
-    private readonly IProviderRegistry _providerRegistry;
-    private readonly IInstaller _installer;
-    private readonly IInteractionService _interaction;
-    private readonly IAgentRegistry _registry;
-    private readonly IAgentEnvironmentDetector _detector;
-    private readonly IProjectLockFile _projectLock;
-    private readonly IGlobalLockFile _globalLock;
-    private readonly IAddCommandPrompter _prompter;
-    private readonly ConsoleEnvironment _consoleEnvironment;
-
-    public AddCommandExecutor(IServiceProvider services)
-    {
-        _sourceParser = services.GetRequiredService<ISourceParser>();
-        _providerRegistry = services.GetRequiredService<IProviderRegistry>();
-        _installer = services.GetRequiredService<IInstaller>();
-        _interaction = services.GetRequiredService<IInteractionService>();
-        _registry = services.GetRequiredService<IAgentRegistry>();
-        _detector = services.GetRequiredService<IAgentEnvironmentDetector>();
-        _projectLock = services.GetRequiredService<IProjectLockFile>();
-        _globalLock = services.GetRequiredService<IGlobalLockFile>();
-        _prompter = services.GetRequiredService<IAddCommandPrompter>();
-        _consoleEnvironment = services.GetRequiredService<ConsoleEnvironment>();
-    }
-
     public async Task<CommandResult> RunAsync(AddCommandOptions options, CancellationToken cancellationToken)
     {
         ParsedSource parsed;
         try
         {
-            parsed = _sourceParser.Parse(options.Source!);
+            parsed = sourceParser.Parse(options.Source!);
         }
         catch (Exception ex)
         {
-            _interaction.WriteError($"Invalid source: {ex.Message}");
+            interaction.WriteError($"Invalid source: {ex.Message}");
             return new CommandResult.Failure(ExitCodeConstants.Failure);
         }
 
+        var detection = await detector.DetectAgentAsync().ConfigureAwait(false);
+        if (detection.IsAgent)
+        {
+            var agents = options.Agents;
+            if (agents.Count == 0 && detection.Name is { } name
+                && detector.GetAgentType(name) is { } mapped)
+            {
+                agents = EnsureUniversalAgents([mapped]);
+            }
+            options = options with { Yes = true, Agents = agents };
+
+            interaction.WriteMarkupLine(
+                $"[on cyan] {Markup.Escape(detection.Name ?? "agent")} [/] Agent detected — installing non-interactively");
+        }
+
         var skillFilters = MergeSkillFilters(options.SkillFilters, parsed);
+        interaction.WriteDim($"Source: {GetSourceDisplayString(parsed)}");
 
         IReadOnlyList<RemoteSkill> skills;
         try
         {
-            var provider = _providerRegistry.Resolve(parsed);
-            skills = await _interaction.StatusAsync(
+            var provider = providerRegistry.Resolve(parsed);
+            var providerOptions = new ProviderOptions(
+                FullDepth: options.FullDepth,
+                IncludeInternal: skillFilters.Count > 0);
+
+            skills = await interaction.StatusAsync(
                 "Fetching skills...",
-                () => provider.FetchSkillsAsync(parsed, cancellationToken)
+                () => provider.FetchSkillsAsync(parsed, providerOptions, cancellationToken)
                     .ContinueWith(t => (IReadOnlyList<RemoteSkill>)t.Result, cancellationToken)).ConfigureAwait(false);
         }
         catch (CliException ex)
         {
-            _interaction.WriteError(ex.Message);
+            interaction.WriteError(ex.Message);
             return new CommandResult.Failure(ex.ExitCode);
         }
         catch (Exception ex)
         {
-            _interaction.WriteError($"Failed to fetch skills: {ex.Message}");
+            var message = ex is AggregateException agg && agg.InnerException is not null
+                ? agg.InnerException.Message
+                : ex.Message;
+            RenderErrorPanel("Failed to fetch skills", message,
+                "Tip: use the --yes (-y) and --global (-g) flags to install without prompts.");
             return new CommandResult.Failure(ExitCodeConstants.Failure);
         }
 
-        if (skills.Count == 0)
+        try
         {
-            _interaction.WriteError("No valid skills found. Skills require a SKILL.md with name and description.");
-            return new CommandResult.Failure(ExitCodeConstants.Failure);
+            if (skills.Count == 0)
+            {
+                if (parsed is ParsedSource.WellKnown)
+                {
+                    interaction.WriteError("No skills found at this URL. Make sure the server has a /.well-known/agent-skills/index.json or /.well-known/skills/index.json file.");
+                }
+                else
+                {
+                    interaction.WriteError("No valid skills found. Skills require a SKILL.md with name and description.");
+                }
+                return new CommandResult.Failure(ExitCodeConstants.Failure);
+            }
+
+            interaction.WriteLine($"Found {skills.Count} skill(s)");
+
+            if (options.List)
+            {
+                var filtered = skillFilters.Count > 0 && !skillFilters.Contains("*", StringComparer.Ordinal)
+                    ? skills.Where(s => skillFilters.Any(f =>
+                        string.Equals(f, s.InstallName, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(f, s.Name, StringComparison.OrdinalIgnoreCase))).ToList()
+                    : skills;
+                ListSkills(filtered);
+                return new CommandResult.Success();
+            }
+
+            return await RunInstallationAsync(parsed, skills, skillFilters, options, cancellationToken).ConfigureAwait(false);
         }
-
-        _interaction.WriteLine($"Found {skills.Count} skill(s)");
-
-        if (options.List)
+        finally
         {
-            ListSkills(skills);
-            return new CommandResult.Success();
+            CleanupStagingPaths(skills);
         }
+    }
 
+    private async Task<CommandResult> RunInstallationAsync(
+        ParsedSource parsed,
+        IReadOnlyList<RemoteSkill> skills,
+        IReadOnlyList<string> skillFilters,
+        AddCommandOptions options,
+        CancellationToken cancellationToken)
+    {
         var selectedSkills = await SelectSkillsAsync(skills, skillFilters, options, cancellationToken).ConfigureAwait(false);
         if (selectedSkills.Count == 0)
         {
-            _interaction.WriteError("No matching skills.");
-            return new CommandResult.Failure(ExitCodeConstants.Failure);
+            if (skillFilters.Count > 0)
+            {
+                interaction.WriteError($"No matching skills found for: {string.Join(", ", skillFilters)}");
+                interaction.WriteLine("Available skills:");
+                foreach (var s in skills)
+                {
+                    interaction.WriteLine($"  {s.InstallName}");
+                }
+                return new CommandResult.Failure(ExitCodeConstants.Failure);
+            }
+            interaction.WriteWarning("Installation cancelled");
+            return new CommandResult.Cancelled();
         }
 
         var nonInteractive = await IsNonInteractiveAsync(options).ConfigureAwait(false);
@@ -101,43 +141,54 @@ internal sealed class AddCommandExecutor
 
         if (targetAgents.Count == 0)
         {
-            _interaction.WriteError("No agents selected.");
+            interaction.WriteError("No agents selected.");
             return new CommandResult.Failure(ExitCodeConstants.Failure);
         }
 
         var installGlobally = options.Global;
         if (!options.Global && !nonInteractive)
         {
-            var supportsGlobal = targetAgents.Any(a => _registry.GetConfig(a).GlobalSkillsDir is not null);
+            var supportsGlobal = targetAgents.Any(a => registry.GetConfig(a).GlobalSkillsDir is not null);
             if (supportsGlobal)
             {
-                installGlobally = await _prompter.SelectGlobalScopeAsync(cancellationToken).ConfigureAwait(false);
+                installGlobally = await prompter.SelectGlobalScopeAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 
         var installMode = options.Copy ? InstallMode.Copy : InstallMode.Symlink;
-        var uniqueDirs = new HashSet<string>(targetAgents.Select(a => _registry.GetConfig(a).SkillsDir), StringComparer.Ordinal);
+        var uniqueDirs = new HashSet<string>(targetAgents.Select(a => registry.GetConfig(a).SkillsDir), StringComparer.Ordinal);
         if (uniqueDirs.Count <= 1)
         {
             installMode = InstallMode.Copy;
         }
         else if (!options.Copy && !nonInteractive)
         {
-            installMode = await _prompter.SelectInstallModeAsync(cancellationToken).ConfigureAwait(false);
+            installMode = await prompter.SelectInstallModeAsync(cancellationToken).ConfigureAwait(false);
         }
 
         if (!nonInteractive)
         {
-            var confirmed = await _prompter.ConfirmInstallationAsync(selectedSkills, targetAgents, cancellationToken)
+            var confirmed = await prompter.ConfirmInstallationAsync(selectedSkills, targetAgents, cancellationToken)
                 .ConfigureAwait(false);
             if (!confirmed)
             {
-                _interaction.WriteWarning("Installation cancelled");
+                interaction.WriteWarning("Installation cancelled");
                 return new CommandResult.Cancelled();
             }
         }
 
         var installOptions = new InstallOptions(installGlobally, Cwd: null, installMode);
+
+        var existingSkills = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var skill in selectedSkills)
+        {
+            var canonicalPath = installer.GetCanonicalPath(skill.InstallName, installGlobally);
+            if (Directory.Exists(canonicalPath))
+            {
+                existingSkills.Add(skill.InstallName);
+            }
+        }
+
         var results = await InstallSkillsAsync(selectedSkills, targetAgents, installOptions, cancellationToken)
             .ConfigureAwait(false);
 
@@ -147,21 +198,101 @@ internal sealed class AddCommandExecutor
         if (successful.Count > 0)
         {
             await UpdateLocksAsync(parsed, successful, installGlobally, cancellationToken).ConfigureAwait(false);
-            _interaction.WriteSuccess($"Installed {successful.Select(r => r.SkillName).Distinct().Count()} skill(s)");
+
+            RenderInstallationSummary(targetAgents, successful, existingSkills, installGlobally);
         }
 
         if (failed.Count > 0)
         {
-            _interaction.WriteError($"Failed to install {failed.Count} entry/entries");
-            foreach (var r in failed)
-            {
-                _interaction.WriteError($"  {r.SkillName} -> {r.AgentType}: {r.Result.Error}");
-            }
-
+            var detail = string.Join(Environment.NewLine, failed.Select(r =>
+                $"{r.SkillName} → {r.AgentType}: {r.Result.Error}"));
+            RenderErrorPanel("Installation failed", detail);
             return new CommandResult.Failure(ExitCodeConstants.Failure);
         }
 
         return new CommandResult.Success();
+    }
+
+    private void RenderInstallationSummary(
+        IReadOnlyList<string> targetAgents,
+        IReadOnlyList<InstallEntry> successful,
+        HashSet<string> existingSkills,
+        bool installGlobally)
+    {
+        var skillNames = successful.Select(r => r.SkillName).Distinct(StringComparer.Ordinal).ToList();
+        var universals = targetAgents.Where(registry.IsUniversalAgent).ToList();
+        var symlinked = targetAgents.Where(a => !registry.IsUniversalAgent(a)).ToList();
+        var overwrites = skillNames.Where(existingSkills.Contains).ToList();
+
+        var canonical = skillNames.Count == 1
+            ? installer.GetCanonicalPath(skillNames[0], installGlobally)
+            : installer.GetCanonicalSkillsDir(installGlobally);
+
+        var summary = new System.Text.StringBuilder();
+        summary.AppendLine($"[bold]Canonical:[/] [dim]{Markup.Escape(canonical)}[/]");
+        if (universals.Count > 0)
+        {
+            summary.AppendLine($"[bold]Universal:[/]  {Markup.Escape(string.Join(", ", universals.Select(GetAgentDisplay)))}");
+        }
+        if (symlinked.Count > 0)
+        {
+            summary.AppendLine($"[bold]Symlinked:[/]  {Markup.Escape(string.Join(", ", symlinked.Select(GetAgentDisplay)))}");
+        }
+        if (overwrites.Count > 0)
+        {
+            summary.Append($"[yellow]Overwrites:[/] {Markup.Escape(string.Join(", ", overwrites))}");
+        }
+
+        interaction.WriteLine();
+        interaction.Console.Write(new Panel(new Markup(summary.ToString().TrimEnd()))
+            .Header("[bold]Installation Summary[/]")
+            .BorderColor(Color.Cyan1)
+            .Expand());
+
+        var installed = new System.Text.StringBuilder();
+        foreach (var skillName in skillNames)
+        {
+            var paths = successful.Where(r => r.SkillName == skillName).Select(r => r.Result.Path).Distinct(StringComparer.Ordinal).ToList();
+            var firstPath = paths.FirstOrDefault() ?? string.Empty;
+            installed.AppendLine($"[green]✓[/] {Markup.Escape(skillName)}");
+            installed.Append($"  [dim]→ {Markup.Escape(firstPath)}[/]");
+            if (skillName != skillNames[^1])
+            {
+                installed.AppendLine();
+            }
+        }
+
+        interaction.Console.Write(new Panel(new Markup(installed.ToString()))
+            .Header($"[bold green]Installed {skillNames.Count} skill(s)[/]")
+            .BorderColor(Color.Green)
+            .Expand());
+
+        interaction.WriteLine();
+        interaction.WriteDim("Done!  Review skills before use; they run with full agent permissions.");
+    }
+
+    private string GetAgentDisplay(string agentType)
+    {
+        var config = registry.GetConfig(agentType);
+        return config.DisplayName;
+    }
+
+    private void RenderErrorPanel(string title, string message, string? tip = null)
+    {
+        var content = new System.Text.StringBuilder();
+        content.Append($"[red]{Markup.Escape(message)}[/]");
+        if (tip is not null)
+        {
+            content.AppendLine();
+            content.AppendLine();
+            content.Append($"[dim]{Markup.Escape(tip)}[/]");
+        }
+
+        interaction.WriteLine();
+        interaction.Console.Write(new Panel(new Markup(content.ToString()))
+            .Header($"[bold red]{Markup.Escape(title)}[/]")
+            .BorderColor(Color.Red)
+            .Expand());
     }
 
     private static IReadOnlyList<string> MergeSkillFilters(IReadOnlyList<string> existing, ParsedSource parsed)
@@ -180,15 +311,48 @@ internal sealed class AddCommandExecutor
 
     private void ListSkills(IReadOnlyList<RemoteSkill> skills)
     {
-        _interaction.WriteLine();
-        _interaction.WriteMarkupLine("[bold]Available Skills[/]");
-        foreach (var skill in skills)
+        interaction.WriteLine();
+        interaction.WriteMarkupLine("[bold]Available Skills[/]");
+
+        var groups = skills
+            .GroupBy(s => s.PluginName, StringComparer.Ordinal)
+            .OrderBy(g => g.Key is null ? 1 : 0)
+            .ThenBy(g => g.Key, StringComparer.Ordinal);
+
+        var first = true;
+        foreach (var group in groups)
         {
-            _interaction.WriteMarkupLine($"  [cyan]{skill.InstallName}[/]");
-            _interaction.WriteDim($"    {skill.Description}");
+            if (group.Key is { } pluginName)
+            {
+                if (!first)
+                {
+                    interaction.WriteLine();
+                }
+                interaction.WriteMarkupLine($"[bold]{Markup.Escape(TitleCase(pluginName))}[/]");
+            }
+
+            foreach (var skill in group.OrderBy(s => s.InstallName, StringComparer.Ordinal))
+            {
+                interaction.WriteMarkupLine($"  [cyan]{Markup.Escape(skill.InstallName)}[/]");
+                interaction.WriteDim($"    {skill.Description}");
+            }
+
+            first = false;
         }
 
-        _interaction.WriteLine();
+        interaction.WriteLine();
+        interaction.WriteDim("Use --skill <name> to install specific skills");
+    }
+
+    private static string TitleCase(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return value;
+        }
+
+        var parts = value.Split(['-', '_', ' '], StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', parts.Select(p => char.ToUpperInvariant(p[0]) + p[1..]));
     }
 
     private async Task<IReadOnlyList<RemoteSkill>> SelectSkillsAsync(
@@ -214,23 +378,28 @@ internal sealed class AddCommandExecutor
             return skills;
         }
 
-        return await _prompter.SelectSkillsAsync(skills, cancellationToken).ConfigureAwait(false);
+        if (consoleEnvironment.IsInputRedirected)
+        {
+            interaction.WriteWarning("Installation cancelled");
+            return Array.Empty<RemoteSkill>();
+        }
+
+        return await prompter.SelectSkillsAsync(skills, cancellationToken).ConfigureAwait(false);
     }
 
-    private async Task<bool> IsNonInteractiveAsync(AddCommandOptions options)
+    private Task<bool> IsNonInteractiveAsync(AddCommandOptions options)
     {
         if (options.Yes || options.All)
         {
-            return true;
+            return Task.FromResult(true);
         }
 
-        if (_consoleEnvironment.IsInputRedirected)
+        if (consoleEnvironment.IsInputRedirected)
         {
-            return true;
+            return Task.FromResult(true);
         }
 
-        var detection = await _detector.DetectAgentAsync().ConfigureAwait(false);
-        return detection.IsAgent;
+        return Task.FromResult(false);
     }
 
     private async Task<IReadOnlyList<string>?> SelectAgentsAsync(
@@ -238,8 +407,9 @@ internal sealed class AddCommandExecutor
         bool nonInteractive,
         CancellationToken cancellationToken)
     {
-        var validAgents = _registry.ListAgentTypes();
+        var validAgents = registry.ListAgentTypes();
 
+        // --agent provided (incl. "*")
         if (options.Agents.Count > 0)
         {
             if (options.Agents.Contains("*", StringComparer.Ordinal))
@@ -250,42 +420,41 @@ internal sealed class AddCommandExecutor
             var invalid = options.Agents.Where(a => !validAgents.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
-                _interaction.WriteError($"Invalid agents: {string.Join(", ", invalid)}");
+                interaction.WriteError($"Invalid agents: {string.Join(", ", invalid)}");
                 return Array.Empty<string>();
             }
 
             return options.Agents;
         }
 
-        var installed = await _detector.DetectInstalledAgentsAsync().ConfigureAwait(false);
+        var installed = await detector.DetectInstalledAgentsAsync().ConfigureAwait(false);
 
-        if (installed.Count > 0 && nonInteractive)
+        // Zero installed
+        if (installed.Count == 0)
+        {
+            if (nonInteractive)
+            {
+                return registry.GetUniversalAgents();
+            }
+
+            return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        // One installed OR non-interactive → no prompt
+        if (installed.Count == 1 || nonInteractive)
         {
             return EnsureUniversalAgents(installed);
         }
 
-        if (nonInteractive)
-        {
-            return validAgents;
-        }
-
-        var detection = await _detector.DetectAgentAsync().ConfigureAwait(false);
-        if (detection.IsAgent && detection.Name is { } agentName)
-        {
-            var mapped = _detector.GetAgentType(agentName);
-            if (mapped is not null)
-            {
-                return EnsureUniversalAgents([mapped]);
-            }
-        }
-
-        return await _prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken)
+        // Multiple installed → prompt
+        return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken)
             .ConfigureAwait(false);
     }
 
     private IReadOnlyList<string> EnsureUniversalAgents(IReadOnlyList<string> agents)
     {
-        var universal = _registry.GetUniversalAgents();
+        var universal = registry.GetUniversalAgents();
         var result = new List<string>(agents);
         foreach (var u in universal)
         {
@@ -298,6 +467,25 @@ internal sealed class AddCommandExecutor
         return result;
     }
 
+    private static void CleanupStagingPaths(IEnumerable<RemoteSkill> skills)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var skill in skills)
+        {
+            if (string.IsNullOrEmpty(skill.CleanupPath))
+            {
+                continue;
+            }
+
+            if (!seen.Add(skill.CleanupPath))
+            {
+                continue;
+            }
+
+            TempDirCleanup.SafeDelete(skill.CleanupPath);
+        }
+    }
+
     private async Task<List<InstallEntry>> InstallSkillsAsync(
         IReadOnlyList<RemoteSkill> selectedSkills,
         IReadOnlyList<string> targetAgents,
@@ -305,13 +493,13 @@ internal sealed class AddCommandExecutor
         CancellationToken cancellationToken)
     {
         var results = new List<InstallEntry>();
-        await _interaction.StatusAsync("Installing skills...", async () =>
+        await interaction.StatusAsync("Installing skills...", async () =>
         {
             foreach (var skill in selectedSkills)
             {
                 foreach (var agentType in targetAgents)
                 {
-                    var result = await _installer.InstallRemoteSkillForAgentAsync(skill, agentType, installOptions, cancellationToken)
+                    var result = await installer.InstallRemoteSkillForAgentAsync(skill, agentType, installOptions, cancellationToken)
                         .ConfigureAwait(false);
                     results.Add(new InstallEntry(skill, agentType, result));
                 }
@@ -349,7 +537,7 @@ internal sealed class AddCommandExecutor
                 {
                     if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
                     {
-                        skillFolderHash = await _projectLock.ComputeSkillFolderHashAsync(installPath, cancellationToken)
+                        skillFolderHash = await projectLock.ComputeSkillFolderHashAsync(installPath, cancellationToken)
                             .ConfigureAwait(false);
                     }
                 }
@@ -368,13 +556,16 @@ internal sealed class AddCommandExecutor
                     InstalledAt = now,
                     UpdatedAt = now
                 };
-                try
+                if (!string.IsNullOrEmpty(ownerRepo))
                 {
-                    await _globalLock.AddEntryAsync(entry.Skill.InstallName, lockEntry, cancellationToken)
-                        .ConfigureAwait(false);
-                }
-                catch
-                {
+                    try
+                    {
+                        await globalLock.AddEntryAsync(entry.Skill.InstallName, lockEntry, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                    catch
+                    {
+                    }
                 }
             }
             else
@@ -384,7 +575,7 @@ internal sealed class AddCommandExecutor
                 {
                     if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
                     {
-                        computedHash = await _projectLock.ComputeSkillFolderHashAsync(installPath, cancellationToken)
+                        computedHash = await projectLock.ComputeSkillFolderHashAsync(installPath, cancellationToken)
                             .ConfigureAwait(false);
                     }
                 }
@@ -402,7 +593,7 @@ internal sealed class AddCommandExecutor
                 };
                 try
                 {
-                    await _projectLock.AddEntryAsync(entry.Skill.InstallName, lockEntry, cwd: null, cancellationToken)
+                    await projectLock.AddEntryAsync(entry.Skill.InstallName, lockEntry, cwd: null, cancellationToken)
                         .ConfigureAwait(false);
                 }
                 catch
@@ -439,6 +630,21 @@ internal sealed class AddCommandExecutor
         ParsedSource.Git g => g.Ref,
         _ => null
     };
+
+    private static string GetSourceDisplayString(ParsedSource source)
+    {
+        var url = GetSourceUrl(source);
+        var @ref = GetSourceRef(source);
+        if (!string.IsNullOrEmpty(@ref))
+        {
+            url += $" @ {@ref}";
+        }
+        if (source is ParsedSource.GitHub gh && !string.IsNullOrEmpty(gh.Subpath))
+        {
+            url += $" ({gh.Subpath})";
+        }
+        return url;
+    }
 
     private sealed record InstallEntry(RemoteSkill Skill, string AgentType, InstallResult Result)
     {

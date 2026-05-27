@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "local-pr-review": {
+      "type": "stdio",
+      "command": "./bin/local-pr-review-mcp",
+      "args": [
+        "--repo",
+        "."
+      ],
+      "env": {}
+    }
+  }
+}

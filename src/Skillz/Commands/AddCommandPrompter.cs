@@ -1,5 +1,6 @@
 using Skillz.Install;
 using Skillz.Interaction;
+using Skillz.Lock;
 using Skillz.Skills;
 
 namespace Skillz.Commands;
@@ -8,11 +9,13 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
 {
     private readonly IInteractionService _interaction;
     private readonly IAgentRegistry _registry;
+    private readonly IGlobalLockFile _globalLock;
 
-    public AddCommandPrompter(IInteractionService interaction, IAgentRegistry registry)
+    public AddCommandPrompter(IInteractionService interaction, IAgentRegistry registry, IGlobalLockFile globalLock)
     {
         _interaction = interaction;
         _registry = registry;
+        _globalLock = globalLock;
     }
 
     public async Task<IReadOnlyList<RemoteSkill>> SelectSkillsAsync(
@@ -29,7 +32,14 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             return skills;
         }
 
-        var choices = skills.Select(s =>
+        // Sort by PluginName (nulls last) then InstallName — matches TS add.ts:1181-1188
+        var sorted = skills
+            .OrderBy(s => s.PluginName is null ? 1 : 0)
+            .ThenBy(s => s.PluginName, StringComparer.Ordinal)
+            .ThenBy(s => s.InstallName, StringComparer.Ordinal)
+            .ToList();
+
+        var choices = sorted.Select(s =>
         {
             var hint = s.Description.Length > 60
                 ? s.Description[..57] + "..."
@@ -53,16 +63,52 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             return Array.Empty<string>();
         }
 
+        // Try to get last-used agents as pre-selection defaults
+        IReadOnlyList<string>? defaults = null;
+        try
+        {
+            var lastUsed = await _globalLock.GetLastSelectedAgentsAsync(cancellationToken).ConfigureAwait(false);
+            if (lastUsed is { Count: > 0 })
+            {
+                defaults = lastUsed.Where(a => available.Contains(a, StringComparer.Ordinal)).ToList();
+                if (defaults.Count == 0) defaults = null;
+            }
+        }
+        catch
+        {
+            // Swallow - best effort
+        }
+
+        // If no last-used, fall back to common defaults
+        defaults ??= available
+            .Where(a => a is "claude-code" or "opencode" or "codex")
+            .ToList();
+
         var choices = available.Select(a =>
         {
             var config = _registry.GetConfig(a);
             return ($"{config.DisplayName} ({a})", a);
         });
 
-        return await _interaction.MultiSelectAsync(
+        var selected = await _interaction.MultiSelectAsync(
             "Which agents do you want to install to?",
             choices,
             cancellationToken).ConfigureAwait(false);
+
+        // Save selection for next time
+        if (selected.Count > 0)
+        {
+            try
+            {
+                await _globalLock.SaveLastSelectedAgentsAsync(selected, cancellationToken).ConfigureAwait(false);
+            }
+            catch
+            {
+                // Swallow - best effort
+            }
+        }
+
+        return selected;
     }
 
     public async Task<bool> SelectGlobalScopeAsync(CancellationToken cancellationToken = default)

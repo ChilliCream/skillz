@@ -76,8 +76,6 @@ internal sealed partial class SourceParser : ISourceParser
         var fragmentSkillFilter = fragment.SkillFilter;
         input = fragment.InputWithoutFragment;
 
-        input = SourceAliases.Resolve(input);
-
         var githubPrefixMatch = GitHubPrefixRegex().Match(input);
         if (githubPrefixMatch.Success)
         {

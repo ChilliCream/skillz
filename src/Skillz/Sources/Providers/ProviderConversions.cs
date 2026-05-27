@@ -8,7 +8,8 @@ internal static class ProviderConversions
         IReadOnlyList<Skill> skills,
         string providerId,
         string sourceIdentifier,
-        string? cloneRoot = null)
+        string? cloneRoot = null,
+        string? cleanupPath = null)
     {
         if (skills.Count == 0)
         {
@@ -35,7 +36,10 @@ internal static class ProviderConversions
                 ProviderId: providerId,
                 SourceIdentifier: sourceIdentifier,
                 SkillPath: skillPath,
-                Metadata: skill.Metadata));
+                SourcePath: skill.Path,
+                Metadata: skill.Metadata,
+                CleanupPath: cleanupPath,
+                PluginName: skill.PluginName));
         }
 
         return result;

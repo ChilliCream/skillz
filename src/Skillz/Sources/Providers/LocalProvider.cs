@@ -17,6 +17,7 @@ internal sealed class LocalProvider : IProvider
 
     public async Task<IReadOnlyList<RemoteSkill>> FetchSkillsAsync(
         ParsedSource source,
+        ProviderOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         if (source is not ParsedSource.Local local)
@@ -33,8 +34,12 @@ internal sealed class LocalProvider : IProvider
                 $"Local path does not exist: {local.LocalPath}");
         }
 
+        var discoveryOptions = new SkillDiscoveryOptions(
+            IncludeInternal: options?.IncludeInternal ?? false,
+            FullDepth: options?.FullDepth ?? false);
+
         var skills = await _skillDiscovery
-            .DiscoverAsync(local.LocalPath, subpath: null, options: null, cancellationToken)
+            .DiscoverAsync(local.LocalPath, subpath: null, discoveryOptions, cancellationToken)
             .ConfigureAwait(false);
 
         return ProviderConversions.ToRemoteSkills(skills, Id, local.LocalPath);

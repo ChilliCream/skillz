@@ -1,0 +1,157 @@
+using Microsoft.Extensions.DependencyInjection;
+using Skillz.Commands;
+using Skillz.Install;
+using Skillz.Interaction;
+using Skillz.Lock;
+using Skillz.Tests.TestServices;
+using Skillz.Tests.Utils;
+using Xunit;
+
+namespace Skillz.Tests.Commands;
+
+[Collection(CommandTestCollection.Name)]
+public class RemoveCommandTests : IDisposable
+{
+    private readonly string _workspace;
+    private readonly string _originalCwd;
+
+    public RemoveCommandTests()
+    {
+        _workspace = Path.Combine(Path.GetTempPath(), "skillz-remove-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_workspace);
+        _originalCwd = Directory.GetCurrentDirectory();
+        Directory.SetCurrentDirectory(_workspace);
+    }
+
+    public void Dispose()
+    {
+        Directory.SetCurrentDirectory(_originalCwd);
+        try
+        {
+            if (Directory.Exists(_workspace))
+            {
+                Directory.Delete(_workspace, recursive: true);
+            }
+        }
+        catch
+        {
+            // best-effort
+        }
+    }
+
+    private static void CreateSkill(string baseDir, string name)
+    {
+        var dir = Path.Combine(baseDir, name);
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "SKILL.md"), $"---\nname: {name}\ndescription: x\n---\n");
+    }
+
+    private void ConfigureInstaller(TestInstaller installer)
+    {
+        installer.OnGetCanonicalSkillsDir = (_, cwd) =>
+            Path.Combine(cwd ?? _workspace, ".agents", "skills");
+
+        installer.OnGetCanonicalPath = (name, _, cwd) =>
+            Path.Combine(cwd ?? _workspace, ".agents", "skills", name);
+
+        installer.OnGetAgentBaseDir = (_, _, cwd) =>
+            Path.Combine(cwd ?? _workspace, ".agents", "skills");
+
+        installer.OnGetInstallPath = (name, _, _, cwd) =>
+            Path.Combine(cwd ?? _workspace, ".agents", "skills", name);
+    }
+
+    [Fact]
+    public async Task Remove_With_No_Skills_Reports_Empty()
+    {
+        var services = CliTestHelper.CreateServiceProvider();
+        var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
+        ConfigureInstaller(installer);
+
+        var cmd = services.GetRequiredService<RemoveCommand>();
+        var parseResult = cmd.Parse(["--yes"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, exitCode);
+        var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
+        Assert.Contains(interaction.Output, o => o.Contains("No skills", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Remove_With_Named_Skill_Deletes_Directory_And_Updates_Lock()
+    {
+        var canonical = Path.Combine(_workspace, ".agents", "skills");
+        Directory.CreateDirectory(canonical);
+        CreateSkill(canonical, "alpha");
+        CreateSkill(canonical, "beta");
+
+        var services = CliTestHelper.CreateServiceProvider();
+        var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
+        ConfigureInstaller(installer);
+
+        var projectLock = (TestProjectLockFile)services.GetRequiredService<IProjectLockFile>();
+        var removedFromLock = new List<string>();
+        projectLock.OnRemoveEntry = (name, _) =>
+        {
+            removedFromLock.Add(name);
+            return true;
+        };
+
+        var cmd = services.GetRequiredService<RemoveCommand>();
+        var parseResult = cmd.Parse(["alpha", "--yes"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, exitCode);
+        Assert.False(Directory.Exists(Path.Combine(canonical, "alpha")));
+        Assert.True(Directory.Exists(Path.Combine(canonical, "beta")));
+        Assert.Contains("alpha", removedFromLock);
+    }
+
+    [Fact]
+    public async Task Remove_With_All_Flag_Removes_Everything_Without_Prompts()
+    {
+        var canonical = Path.Combine(_workspace, ".agents", "skills");
+        Directory.CreateDirectory(canonical);
+        CreateSkill(canonical, "alpha");
+        CreateSkill(canonical, "beta");
+
+        var services = CliTestHelper.CreateServiceProvider();
+        var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
+        ConfigureInstaller(installer);
+
+        var cmd = services.GetRequiredService<RemoveCommand>();
+        var parseResult = cmd.Parse(["--all"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, exitCode);
+        Assert.False(Directory.Exists(Path.Combine(canonical, "alpha")));
+        Assert.False(Directory.Exists(Path.Combine(canonical, "beta")));
+    }
+
+    [Fact]
+    public async Task Remove_Uses_Prompter_When_Interactive()
+    {
+        var canonical = Path.Combine(_workspace, ".agents", "skills");
+        Directory.CreateDirectory(canonical);
+        CreateSkill(canonical, "alpha");
+        CreateSkill(canonical, "beta");
+
+        var services = CliTestHelper.CreateServiceProvider(configure: s =>
+            s.AddSingleton<ConsoleEnvironment>(new TestConsoleEnvironment { InputRedirected = false }));
+
+        var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
+        ConfigureInstaller(installer);
+
+        var prompter = services.GetRequiredService<TestRemoveCommandPrompter>();
+        prompter.OnSelectSkills = installed => installed.Where(s => s == "beta").ToList();
+        prompter.OnConfirmRemoval = _ => true;
+
+        var cmd = services.GetRequiredService<RemoveCommand>();
+        var parseResult = cmd.Parse(Array.Empty<string>());
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, exitCode);
+        Assert.True(Directory.Exists(Path.Combine(canonical, "alpha")));
+        Assert.False(Directory.Exists(Path.Combine(canonical, "beta")));
+    }
+}

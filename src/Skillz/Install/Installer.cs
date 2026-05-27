@@ -13,6 +13,7 @@ internal sealed class Installer : IInstaller
     private static readonly HashSet<string> s_excludeDirs = new(StringComparer.Ordinal)
     {
         ".git",
+        "node_modules",
         "__pycache__",
         "__pypackages__"
     };
@@ -216,19 +217,43 @@ internal sealed class Installer : IInstaller
             if (installMode == InstallMode.Copy)
             {
                 CleanAndCreateDirectory(agentDir);
-                var agentSkillMd = Path.Combine(agentDir, KnownConfigNames.SkillFileName);
-                await File.WriteAllTextAsync(agentSkillMd, skill.Content, cancellationToken).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
+                {
+                    await CopyDirectoryAsync(skill.SourcePath, agentDir, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    var agentSkillMd = Path.Combine(agentDir, KnownConfigNames.SkillFileName);
+                    await File.WriteAllTextAsync(agentSkillMd, skill.Content, cancellationToken).ConfigureAwait(false);
+                }
 
                 return new InstallResult(true, agentDir, Mode: InstallMode.Copy);
             }
 
             CleanAndCreateDirectory(canonicalDir);
-            var canonicalSkillMd = Path.Combine(canonicalDir, KnownConfigNames.SkillFileName);
-            await File.WriteAllTextAsync(canonicalSkillMd, skill.Content, cancellationToken).ConfigureAwait(false);
+            if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
+            {
+                await CopyDirectoryAsync(skill.SourcePath, canonicalDir, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                var canonicalSkillMd = Path.Combine(canonicalDir, KnownConfigNames.SkillFileName);
+                await File.WriteAllTextAsync(canonicalSkillMd, skill.Content, cancellationToken).ConfigureAwait(false);
+            }
 
             if (isGlobal && _registry.IsUniversalAgent(agentType))
             {
                 return new InstallResult(true, canonicalDir, canonicalDir, InstallMode.Symlink);
+            }
+
+            if (!isGlobal && !_registry.IsUniversalAgent(agentType))
+            {
+                var rootSegment = config.SkillsDir.Split('/', '\\')[0];
+                var agentRootDir = Path.Combine(cwd, rootSegment);
+                if (!Directory.Exists(agentRootDir))
+                {
+                    return new InstallResult(true, canonicalDir, canonicalDir, InstallMode.Symlink, Skipped: true);
+                }
             }
 
             var symlinkCreated = TryCreateSymlink(canonicalDir, agentDir);
@@ -236,8 +261,15 @@ internal sealed class Installer : IInstaller
             if (!symlinkCreated)
             {
                 CleanAndCreateDirectory(agentDir);
-                var fallbackSkillMd = Path.Combine(agentDir, KnownConfigNames.SkillFileName);
-                await File.WriteAllTextAsync(fallbackSkillMd, skill.Content, cancellationToken).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
+                {
+                    await CopyDirectoryAsync(skill.SourcePath, agentDir, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    var fallbackSkillMd = Path.Combine(agentDir, KnownConfigNames.SkillFileName);
+                    await File.WriteAllTextAsync(fallbackSkillMd, skill.Content, cancellationToken).ConfigureAwait(false);
+                }
 
                 return new InstallResult(true, agentDir, canonicalDir, InstallMode.Symlink, SymlinkFailed: true);
             }

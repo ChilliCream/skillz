@@ -62,14 +62,14 @@ internal sealed class ProjectLockFile : IProjectLockFile
             lockPath,
             async () =>
             {
-                await using var stream = File.Create(lockPath);
-                await JsonSerializer.SerializeAsync(
-                    stream,
-                    sorted,
-                    JsonSourceGenerationContext.Default.LocalSkillLockFile,
-                    cancellationToken).ConfigureAwait(false);
+                var existing = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
+                if (existing.Version > CurrentVersion)
+                {
+                    Console.Error.WriteLine($"Refusing to overwrite project lock file: on-disk version v{existing.Version} is newer than this skillz (v{CurrentVersion}).");
+                    return;
+                }
 
-                await stream.WriteAsync("\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
+                await WriteInternalAsync(sorted, cwd, cancellationToken).ConfigureAwait(false);
             },
             cancellationToken: cancellationToken).ConfigureAwait(false);
     }
@@ -86,6 +86,12 @@ internal sealed class ProjectLockFile : IProjectLockFile
             async () =>
             {
                 var lockFile = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
+                if (lockFile.Version > CurrentVersion)
+                {
+                    Console.Error.WriteLine($"Refusing to modify project lock file: on-disk version v{lockFile.Version} is newer than this skillz (v{CurrentVersion}).");
+                    return;
+                }
+
                 lockFile.Skills[skillName] = entry;
                 await WriteInternalAsync(lockFile, cwd, cancellationToken).ConfigureAwait(false);
             },
@@ -104,6 +110,12 @@ internal sealed class ProjectLockFile : IProjectLockFile
             async () =>
             {
                 var lockFile = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
+                if (lockFile.Version > CurrentVersion)
+                {
+                    Console.Error.WriteLine($"Refusing to modify project lock file: on-disk version v{lockFile.Version} is newer than this skillz (v{CurrentVersion}).");
+                    return;
+                }
+
                 removed = lockFile.Skills.Remove(skillName);
                 if (removed)
                 {

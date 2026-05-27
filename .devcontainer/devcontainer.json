@@ -1,0 +1,33 @@
+{
+  "name": ".NET",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.vscode-dotnet-runtime",
+        "editorconfig.editorconfig"
+      ],
+      "settings": {
+        "dotnet.defaultSolution": "disable",
+        "editor.formatOnSave": true,
+        "omnisharp.enableEditorConfigSupport": true
+      }
+    }
+  },
+  "postCreateCommand": "dotnet --info && node --version && npm --version",
+  "remoteUser": "vscode"
+}

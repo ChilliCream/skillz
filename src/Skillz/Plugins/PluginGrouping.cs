@@ -33,9 +33,17 @@ internal sealed class PluginGrouping : IPluginGrouping
                     }
 
                     var skillDir = Path.Combine(pluginBase, skillPath);
+                    // Normalize: if path ends with SKILL.md, use the parent directory
+                    var fullPath = Path.GetFullPath(skillDir);
+                    if (fullPath.EndsWith("/SKILL.md", StringComparison.OrdinalIgnoreCase)
+                        || fullPath.EndsWith("\\SKILL.md", StringComparison.OrdinalIgnoreCase))
+                    {
+                        fullPath = Path.GetDirectoryName(fullPath) ?? fullPath;
+                    }
+
                     if (PathContainment.IsContainedIn(skillDir, basePath))
                     {
-                        groupings[Path.GetFullPath(skillDir)] = name;
+                        groupings[fullPath] = name;
                     }
                 }
             }
@@ -56,9 +64,17 @@ internal sealed class PluginGrouping : IPluginGrouping
                 }
 
                 var skillDir = Path.Combine(basePath, skillPath);
+                // Normalize: if path ends with SKILL.md, use the parent directory
+                var fullPath = Path.GetFullPath(skillDir);
+                if (fullPath.EndsWith("/SKILL.md", StringComparison.OrdinalIgnoreCase)
+                    || fullPath.EndsWith("\\SKILL.md", StringComparison.OrdinalIgnoreCase))
+                {
+                    fullPath = Path.GetDirectoryName(fullPath) ?? fullPath;
+                }
+
                 if (PathContainment.IsContainedIn(skillDir, basePath))
                 {
-                    groupings[Path.GetFullPath(skillDir)] = name;
+                    groupings[fullPath] = name;
                 }
             }
         });

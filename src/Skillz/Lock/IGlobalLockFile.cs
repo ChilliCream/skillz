@@ -11,4 +11,8 @@ internal interface IGlobalLockFile
     Task<bool> RemoveEntryAsync(string skillName, CancellationToken cancellationToken = default);
 
     Task<SkillLockEntry?> GetEntryAsync(string skillName, CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<string>?> GetLastSelectedAgentsAsync(CancellationToken cancellationToken = default);
+
+    Task SaveLastSelectedAgentsAsync(IReadOnlyList<string> agents, CancellationToken cancellationToken = default);
 }
