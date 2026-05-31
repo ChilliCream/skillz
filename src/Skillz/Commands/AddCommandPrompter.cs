@@ -131,11 +131,19 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
     public Task<bool> ConfirmInstallationAsync(
         IReadOnlyList<RemoteSkill> skills,
         IReadOnlyList<string> agents,
+        IReadOnlyList<OverwriteTarget> overwrites,
         CancellationToken cancellationToken = default)
     {
         var skillNames = string.Join(", ", skills.Select(s => s.InstallName));
         var agentNames = string.Join(", ", agents);
         var message = $"Install {skills.Count} skill(s) [{skillNames}] to {agents.Count} agent(s) [{agentNames}]?";
+        if (overwrites.Count > 0)
+        {
+            var targets = string.Join(
+                Environment.NewLine,
+                overwrites.Select(o => $"  - {o.SkillName}: {o.DestinationPath}"));
+            message += $"{Environment.NewLine}Existing installs will be overwritten:{Environment.NewLine}{targets}";
+        }
 
         return _interaction.ConfirmAsync(message, defaultValue: true, cancellationToken);
     }

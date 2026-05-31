@@ -1,3 +1,4 @@
+using Skillz;
 using Skillz.Install;
 using Skillz.Lock;
 using Xunit;
@@ -181,6 +182,66 @@ public class GlobalLockFileTests : IDisposable
 
         Assert.Equal(GlobalLockFile.CurrentVersion, result.Version);
         Assert.Empty(result.Skills);
+        // A plain read must not rewrite or wipe a corrupt file on disk.
+        Assert.Equal("{ this is not json", await File.ReadAllTextAsync(lockPath, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task AddEntryAsync_Refuses_Corrupted_Json_And_Preserves_File()
+    {
+        var lockPath = _xdgPaths.GetGlobalLockPath();
+        Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
+        const string corrupt = "{ this is not json";
+        await File.WriteAllTextAsync(lockPath, corrupt, TestContext.Current.CancellationToken);
+
+        var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
+        var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
+            "new-skill",
+            new SkillLockEntry { Source = "org/repo", SourceType = "github", SourceUrl = "u", SkillFolderHash = "h" },
+            TestContext.Current.CancellationToken));
+
+        Assert.Contains("corrupt", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(corrupt, await File.ReadAllTextAsync(lockPath, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task AddEntryAsync_Refuses_Zero_Byte_Lock_And_Preserves_File()
+    {
+        var lockPath = _xdgPaths.GetGlobalLockPath();
+        Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
+        await File.WriteAllBytesAsync(lockPath, [], TestContext.Current.CancellationToken);
+
+        var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
+        var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
+            "new-skill",
+            new SkillLockEntry { Source = "org/repo", SourceType = "github", SourceUrl = "u", SkillFolderHash = "h" },
+            TestContext.Current.CancellationToken));
+
+        Assert.Contains("corrupt", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, new FileInfo(lockPath).Length);
+    }
+
+    [Fact]
+    public async Task AddEntryAsync_Rejects_Newer_Lock_Version_And_Preserves_File()
+    {
+        var lockPath = _xdgPaths.GetGlobalLockPath();
+        Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
+        var newer = $$"""
+            {
+              "version": {{GlobalLockFile.CurrentVersion + 1}},
+              "skills": {}
+            }
+            """;
+        await File.WriteAllTextAsync(lockPath, newer, TestContext.Current.CancellationToken);
+
+        var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
+        var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
+            "new-skill",
+            new SkillLockEntry { Source = "org/repo", SourceType = "github", SourceUrl = "u", SkillFolderHash = "h" },
+            TestContext.Current.CancellationToken));
+
+        Assert.Contains("newer", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(newer, await File.ReadAllTextAsync(lockPath, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -217,6 +278,39 @@ public class GlobalLockFileTests : IDisposable
         Assert.Equal("main", entry.Ref);
         Assert.Equal("skills/round-trip", entry.SkillPath);
         Assert.Equal("deadbeef", entry.SkillFolderHash);
+        Assert.False(File.Exists(_xdgPaths.GetGlobalLockPath() + ".tmp"));
+    }
+
+    [Fact]
+    public async Task WriteAsync_Replaces_Existing_File_Without_Leaving_Temp_File()
+    {
+        var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
+        await lockFile.AddEntryAsync(
+            "old-skill",
+            new SkillLockEntry { Source = "org/old", SourceType = "github", SourceUrl = "u", SkillFolderHash = "old" },
+            TestContext.Current.CancellationToken);
+
+        var replacement = new SkillLockFile
+        {
+            Version = GlobalLockFile.CurrentVersion,
+            Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
+            {
+                ["new-skill"] = new()
+                {
+                    Source = "org/new",
+                    SourceType = "github",
+                    SourceUrl = "u",
+                    SkillFolderHash = "new"
+                }
+            }
+        };
+
+        await lockFile.WriteAsync(replacement, TestContext.Current.CancellationToken);
+
+        var output = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("old-skill", output.Skills.Keys);
+        Assert.Equal("new", output.Skills["new-skill"].SkillFolderHash);
+        Assert.False(File.Exists(_xdgPaths.GetGlobalLockPath() + ".tmp"));
     }
 
     [Fact]

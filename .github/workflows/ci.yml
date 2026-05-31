@@ -25,11 +25,13 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          global-json-file: global.json
 
       - name: Restore
         run: dotnet restore
 
+      # Building the solution compiles the CLI for all its target frameworks
+      # (net8.0;net9.0;net10.0); the test projects target net9.0 only.
       - name: Build
         run: dotnet build --no-restore -c Release
 
@@ -37,4 +39,4 @@ jobs:
         run: dotnet test --no-build -c Release --verbosity normal
 
       - name: AOT Publish
-        run: dotnet publish src/Skillz/Skillz.csproj -c Release -r ${{ matrix.rid }} --self-contained
+        run: dotnet publish src/Skillz/Skillz.csproj -c Release -f net10.0 -r ${{ matrix.rid }} --self-contained

@@ -313,7 +313,7 @@ internal sealed partial class WellKnownProvider : IProvider
                             skillDir,
                             normalizedRelative.Replace('/', Path.DirectorySeparatorChar));
 
-                        if (!PathContainment.IsContainedIn(destination, skillDir))
+                        if (!PathContainment.IsContainedInRealPath(destination, skillDir))
                         {
                             continue;
                         }

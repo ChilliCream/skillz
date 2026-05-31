@@ -147,6 +147,8 @@ public class UpdateCommandTests : IDisposable
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("Found 1 global update", StringComparison.Ordinal));
         Assert.Contains(interaction.Output, line => line.Contains("Update available", StringComparison.Ordinal));
+        Assert.Contains(interaction.Output, line => line.Contains("Updates available for 1 skill", StringComparison.Ordinal));
+        Assert.DoesNotContain(interaction.Output, line => line.Contains("Updated 1 skill", StringComparison.Ordinal));
     }
 
     [Fact]

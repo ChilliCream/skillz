@@ -62,7 +62,7 @@ internal sealed class Installer : IInstaller
         var canonicalBase = GetCanonicalSkillsDir(global, cwd);
         var canonicalPath = Path.Combine(canonicalBase, sanitized);
 
-        if (!PathContainment.IsContainedIn(canonicalPath, canonicalBase))
+        if (!PathContainment.IsContainedInRealPath(canonicalPath, canonicalBase))
         {
             throw new InvalidOperationException("Invalid skill name: potential path traversal detected");
         }
@@ -76,7 +76,7 @@ internal sealed class Installer : IInstaller
         var targetBase = GetAgentBaseDir(agentType, global, cwd);
         var installPath = Path.Combine(targetBase, sanitized);
 
-        if (!PathContainment.IsContainedIn(installPath, targetBase))
+        if (!PathContainment.IsContainedInRealPath(installPath, targetBase))
         {
             throw new InvalidOperationException("Invalid skill name: potential path traversal detected");
         }
@@ -113,7 +113,7 @@ internal sealed class Installer : IInstaller
         var agentBase = GetAgentBaseDir(agentType, isGlobal, cwd);
         var agentDir = Path.Combine(agentBase, skillName);
 
-        if (!PathContainment.IsContainedIn(canonicalDir, canonicalBase))
+        if (!PathContainment.IsContainedInRealPath(canonicalDir, canonicalBase))
         {
             return new InstallResult(
                 false,
@@ -122,7 +122,7 @@ internal sealed class Installer : IInstaller
                 Error: "Invalid skill name: potential path traversal detected");
         }
 
-        if (!PathContainment.IsContainedIn(agentDir, agentBase))
+        if (!PathContainment.IsContainedInRealPath(agentDir, agentBase))
         {
             return new InstallResult(
                 false,
@@ -135,13 +135,13 @@ internal sealed class Installer : IInstaller
         {
             if (installMode == InstallMode.Copy)
             {
-                CleanAndCreateDirectory(agentDir);
+                CleanAndCreateDirectory(agentDir, agentBase);
                 await CopyDirectoryAsync(skill.Path, agentDir, cancellationToken).ConfigureAwait(false);
 
                 return new InstallResult(true, agentDir, Mode: InstallMode.Copy);
             }
 
-            CleanAndCreateDirectory(canonicalDir);
+            CleanAndCreateDirectory(canonicalDir, canonicalBase);
             await CopyDirectoryAsync(skill.Path, canonicalDir, cancellationToken).ConfigureAwait(false);
 
             if (isGlobal && _registry.IsUniversalAgent(agentType))
@@ -163,7 +163,7 @@ internal sealed class Installer : IInstaller
 
             if (!symlinkCreated)
             {
-                CleanAndCreateDirectory(agentDir);
+                CleanAndCreateDirectory(agentDir, agentBase);
                 await CopyDirectoryAsync(skill.Path, agentDir, cancellationToken).ConfigureAwait(false);
 
                 return new InstallResult(true, agentDir, canonicalDir, InstallMode.Symlink, SymlinkFailed: true);
@@ -205,7 +205,7 @@ internal sealed class Installer : IInstaller
         var agentBase = GetAgentBaseDir(agentType, isGlobal, cwd);
         var agentDir = Path.Combine(agentBase, skillName);
 
-        if (!PathContainment.IsContainedIn(canonicalDir, canonicalBase))
+        if (!PathContainment.IsContainedInRealPath(canonicalDir, canonicalBase))
         {
             return new InstallResult(
                 false,
@@ -214,7 +214,7 @@ internal sealed class Installer : IInstaller
                 Error: "Invalid skill name: potential path traversal detected");
         }
 
-        if (!PathContainment.IsContainedIn(agentDir, agentBase))
+        if (!PathContainment.IsContainedInRealPath(agentDir, agentBase))
         {
             return new InstallResult(
                 false,
@@ -227,7 +227,7 @@ internal sealed class Installer : IInstaller
         {
             if (installMode == InstallMode.Copy)
             {
-                CleanAndCreateDirectory(agentDir);
+                CleanAndCreateDirectory(agentDir, agentBase);
                 if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
                 {
                     await CopyDirectoryAsync(skill.SourcePath, agentDir, cancellationToken).ConfigureAwait(false);
@@ -241,7 +241,7 @@ internal sealed class Installer : IInstaller
                 return new InstallResult(true, agentDir, Mode: InstallMode.Copy);
             }
 
-            CleanAndCreateDirectory(canonicalDir);
+            CleanAndCreateDirectory(canonicalDir, canonicalBase);
             if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
             {
                 await CopyDirectoryAsync(skill.SourcePath, canonicalDir, cancellationToken).ConfigureAwait(false);
@@ -271,7 +271,7 @@ internal sealed class Installer : IInstaller
 
             if (!symlinkCreated)
             {
-                CleanAndCreateDirectory(agentDir);
+                CleanAndCreateDirectory(agentDir, agentBase);
                 if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
                 {
                     await CopyDirectoryAsync(skill.SourcePath, agentDir, cancellationToken).ConfigureAwait(false);
@@ -294,25 +294,30 @@ internal sealed class Installer : IInstaller
         }
     }
 
-    private static void CleanAndCreateDirectory(string path)
+    private static void CleanAndCreateDirectory(string path, string containmentBase)
     {
+        if (!PathContainment.IsContainedInRealPath(path, containmentBase))
+        {
+            throw new InvalidOperationException("Install destination escapes its expected root");
+        }
+
         try
         {
-            if (Directory.Exists(path))
+            // Delete any reparse point (symlink / self-loop) as a link first,
+            // never recursing through it — so replacing a symlinked
+            // destination can never touch whatever it points at.
+            var info = new FileInfo(path);
+            if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                DeleteReparsePoint(path);
+            }
+            else if (Directory.Exists(path))
             {
                 Directory.Delete(path, recursive: true);
             }
             else if (File.Exists(path))
             {
                 File.Delete(path);
-            }
-            else
-            {
-                var info = new FileInfo(path);
-                if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
-                {
-                    File.Delete(path);
-                }
             }
         }
         catch
@@ -325,6 +330,18 @@ internal sealed class Installer : IInstaller
 
     private static async Task CopyDirectoryAsync(string src, string dest, CancellationToken cancellationToken)
     {
+        var sourceRoot = RealPath.TryGetRealPath(src)
+            ?? throw new InvalidOperationException($"Source path cannot be resolved: {src}");
+
+        await CopyDirectoryAsync(src, dest, sourceRoot, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static async Task CopyDirectoryAsync(
+        string src,
+        string dest,
+        string sourceRoot,
+        CancellationToken cancellationToken)
+    {
         Directory.CreateDirectory(dest);
 
         var entries = new DirectoryInfo(src).EnumerateFileSystemInfos();
@@ -333,8 +350,10 @@ internal sealed class Installer : IInstaller
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var isDirectory = entry is DirectoryInfo;
-            if (IsExcluded(entry.Name, isDirectory))
+            var isReparsePoint = (entry.Attributes & FileAttributes.ReparsePoint) != 0;
+            var isDirectoryEntry = entry is DirectoryInfo;
+            var isDirectory = isDirectoryEntry && !isReparsePoint;
+            if (IsExcluded(entry.Name, isDirectoryEntry))
             {
                 continue;
             }
@@ -342,56 +361,67 @@ internal sealed class Installer : IInstaller
             var srcPath = entry.FullName;
             var destPath = Path.Combine(dest, entry.Name);
 
-            if (isDirectory)
+            if (isReparsePoint)
             {
-                await CopyDirectoryAsync(srcPath, destPath, cancellationToken).ConfigureAwait(false);
+                await CopyReparsePointTargetAsync(entry, destPath, sourceRoot, cancellationToken).ConfigureAwait(false);
+            }
+            else if (isDirectory)
+            {
+                await CopyDirectoryAsync(srcPath, destPath, sourceRoot, cancellationToken).ConfigureAwait(false);
             }
             else
             {
-                try
-                {
-                    var isSymlink = (entry.Attributes & FileAttributes.ReparsePoint) != 0;
-                    if (isSymlink)
-                    {
-                        // dereference: copy the target content instead of the link itself
-                        try
-                        {
-                            var resolved = entry.ResolveLinkTarget(returnFinalTarget: true);
-                            if (resolved is FileInfo file)
-                            {
-                                File.Copy(file.FullName, destPath, overwrite: true);
-                                continue;
-                            }
-
-                            if (resolved is DirectoryInfo dir)
-                            {
-                                await CopyDirectoryAsync(dir.FullName, destPath, cancellationToken)
-                                    .ConfigureAwait(false);
-                                continue;
-                            }
-                        }
-                        catch (FileNotFoundException)
-                        {
-                            Console.Error.WriteLine($"Skipping broken symlink: {srcPath}");
-                            continue;
-                        }
-                        catch (DirectoryNotFoundException)
-                        {
-                            Console.Error.WriteLine($"Skipping broken symlink: {srcPath}");
-                            continue;
-                        }
-                    }
-
-                    File.Copy(srcPath, destPath, overwrite: true);
-                }
-                catch (FileNotFoundException) when ((entry.Attributes & FileAttributes.ReparsePoint) != 0)
-                {
-                    Console.Error.WriteLine($"Skipping broken symlink: {srcPath}");
-                }
+                File.Copy(srcPath, destPath, overwrite: true);
             }
         }
 
         await Task.CompletedTask.ConfigureAwait(false);
+    }
+
+    private static async Task CopyReparsePointTargetAsync(
+        FileSystemInfo entry,
+        string destPath,
+        string sourceRoot,
+        CancellationToken cancellationToken)
+    {
+        FileSystemInfo? resolved;
+        try
+        {
+            resolved = entry.ResolveLinkTarget(returnFinalTarget: true);
+        }
+        catch (FileNotFoundException ex)
+        {
+            throw new InvalidOperationException($"Refusing to copy broken symlink: {entry.FullName}", ex);
+        }
+        catch (DirectoryNotFoundException ex)
+        {
+            throw new InvalidOperationException($"Refusing to copy broken symlink: {entry.FullName}", ex);
+        }
+
+        // A broken link does not always throw above: ResolveLinkTarget can
+        // return a non-null FileInfo whose Exists is false. Treat any target
+        // that does not actually exist as a broken symlink.
+        if (resolved is not { Exists: true })
+        {
+            throw new InvalidOperationException($"Refusing to copy broken symlink: {entry.FullName}");
+        }
+
+        if (!PathContainment.IsContainedInRealPath(resolved.FullName, sourceRoot))
+        {
+            throw new InvalidOperationException($"Refusing to copy symlink outside source root: {entry.FullName}");
+        }
+
+        switch (resolved)
+        {
+            case FileInfo file:
+                File.Copy(file.FullName, destPath, overwrite: true);
+                break;
+            case DirectoryInfo dir:
+                await CopyDirectoryAsync(dir.FullName, destPath, sourceRoot, cancellationToken).ConfigureAwait(false);
+                break;
+            default:
+                throw new InvalidOperationException($"Refusing to copy unsupported symlink target: {entry.FullName}");
+        }
     }
 
     private static bool IsExcluded(string name, bool isDirectory)
@@ -416,16 +446,16 @@ internal sealed class Installer : IInstaller
             var resolvedTarget = Path.GetFullPath(target);
             var resolvedLinkPath = Path.GetFullPath(linkPath);
 
-            var realTarget = TryGetRealPath(resolvedTarget) ?? resolvedTarget;
-            var realLinkPath = TryGetRealPath(resolvedLinkPath) ?? resolvedLinkPath;
+            var realTarget = RealPath.TryGetRealPath(resolvedTarget) ?? resolvedTarget;
+            var realLinkPath = RealPath.TryGetRealPath(resolvedLinkPath) ?? resolvedLinkPath;
 
             if (PathEquals(realTarget, realLinkPath))
             {
                 return true;
             }
 
-            var realTargetWithParents = ResolveParentSymlinks(target);
-            var realLinkPathWithParents = ResolveParentSymlinks(linkPath);
+            var realTargetWithParents = RealPath.ResolveWithNearestExistingParent(target) ?? resolvedTarget;
+            var realLinkPathWithParents = RealPath.ResolveWithNearestExistingParent(linkPath) ?? resolvedLinkPath;
 
             if (PathEquals(realTargetWithParents, realLinkPathWithParents))
             {
@@ -444,7 +474,7 @@ internal sealed class Installer : IInstaller
                         var existingTarget = info.LinkTarget;
                         if (existingTarget is not null)
                         {
-                            var resolvedExisting = ResolveSymlinkTarget(linkPath, existingTarget);
+                            var resolvedExisting = RealPath.ResolveSymlinkTarget(linkPath, existingTarget);
                             if (PathEquals(resolvedExisting, resolvedTarget))
                             {
                                 return true;
@@ -481,7 +511,8 @@ internal sealed class Installer : IInstaller
                 Directory.CreateDirectory(linkDir);
             }
 
-            var realLinkDir = ResolveParentSymlinksForDir(linkDir ?? string.Empty);
+            var realLinkDir = RealPath.ResolveWithNearestExistingParent(linkDir ?? string.Empty)
+                ?? Path.GetFullPath(linkDir ?? string.Empty);
             var relativePath = Path.GetRelativePath(realLinkDir, target);
 
             Directory.CreateSymbolicLink(linkPath, relativePath);
@@ -493,93 +524,9 @@ internal sealed class Installer : IInstaller
         }
     }
 
-    private static string? TryGetRealPath(string path)
-    {
-        try
-        {
-            if (Directory.Exists(path))
-            {
-                var info = new DirectoryInfo(path);
-                if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
-                {
-                    var resolved = info.ResolveLinkTarget(returnFinalTarget: true);
-                    if (resolved is not null)
-                    {
-                        return Path.GetFullPath(resolved.FullName);
-                    }
-                }
-
-                return Path.GetFullPath(info.FullName);
-            }
-
-            if (File.Exists(path))
-            {
-                var info = new FileInfo(path);
-                if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
-                {
-                    var resolved = info.ResolveLinkTarget(returnFinalTarget: true);
-                    if (resolved is not null)
-                    {
-                        return Path.GetFullPath(resolved.FullName);
-                    }
-                }
-
-                return Path.GetFullPath(info.FullName);
-            }
-        }
-        catch
-        {
-            // fall through
-        }
-
-        return null;
-    }
-
-    private static string ResolveParentSymlinks(string path)
-    {
-        var resolved = Path.GetFullPath(path);
-        var dir = Path.GetDirectoryName(resolved);
-        var baseName = Path.GetFileName(resolved);
-        if (string.IsNullOrEmpty(dir))
-        {
-            return resolved;
-        }
-
-        var realDir = TryGetRealPath(dir);
-        if (realDir is null)
-        {
-            return resolved;
-        }
-
-        return Path.Combine(realDir, baseName);
-    }
-
-    private static string ResolveParentSymlinksForDir(string dir)
-    {
-        if (string.IsNullOrEmpty(dir))
-        {
-            return dir;
-        }
-
-        var real = TryGetRealPath(dir);
-        return real ?? Path.GetFullPath(dir);
-    }
-
-    private static string ResolveSymlinkTarget(string linkPath, string linkTarget)
-    {
-        if (Path.IsPathRooted(linkTarget))
-        {
-            return Path.GetFullPath(linkTarget);
-        }
-
-        var dir = Path.GetDirectoryName(linkPath) ?? string.Empty;
-        return Path.GetFullPath(Path.Combine(dir, linkTarget));
-    }
-
     private static bool PathEquals(string a, string b)
     {
-        var comparison = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-        return string.Equals(a, b, comparison);
+        return string.Equals(a, b, PathContainment.Comparison);
     }
 
     private static void DeleteReparsePoint(string path)

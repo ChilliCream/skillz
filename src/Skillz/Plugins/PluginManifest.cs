@@ -30,7 +30,7 @@ internal sealed class PluginManifest : IPluginManifest
         List<string>? skills,
         List<string> searchDirs)
     {
-        if (!PathContainment.IsContainedIn(pluginBase, basePath))
+        if (!PathContainment.IsContainedInRealPath(pluginBase, basePath))
         {
             return;
         }
@@ -50,7 +50,7 @@ internal sealed class PluginManifest : IPluginManifest
                     continue;
                 }
 
-                if (PathContainment.IsContainedIn(skillDir, basePath))
+                if (PathContainment.IsContainedInRealPath(skillDir, basePath))
                 {
                     searchDirs.Add(skillDir);
                 }

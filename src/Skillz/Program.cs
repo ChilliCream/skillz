@@ -20,7 +20,7 @@ internal static class Program
     {
         // Strip bare `--` tokens — skillz has no pass-through commands and System.CommandLine
         // treats the terminator inconsistently with TS, which simply ignores it.
-        args = args.Where(a => a != "--").ToArray();
+        args = StripBareTerminators(args);
 
         using var cts = new CancellationTokenSource();
 
@@ -139,4 +139,6 @@ internal static class Program
             await host.StopAsync().ConfigureAwait(false);
         }
     }
+
+    internal static string[] StripBareTerminators(string[] args) => args.Where(a => a != "--").ToArray();
 }

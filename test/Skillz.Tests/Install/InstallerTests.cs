@@ -174,6 +174,144 @@ public class InstallerTests : IDisposable
     }
 
     [Fact]
+    public async Task CopyMode_RejectsFileSymlinkEscape()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var skillName = "file-link-escape";
+        var sourceDir = CreateSkillSource(skillName);
+        var outsideFile = Path.Combine(_root, "outside-secret.txt");
+        await File.WriteAllTextAsync(outsideFile, "secret", TestContext.Current.CancellationToken);
+        File.CreateSymbolicLink(Path.Combine(sourceDir, "loot.txt"), outsideFile);
+        var skill = MakeSkill(skillName, sourceDir);
+
+        var result = await _installer.InstallSkillForAgentAsync(
+            skill,
+            "codex",
+            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Success);
+        Assert.Contains("outside source root", result.Error);
+        Assert.False(File.Exists(Path.Combine(_projectDir, ".agents", "skills", skillName, "loot.txt")));
+    }
+
+    [Fact]
+    public async Task CopyMode_RejectsDirectorySymlinkEscape()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var skillName = "dir-link-escape";
+        var sourceDir = CreateSkillSource(skillName);
+        var outsideDir = Path.Combine(_root, "outside-dir");
+        Directory.CreateDirectory(outsideDir);
+        await File.WriteAllTextAsync(
+            Path.Combine(outsideDir, "secret.txt"),
+            "secret",
+            TestContext.Current.CancellationToken);
+        Directory.CreateSymbolicLink(Path.Combine(sourceDir, "loot"), outsideDir);
+        var skill = MakeSkill(skillName, sourceDir);
+
+        var result = await _installer.InstallSkillForAgentAsync(
+            skill,
+            "codex",
+            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Success);
+        Assert.Contains("outside source root", result.Error);
+    }
+
+    [Fact]
+    public async Task CopyMode_RejectsBrokenSymlink()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var skillName = "broken-link";
+        var sourceDir = CreateSkillSource(skillName);
+        File.CreateSymbolicLink(Path.Combine(sourceDir, "missing.txt"), Path.Combine(sourceDir, "nope.txt"));
+        var skill = MakeSkill(skillName, sourceDir);
+
+        var result = await _installer.InstallSkillForAgentAsync(
+            skill,
+            "codex",
+            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Success);
+        Assert.Contains("broken symlink", result.Error);
+    }
+
+    [Fact]
+    public async Task CopyMode_InRootSymlinkCopiesTargetContent()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var skillName = "in-root-link";
+        var sourceDir = CreateSkillSource(skillName);
+        var target = Path.Combine(sourceDir, "content.txt");
+        await File.WriteAllTextAsync(target, "linked content", TestContext.Current.CancellationToken);
+        File.CreateSymbolicLink(Path.Combine(sourceDir, "alias.txt"), target);
+        var skill = MakeSkill(skillName, sourceDir);
+
+        var result = await _installer.InstallSkillForAgentAsync(
+            skill,
+            "codex",
+            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(result.Success);
+        var copied = Path.Combine(_projectDir, ".agents", "skills", skillName, "alias.txt");
+        Assert.Equal("linked content", await File.ReadAllTextAsync(copied, TestContext.Current.CancellationToken));
+        Assert.True((new FileInfo(copied).Attributes & FileAttributes.ReparsePoint) == 0);
+    }
+
+    [Fact]
+    public async Task CopyMode_SymlinkedDestination_IsReplaced_WithoutFollowingTarget()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var skillName = "destination-link";
+        var sourceDir = CreateSkillSource(skillName);
+        var skill = MakeSkill(skillName, sourceDir);
+        var targetBase = Path.Combine(_projectDir, ".agents", "skills");
+        Directory.CreateDirectory(targetBase);
+        var outsideDir = Path.Combine(_root, "outside-destination");
+        Directory.CreateDirectory(outsideDir);
+        var installPath = Path.Combine(targetBase, skillName);
+        Directory.CreateSymbolicLink(installPath, outsideDir);
+
+        var result = await _installer.InstallSkillForAgentAsync(
+            skill,
+            "codex",
+            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            TestContext.Current.CancellationToken);
+
+        // The symlinked destination is replaced with a real directory; the
+        // install must never write through the link into the outside target.
+        Assert.True(result.Success);
+        Assert.True((new FileInfo(installPath).Attributes & FileAttributes.ReparsePoint) == 0);
+        Assert.True(File.Exists(Path.Combine(installPath, "SKILL.md")));
+        Assert.True(Directory.Exists(outsideDir));
+        Assert.False(File.Exists(Path.Combine(outsideDir, "SKILL.md")));
+    }
+
+    [Fact]
     public async Task UniversalAgent_ProjectInstall_DoesNotCreateSymlink()
     {
         var skillName = "universal-only-skill";

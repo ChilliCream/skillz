@@ -48,6 +48,7 @@ internal sealed class ProjectLockFile : IProjectLockFile
         }
         catch (JsonException)
         {
+            Console.Error.WriteLine($"Warning: Project lock file '{lockPath}' is corrupt and will be ignored for this read.");
             return CreateEmpty();
         }
     }
@@ -65,12 +66,10 @@ internal sealed class ProjectLockFile : IProjectLockFile
                 lockPath,
                 async () =>
                 {
-                    var existing = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
+                    var existing = await ReadInternalAsync(cwd, true, cancellationToken).ConfigureAwait(false);
                     if (existing.Version > CurrentVersion)
                     {
-                        Console.Error.WriteLine(
-                            $"Refusing to overwrite project lock file: on-disk version v{existing.Version} is newer than this skillz (v{CurrentVersion}).");
-                        return;
+                        throw CreateNewerVersionException(lockPath, existing.Version);
                     }
 
                     await WriteInternalAsync(sorted, cwd, cancellationToken).ConfigureAwait(false);
@@ -91,12 +90,10 @@ internal sealed class ProjectLockFile : IProjectLockFile
                 lockPath,
                 async () =>
                 {
-                    var lockFile = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
+                    var lockFile = await ReadInternalAsync(cwd, true, cancellationToken).ConfigureAwait(false);
                     if (lockFile.Version > CurrentVersion)
                     {
-                        Console.Error.WriteLine(
-                            $"Refusing to modify project lock file: on-disk version v{lockFile.Version} is newer than this skillz (v{CurrentVersion}).");
-                        return;
+                        throw CreateNewerVersionException(lockPath, lockFile.Version);
                     }
 
                     lockFile.Skills[skillName] = entry;
@@ -118,12 +115,10 @@ internal sealed class ProjectLockFile : IProjectLockFile
                 lockPath,
                 async () =>
                 {
-                    var lockFile = await ReadInternalAsync(cwd, cancellationToken).ConfigureAwait(false);
+                    var lockFile = await ReadInternalAsync(cwd, true, cancellationToken).ConfigureAwait(false);
                     if (lockFile.Version > CurrentVersion)
                     {
-                        Console.Error.WriteLine(
-                            $"Refusing to modify project lock file: on-disk version v{lockFile.Version} is newer than this skillz (v{CurrentVersion}).");
-                        return;
+                        throw CreateNewerVersionException(lockPath, lockFile.Version);
                     }
 
                     removed = lockFile.Skills.Remove(skillName);
@@ -201,7 +196,10 @@ internal sealed class ProjectLockFile : IProjectLockFile
         }
     }
 
-    private async Task<LocalSkillLockFile> ReadInternalAsync(string? cwd, CancellationToken cancellationToken)
+    private async Task<LocalSkillLockFile> ReadInternalAsync(
+        string? cwd,
+        bool throwOnCorrupt,
+        CancellationToken cancellationToken)
     {
         var lockPath = GetLockPath(cwd);
 
@@ -212,7 +210,17 @@ internal sealed class ProjectLockFile : IProjectLockFile
                 .DeserializeAsync(stream, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (parsed is null || parsed.Skills is null || parsed.Version < CurrentVersion)
+            if (parsed is null || parsed.Skills is null)
+            {
+                if (throwOnCorrupt)
+                {
+                    throw CreateCorruptLockException(lockPath);
+                }
+
+                return CreateEmpty();
+            }
+
+            if (parsed.Version < CurrentVersion)
             {
                 return CreateEmpty();
             }
@@ -229,6 +237,12 @@ internal sealed class ProjectLockFile : IProjectLockFile
         }
         catch (JsonException)
         {
+            if (throwOnCorrupt)
+            {
+                throw CreateCorruptLockException(lockPath);
+            }
+
+            Console.Error.WriteLine($"Warning: Project lock file '{lockPath}' is corrupt and will be ignored for this read.");
             return CreateEmpty();
         }
     }
@@ -238,12 +252,59 @@ internal sealed class ProjectLockFile : IProjectLockFile
         var lockPath = GetLockPath(cwd);
         var sorted = SortedCopy(lockFile);
 
-        await using var stream = File.Create(lockPath);
-        await JsonSerializer
-            .SerializeAsync(stream, sorted, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken)
-            .ConfigureAwait(false);
+        var tempPath = lockPath + ".tmp";
+        try
+        {
+            await using (var stream = new FileStream(
+                             tempPath,
+                             FileMode.Create,
+                             FileAccess.Write,
+                             FileShare.None,
+                             bufferSize: 4096,
+                             options: FileOptions.Asynchronous))
+            {
+                await JsonSerializer
+                    .SerializeAsync(stream, sorted, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken)
+                    .ConfigureAwait(false);
 
-        await stream.WriteAsync("\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
+                await stream.WriteAsync("\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
+                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            File.Move(tempPath, lockPath, overwrite: true);
+        }
+        catch
+        {
+            TryDelete(tempPath);
+            throw;
+        }
+    }
+
+    private static CliException CreateCorruptLockException(string lockPath)
+    {
+        return new CliException(
+            ExitCodeConstants.Failure,
+            $"Refusing to modify project lock file '{lockPath}' because it is corrupt or empty. Please repair or remove the file and retry.");
+    }
+
+    private static CliException CreateNewerVersionException(string lockPath, int version)
+    {
+        return new CliException(
+            ExitCodeConstants.Failure,
+            $"Refusing to modify project lock file '{lockPath}': on-disk version v{version} is newer than this skillz supports (v{CurrentVersion}).");
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     private static LocalSkillLockFile SortedCopy(LocalSkillLockFile lockFile)

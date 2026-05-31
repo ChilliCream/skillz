@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Skillz;
 using Skillz.Commands;
 using Skillz.Install;
 using Skillz.Interaction;
@@ -227,7 +228,7 @@ public class AddCommandTests : IDisposable
             configurePrompter: p =>
             {
                 p.OnSelectSkills = skills => skills.Where(s => s.InstallName == "beta").ToList();
-                p.OnConfirmInstallation = (_, _) => true;
+                p.OnConfirmInstallation = (_, _, _) => true;
             },
             configureInstaller: i =>
                 i.OnInstallRemoteSkill = (skill, _, _) =>
@@ -243,6 +244,95 @@ public class AddCommandTests : IDisposable
         Assert.Equal(0, exitCode);
         Assert.Contains("beta", installed);
         Assert.DoesNotContain("alpha", installed);
+    }
+
+    [Fact]
+    public async Task Add_Interactive_Confirmation_Includes_Existing_Canonical_Path()
+    {
+        var canonical = Path.Combine(_workspace, ".skillz", "skills", "alpha");
+        Directory.CreateDirectory(canonical);
+
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configurePrompter: p =>
+            {
+                p.OnConfirmInstallation = (_, _, overwrites) =>
+                    overwrites.Count == 1 && overwrites[0].DestinationPath == canonical;
+            },
+            configureInstaller: i =>
+            {
+                i.OnGetCanonicalPath = (skill, _, _) => Path.Combine(_workspace, ".skillz", "skills", skill);
+                i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, canonical);
+            });
+
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        var prompter = services.GetRequiredService<TestAddCommandPrompter>();
+        Assert.Equal(0, exitCode);
+        Assert.Single(prompter.LastOverwriteTargets);
+        Assert.Equal(canonical, prompter.LastOverwriteTargets[0].DestinationPath);
+    }
+
+    [Fact]
+    public async Task Add_Interactive_Cancel_With_Overwrite_Does_Not_Install()
+    {
+        var canonical = Path.Combine(_workspace, ".skillz", "skills", "alpha");
+        Directory.CreateDirectory(canonical);
+        var installed = false;
+
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configurePrompter: p => p.OnConfirmInstallation = (_, _, _) => false,
+            configureInstaller: i =>
+            {
+                i.OnGetCanonicalPath = (skill, _, _) => Path.Combine(_workspace, ".skillz", "skills", skill);
+                i.OnInstallRemoteSkill = (_, _, _) =>
+                {
+                    installed = true;
+                    return new InstallResult(true, canonical);
+                };
+            });
+
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        Assert.Equal(ExitCodeConstants.Cancelled, exitCode);
+        Assert.False(installed);
+    }
+
+    [Fact]
+    public async Task Add_Yes_Warns_About_Overwrite_Before_Installing()
+    {
+        var canonical = Path.Combine(_workspace, ".skillz", "skills", "alpha");
+        Directory.CreateDirectory(canonical);
+
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") });
+        var interaction = services.GetRequiredService<TestInteractionService>();
+        var installer = services.GetRequiredService<TestInstaller>();
+        installer.OnGetCanonicalPath = (skill, _, _) => Path.Combine(_workspace, ".skillz", "skills", skill);
+        installer.OnInstallRemoteSkill = (_, _, _) =>
+        {
+            interaction.WriteLine("INSTALL ACTION");
+            return new InstallResult(true, canonical);
+        };
+
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        var output = services.GetRequiredService<TestInteractionService>().Output.ToList();
+        var warningIndex = output.FindIndex(line => line.Contains("Overwriting existing skill", StringComparison.Ordinal));
+        var installIndex = output.FindIndex(line => line.Contains("INSTALL ACTION", StringComparison.Ordinal));
+        Assert.Equal(0, exitCode);
+        Assert.True(warningIndex >= 0);
+        Assert.True(installIndex > warningIndex);
     }
 
     [Fact]

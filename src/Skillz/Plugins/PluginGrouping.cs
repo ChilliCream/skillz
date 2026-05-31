@@ -20,7 +20,7 @@ internal sealed class PluginGrouping : IPluginGrouping
                     return;
                 }
 
-                if (!PathContainment.IsContainedIn(pluginBase, basePath))
+                if (!PathContainment.IsContainedInRealPath(pluginBase, basePath))
                 {
                     return;
                 }
@@ -43,7 +43,7 @@ internal sealed class PluginGrouping : IPluginGrouping
                             fullPath = Path.GetDirectoryName(fullPath) ?? fullPath;
                         }
 
-                        if (PathContainment.IsContainedIn(skillDir, basePath))
+                        if (PathContainment.IsContainedInRealPath(skillDir, basePath))
                         {
                             groupings[fullPath] = name;
                         }
@@ -76,7 +76,7 @@ internal sealed class PluginGrouping : IPluginGrouping
                         fullPath = Path.GetDirectoryName(fullPath) ?? fullPath;
                     }
 
-                    if (PathContainment.IsContainedIn(skillDir, basePath))
+                    if (PathContainment.IsContainedInRealPath(skillDir, basePath))
                     {
                         groupings[fullPath] = name;
                     }

@@ -21,5 +21,8 @@ internal interface IAddCommandPrompter
     Task<bool> ConfirmInstallationAsync(
         IReadOnlyList<RemoteSkill> skills,
         IReadOnlyList<string> agents,
+        IReadOnlyList<OverwriteTarget> overwrites,
         CancellationToken cancellationToken = default);
 }
+
+internal sealed record OverwriteTarget(string SkillName, string DestinationPath);

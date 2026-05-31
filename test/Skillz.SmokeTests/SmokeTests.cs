@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.Versioning;
 using CliWrap;
 using CliWrap.Buffered;
 using Xunit;
@@ -8,6 +9,8 @@ namespace Skillz.SmokeTests;
 public class SmokeTests
 {
     private static readonly string ProjectPath = ResolveProjectPath();
+    private static readonly string TargetFramework = ResolveTargetFramework();
+    private static readonly string Configuration = ResolveConfiguration();
 
     [Fact]
     public async Task Version_Flag_Prints_Version()
@@ -72,8 +75,14 @@ public class SmokeTests
 
     private static async Task<BufferedCommandResult> RunSkillzAsync(string arguments, string? workingDirectory = null)
     {
-        var args = new[] { "run", "--project", ProjectPath, "--framework", "net9.0", "--no-build", "--" }.Concat(
-            SplitArguments(arguments));
+        // Run the already-built CLI in the SAME configuration these tests were
+        // built in. 'dotnet run --no-build' defaults to Debug, so without this
+        // a Release test run (e.g. CI) would point at a Debug build that does
+        // not exist and every smoke test would fail with exit code 1.
+        var args = new[]
+        {
+            "run", "--project", ProjectPath, "-c", Configuration, "--framework", TargetFramework, "--no-build", "--"
+        }.Concat(SplitArguments(arguments));
 
         var command = Cli.Wrap("dotnet").WithArguments(args).WithValidation(CommandResultValidation.None);
 
@@ -83,6 +92,44 @@ public class SmokeTests
         }
 
         return await command.ExecuteBufferedAsync(TestContext.Current.CancellationToken);
+    }
+
+    private static string ResolveConfiguration()
+    {
+        var configured = Environment.GetEnvironmentVariable("SKILLZ_SMOKE_TEST_CONFIGURATION");
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return configured.Trim();
+        }
+
+#if DEBUG
+        return "Debug";
+#else
+        return "Release";
+#endif
+    }
+
+    private static string ResolveTargetFramework()
+    {
+        var configuredFramework = Environment.GetEnvironmentVariable("SKILLZ_SMOKE_TEST_TFM");
+        if (!string.IsNullOrWhiteSpace(configuredFramework))
+        {
+            return configuredFramework.Trim();
+        }
+
+        var frameworkName =
+            typeof(SmokeTests).Assembly.GetCustomAttributes(typeof(TargetFrameworkAttribute), inherit: false)
+                .OfType<TargetFrameworkAttribute>()
+                .Single()
+                .FrameworkName;
+
+        var versionPrefix = ".NETCoreApp,Version=v";
+        if (!frameworkName.StartsWith(versionPrefix, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException($"Unsupported target framework '{frameworkName}'.");
+        }
+
+        return "net" + frameworkName[versionPrefix.Length..];
     }
 
     private static IEnumerable<string> SplitArguments(string arguments)

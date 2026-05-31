@@ -13,7 +13,7 @@ internal sealed class UpdateCommand(
     IGlobalLockFile globalLockFile,
     IProjectLockFile projectLockFile,
     IBlobClient blobClient,
-    ConsoleEnvironment consoleEnvironment) : BaseCommand(CommandName, "Check for and apply skill updates.")
+    ConsoleEnvironment consoleEnvironment) : BaseCommand(CommandName, "Check for skill updates.")
 {
     public const string CommandName = "update";
 
@@ -64,7 +64,7 @@ internal sealed class UpdateCommand(
 
         if (skillFilter is not null)
         {
-            interaction.WriteMarkupLine($"Updating {Markup.Escape(string.Join(", ", skillFilter))}...");
+            interaction.WriteMarkupLine($"Checking {Markup.Escape(string.Join(", ", skillFilter))}...");
         }
         else
         {
@@ -73,7 +73,7 @@ internal sealed class UpdateCommand(
 
         interaction.WriteLine();
 
-        var totalSuccess = 0;
+        var totalUpdatesAvailable = 0;
         var totalFail = 0;
         var totalFound = 0;
 
@@ -85,7 +85,7 @@ internal sealed class UpdateCommand(
             }
 
             var globalResult = await UpdateGlobalSkillsAsync(skillFilter, cancellationToken).ConfigureAwait(false);
-            totalSuccess += globalResult.SuccessCount;
+            totalUpdatesAvailable += globalResult.UpdatesAvailableCount;
             totalFail += globalResult.FailCount;
             totalFound += globalResult.CheckedCount;
 
@@ -103,7 +103,7 @@ internal sealed class UpdateCommand(
             }
 
             var projectResult = await UpdateProjectSkillsAsync(skillFilter, cancellationToken).ConfigureAwait(false);
-            totalSuccess += projectResult.SuccessCount;
+            totalUpdatesAvailable += projectResult.UpdatesAvailableCount;
             totalFail += projectResult.FailCount;
             totalFound += projectResult.FoundCount;
         }
@@ -115,9 +115,10 @@ internal sealed class UpdateCommand(
 
         interaction.WriteLine();
 
-        if (totalSuccess > 0)
+        if (totalUpdatesAvailable > 0)
         {
-            interaction.WriteSuccess($"Updated {totalSuccess} skill(s)");
+            interaction.WriteWarning(
+                $"Updates available for {totalUpdatesAvailable} skill(s); no updates were applied.");
         }
 
         if (totalFail > 0)
@@ -207,7 +208,7 @@ internal sealed class UpdateCommand(
         return Task.FromResult(false);
     }
 
-    private async Task<(int SuccessCount, int FailCount, int CheckedCount)> UpdateGlobalSkillsAsync(
+    private async Task<(int UpdatesAvailableCount, int FailCount, int CheckedCount)> UpdateGlobalSkillsAsync(
         string[]? skillFilter,
         CancellationToken cancellationToken)
     {
@@ -301,20 +302,20 @@ internal sealed class UpdateCommand(
         interaction.WriteMarkupLine($"Found {updates.Count} global update(s)");
         interaction.WriteLine();
 
-        var successCount = 0;
+        var updatesAvailableCount = 0;
 
         foreach (var (name, _) in updates)
         {
             interaction.WriteMarkupLine($"[grey85]Update available:[/] {Markup.Escape(name)}");
             interaction.WriteDim($"  Run: skillz add {BuildInstallSource(lockFile.Skills[name])} -g -y");
-            successCount++;
+            updatesAvailableCount++;
         }
 
         PrintSkippedSkills(skipped);
-        return (successCount, 0, checkedCount);
+        return (updatesAvailableCount, 0, checkedCount);
     }
 
-    private async Task<(int SuccessCount, int FailCount, int FoundCount)> UpdateProjectSkillsAsync(
+    private async Task<(int UpdatesAvailableCount, int FailCount, int FoundCount)> UpdateProjectSkillsAsync(
         string[]? skillFilter,
         CancellationToken cancellationToken)
     {
@@ -353,23 +354,23 @@ internal sealed class UpdateCommand(
             return (0, 0, projectSkills.Count);
         }
 
-        interaction.WriteMarkupLine($"Refreshing {updatable.Count} skill(s)...");
+        interaction.WriteMarkupLine($"Found {updatable.Count} project update(s)");
         interaction.WriteLine();
 
-        var successCount = 0;
+        var updatesAvailableCount = 0;
 
         foreach (var (name, entry) in updatable)
         {
             var installUrl = BuildLocalInstallSource(entry);
             interaction.WriteMarkupLine($"[grey85]Update available:[/] {Markup.Escape(name)}");
             interaction.WriteDim($"  Run: skillz add {installUrl} --skill {name} -y");
-            successCount++;
+            updatesAvailableCount++;
         }
 
         PrintLegacyProjectSkills(legacy);
         await Task.CompletedTask.ConfigureAwait(false);
 
-        return (successCount, 0, projectSkills.Count);
+        return (updatesAvailableCount, 0, projectSkills.Count);
     }
 
     private async Task<string?> TryFetchSkillFolderHashAsync(

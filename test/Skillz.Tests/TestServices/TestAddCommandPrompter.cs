@@ -14,7 +14,10 @@ internal sealed class TestAddCommandPrompter : IAddCommandPrompter
 
     public Func<InstallMode>? OnSelectInstallMode { get; set; }
 
-    public Func<IReadOnlyList<RemoteSkill>, IReadOnlyList<string>, bool>? OnConfirmInstallation { get; set; }
+    public Func<IReadOnlyList<RemoteSkill>, IReadOnlyList<string>, IReadOnlyList<OverwriteTarget>, bool>?
+        OnConfirmInstallation { get; set; }
+
+    public IReadOnlyList<OverwriteTarget> LastOverwriteTargets { get; private set; } = [];
 
     public Task<IReadOnlyList<RemoteSkill>> SelectSkillsAsync(
         IReadOnlyList<RemoteSkill> skills,
@@ -48,9 +51,11 @@ internal sealed class TestAddCommandPrompter : IAddCommandPrompter
     public Task<bool> ConfirmInstallationAsync(
         IReadOnlyList<RemoteSkill> skills,
         IReadOnlyList<string> agents,
+        IReadOnlyList<OverwriteTarget> overwrites,
         CancellationToken cancellationToken = default)
     {
-        var result = OnConfirmInstallation is null || OnConfirmInstallation(skills, agents);
+        LastOverwriteTargets = overwrites;
+        var result = OnConfirmInstallation is null || OnConfirmInstallation(skills, agents, overwrites);
         return Task.FromResult(result);
     }
 }

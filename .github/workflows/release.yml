@@ -30,10 +30,10 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          global-json-file: global.json
 
       - name: Publish
-        run: dotnet publish src/Skillz/Skillz.csproj -c Release -r ${{ matrix.rid }} --self-contained -o ./publish/${{ matrix.rid }}
+        run: dotnet publish src/Skillz/Skillz.csproj -c Release -f net10.0 -r ${{ matrix.rid }} --self-contained -o ./publish/${{ matrix.rid }}
 
       - uses: actions/upload-artifact@v4
         with:
@@ -48,7 +48,7 @@ jobs:
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '9.0.x'
+          global-json-file: global.json
 
       - name: Pack
         run: dotnet pack src/Skillz.Tool/Skillz.Tool.csproj -c Release -o ./nupkg

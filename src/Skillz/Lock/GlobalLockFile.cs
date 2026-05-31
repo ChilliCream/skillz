@@ -59,6 +59,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         }
         catch (JsonException)
         {
+            Console.Error.WriteLine($"Warning: Global lock file '{lockPath}' is corrupt and will be ignored for this read.");
             return CreateEmpty();
         }
     }
@@ -77,12 +78,10 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                 lockPath,
                 async () =>
                 {
-                    var existing = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
+                    var existing = await ReadInternalAsync(true, cancellationToken).ConfigureAwait(false);
                     if (existing.Version > CurrentVersion)
                     {
-                        Console.Error.WriteLine(
-                            $"Refusing to overwrite global lock file: on-disk version v{existing.Version} is newer than this skillz (v{CurrentVersion}).");
-                        return;
+                        throw CreateNewerVersionException(lockPath, existing.Version);
                     }
 
                     await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
@@ -108,10 +107,10 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                 lockPath,
                 async () =>
                 {
-                    var lockFile = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
+                    var lockFile = await ReadInternalAsync(true, cancellationToken).ConfigureAwait(false);
                     if (lockFile.Version > CurrentVersion)
                     {
-                        return;
+                        throw CreateNewerVersionException(lockPath, lockFile.Version);
                     }
 
                     var now = _utcNow().ToString("o");
@@ -145,11 +144,10 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                 lockPath,
                 async () =>
                 {
-                    var lockFile = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
+                    var lockFile = await ReadInternalAsync(true, cancellationToken).ConfigureAwait(false);
                     if (lockFile.Version > CurrentVersion)
                     {
-                        removed = false;
-                        return;
+                        throw CreateNewerVersionException(lockPath, lockFile.Version);
                     }
 
                     removed = lockFile.Skills.Remove(skillName);
@@ -198,32 +196,25 @@ internal sealed class GlobalLockFile : IGlobalLockFile
             Directory.CreateDirectory(directory);
         }
 
-        try
-        {
-            await FileLock
-                .WithLockAsync(
-                    lockPath,
-                    async () =>
+        await FileLock
+            .WithLockAsync(
+                lockPath,
+                async () =>
+                {
+                    var lockFile = await ReadInternalAsync(true, cancellationToken).ConfigureAwait(false);
+                    if (lockFile.Version > CurrentVersion)
                     {
-                        var lockFile = await ReadInternalAsync(cancellationToken).ConfigureAwait(false);
-                        if (lockFile.Version > CurrentVersion)
-                        {
-                            return;
-                        }
+                        throw CreateNewerVersionException(lockPath, lockFile.Version);
+                    }
 
-                        lockFile.LastSelectedAgents = agents.ToList();
-                        await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
-                    },
-                    cancellationToken: cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch
-        {
-            // Silently swallow — corrupted lock must not break add
-        }
+                    lockFile.LastSelectedAgents = agents.ToList();
+                    await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
+                },
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
     }
 
-    private async Task<SkillLockFile> ReadInternalAsync(CancellationToken cancellationToken)
+    private async Task<SkillLockFile> ReadInternalAsync(bool throwOnCorrupt, CancellationToken cancellationToken)
     {
         var lockPath = _xdgPaths.GetGlobalLockPath();
 
@@ -236,6 +227,11 @@ internal sealed class GlobalLockFile : IGlobalLockFile
 
             if (parsed is null || parsed.Skills is null)
             {
+                if (throwOnCorrupt)
+                {
+                    throw CreateCorruptLockException(lockPath);
+                }
+
                 return CreateEmpty();
             }
 
@@ -246,8 +242,11 @@ internal sealed class GlobalLockFile : IGlobalLockFile
 
             if (parsed.Version > CurrentVersion)
             {
-                Console.Error.WriteLine(
-                    $"Warning: Lock file was written by a newer version of skillz (v{parsed.Version}, this is v{CurrentVersion}). Data will be preserved but some fields may be ignored.");
+                if (!throwOnCorrupt)
+                {
+                    Console.Error.WriteLine(
+                        $"Warning: Lock file was written by a newer version of skillz (v{parsed.Version}, this is v{CurrentVersion}). Data will be preserved but some fields may be ignored.");
+                }
                 return parsed;
             }
 
@@ -263,6 +262,12 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         }
         catch (JsonException)
         {
+            if (throwOnCorrupt)
+            {
+                throw CreateCorruptLockException(lockPath);
+            }
+
+            Console.Error.WriteLine($"Warning: Global lock file '{lockPath}' is corrupt and will be ignored for this read.");
             return CreateEmpty();
         }
     }
@@ -277,10 +282,57 @@ internal sealed class GlobalLockFile : IGlobalLockFile
             lockFile.Dismissed = null;
         }
 
-        await using var stream = File.Create(lockPath);
-        await JsonSerializer
-            .SerializeAsync(stream, lockFile, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken)
-            .ConfigureAwait(false);
+        var tempPath = lockPath + ".tmp";
+        try
+        {
+            await using (var stream = new FileStream(
+                             tempPath,
+                             FileMode.Create,
+                             FileAccess.Write,
+                             FileShare.None,
+                             bufferSize: 4096,
+                             options: FileOptions.Asynchronous))
+            {
+                await JsonSerializer
+                    .SerializeAsync(stream, lockFile, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken)
+                    .ConfigureAwait(false);
+                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+            }
+
+            File.Move(tempPath, lockPath, overwrite: true);
+        }
+        catch
+        {
+            TryDelete(tempPath);
+            throw;
+        }
+    }
+
+    private static CliException CreateCorruptLockException(string lockPath)
+    {
+        return new CliException(
+            ExitCodeConstants.Failure,
+            $"Refusing to modify global lock file '{lockPath}' because it is corrupt or empty. Please repair or remove the file and retry.");
+    }
+
+    private static CliException CreateNewerVersionException(string lockPath, int version)
+    {
+        return new CliException(
+            ExitCodeConstants.Failure,
+            $"Refusing to modify global lock file '{lockPath}': on-disk version v{version} is newer than this skillz supports (v{CurrentVersion}).");
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     private static SkillLockFile CreateEmpty()

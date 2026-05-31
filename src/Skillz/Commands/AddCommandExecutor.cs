@@ -1,3 +1,11 @@
+using Skillz.Install;
+using Skillz.Interaction;
+using Skillz.Lock;
+using Skillz.Skills;
+using Skillz.Sources;
+using Skillz.Sources.Providers;
+using Spectre.Console;
+
 namespace Skillz.Commands;
 
 internal sealed class AddCommandExecutor(
@@ -186,10 +194,12 @@ internal sealed class AddCommandExecutor(
             installMode = await prompter.SelectInstallModeAsync(cancellationToken).ConfigureAwait(false);
         }
 
+        var overwriteTargets = GetOverwriteTargets(selectedSkills, installGlobally);
+
         if (!nonInteractive)
         {
             var confirmed = await prompter
-                .ConfirmInstallationAsync(selectedSkills, targetAgents, cancellationToken)
+                .ConfirmInstallationAsync(selectedSkills, targetAgents, overwriteTargets, cancellationToken)
                 .ConfigureAwait(false);
             if (!confirmed)
             {
@@ -199,14 +209,13 @@ internal sealed class AddCommandExecutor(
         }
 
         var installOptions = new InstallOptions(installGlobally, Cwd: null, installMode);
-
-        var existingSkills = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var skill in selectedSkills)
+        var existingSkills = overwriteTargets.Select(o => o.SkillName).ToHashSet(StringComparer.Ordinal);
+        if (nonInteractive)
         {
-            var canonicalPath = installer.GetCanonicalPath(skill.InstallName, installGlobally);
-            if (Directory.Exists(canonicalPath))
+            foreach (var overwrite in overwriteTargets)
             {
-                existingSkills.Add(skill.InstallName);
+                interaction.WriteWarning(
+                    $"Overwriting existing skill '{overwrite.SkillName}' at {overwrite.DestinationPath}");
             }
         }
 
@@ -299,7 +308,41 @@ internal sealed class AddCommandExecutor(
                 .Expand());
 
         interaction.WriteLine();
-        interaction.WriteDim("Done!  Review skills before use; they run with full agent permissions.");
+        interaction.WriteWarning("Done!  Review skills before use; they run with full agent permissions.");
+    }
+
+    private IReadOnlyList<OverwriteTarget> GetOverwriteTargets(
+        IReadOnlyList<RemoteSkill> selectedSkills,
+        bool installGlobally)
+    {
+        var overwrites = new List<OverwriteTarget>();
+        foreach (var skill in selectedSkills)
+        {
+            var canonicalPath = installer.GetCanonicalPath(skill.InstallName, installGlobally);
+            if (PathExists(canonicalPath))
+            {
+                overwrites.Add(new OverwriteTarget(skill.InstallName, canonicalPath));
+            }
+        }
+
+        return overwrites;
+    }
+
+    private static bool PathExists(string path)
+    {
+        if (Directory.Exists(path) || File.Exists(path))
+        {
+            return true;
+        }
+
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private string GetAgentDisplay(string agentType)

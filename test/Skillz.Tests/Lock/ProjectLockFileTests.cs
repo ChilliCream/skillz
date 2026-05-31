@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Skillz;
 using Skillz.Lock;
 using Xunit;
 
@@ -113,6 +114,68 @@ public class ProjectLockFileTests : IDisposable
 
         Assert.Equal(ProjectLockFile.CurrentVersion, result.Version);
         Assert.Empty(result.Skills);
+        // A plain read must not rewrite or wipe a conflicted file on disk.
+        Assert.Equal(
+            conflicted,
+            await File.ReadAllTextAsync(Path.Combine(_tempDir, "skills-lock.json"), TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task AddEntryAsync_Refuses_Corrupted_Json_And_Preserves_File()
+    {
+        var lockPath = Path.Combine(_tempDir, "skills-lock.json");
+        const string corrupt = "{ this is not json";
+        await File.WriteAllTextAsync(lockPath, corrupt, TestContext.Current.CancellationToken);
+
+        var lockFile = new ProjectLockFile();
+        var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
+            "new-skill",
+            new LocalSkillLockEntry { Source = "org/repo", SourceType = "github", ComputedHash = "hash123" },
+            _tempDir,
+            TestContext.Current.CancellationToken));
+
+        Assert.Contains("corrupt", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(corrupt, await File.ReadAllTextAsync(lockPath, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task AddEntryAsync_Refuses_Zero_Byte_Lock_And_Preserves_File()
+    {
+        var lockPath = Path.Combine(_tempDir, "skills-lock.json");
+        await File.WriteAllBytesAsync(lockPath, [], TestContext.Current.CancellationToken);
+
+        var lockFile = new ProjectLockFile();
+        var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
+            "new-skill",
+            new LocalSkillLockEntry { Source = "org/repo", SourceType = "github", ComputedHash = "hash123" },
+            _tempDir,
+            TestContext.Current.CancellationToken));
+
+        Assert.Contains("corrupt", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, new FileInfo(lockPath).Length);
+    }
+
+    [Fact]
+    public async Task AddEntryAsync_Rejects_Newer_Lock_Version_And_Preserves_File()
+    {
+        var lockPath = Path.Combine(_tempDir, "skills-lock.json");
+        var newer = $$"""
+            {
+              "version": {{ProjectLockFile.CurrentVersion + 1}},
+              "skills": {}
+            }
+            """;
+        await File.WriteAllTextAsync(lockPath, newer, TestContext.Current.CancellationToken);
+
+        var lockFile = new ProjectLockFile();
+        var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
+            "new-skill",
+            new LocalSkillLockEntry { Source = "org/repo", SourceType = "github", ComputedHash = "hash123" },
+            _tempDir,
+            TestContext.Current.CancellationToken));
+
+        Assert.Contains("newer", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(newer, await File.ReadAllTextAsync(lockPath, TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -183,6 +246,39 @@ public class ProjectLockFileTests : IDisposable
         var skills = doc.RootElement.GetProperty("skills");
         var keys = skills.EnumerateObject().Select(p => p.Name).ToList();
         Assert.Equal(new[] { "alpha-skill", "middle-skill", "zebra-skill" }, keys);
+        Assert.False(File.Exists(Path.Combine(_tempDir, "skills-lock.json.tmp")));
+    }
+
+    [Fact]
+    public async Task WriteAsync_Replaces_Existing_File_Without_Leaving_Temp_File()
+    {
+        var lockFile = new ProjectLockFile();
+        await lockFile.AddEntryAsync(
+            "old-skill",
+            new LocalSkillLockEntry { Source = "org/old", SourceType = "github", ComputedHash = "old" },
+            _tempDir,
+            TestContext.Current.CancellationToken);
+
+        var replacement = new LocalSkillLockFile
+        {
+            Version = ProjectLockFile.CurrentVersion,
+            Skills = new Dictionary<string, LocalSkillLockEntry>(StringComparer.Ordinal)
+            {
+                ["new-skill"] = new()
+                {
+                    Source = "org/new",
+                    SourceType = "github",
+                    ComputedHash = "new"
+                }
+            }
+        };
+
+        await lockFile.WriteAsync(replacement, _tempDir, TestContext.Current.CancellationToken);
+
+        var output = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("old-skill", output.Skills.Keys);
+        Assert.Equal("new", output.Skills["new-skill"].ComputedHash);
+        Assert.False(File.Exists(Path.Combine(_tempDir, "skills-lock.json.tmp")));
     }
 
     [Fact]
