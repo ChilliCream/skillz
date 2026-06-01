@@ -461,7 +461,7 @@ internal sealed class AddCommandExecutor(
         if (consoleEnvironment.IsInputRedirected)
         {
             interaction.WriteWarning("Installation cancelled");
-            return Array.Empty<RemoteSkill>();
+            return [];
         }
 
         return await prompter.SelectSkillsAsync(skills, cancellationToken).ConfigureAwait(false);
@@ -501,7 +501,7 @@ internal sealed class AddCommandExecutor(
             if (invalid.Count > 0)
             {
                 interaction.WriteError($"Invalid agents: {string.Join(", ", invalid)}");
-                return Array.Empty<string>();
+                return [];
             }
 
             return options.Agents;

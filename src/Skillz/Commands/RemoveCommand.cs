@@ -56,9 +56,9 @@ internal sealed class RemoveCommand(
         ParseResult parseResult,
         CancellationToken cancellationToken)
     {
-        var requestedSkills = parseResult.GetValue(_skillsArgument) ?? Array.Empty<string>();
+        var requestedSkills = parseResult.GetValue(_skillsArgument) ?? [];
         var global = parseResult.GetValue(_globalOption);
-        var agents = parseResult.GetValue(_agentOption) ?? Array.Empty<string>();
+        var agents = parseResult.GetValue(_agentOption) ?? [];
         var yes = parseResult.GetValue(_yesOption);
         var all = parseResult.GetValue(_allOption);
 

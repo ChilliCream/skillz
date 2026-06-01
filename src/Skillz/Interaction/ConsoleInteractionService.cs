@@ -111,7 +111,7 @@ internal sealed class ConsoleInteractionService : IInteractionService
         var pairs = choices.ToList();
         if (pairs.Count == 0)
         {
-            return Array.Empty<T>();
+            return [];
         }
 
         var labels = pairs.Select(c => c.Label).ToArray();

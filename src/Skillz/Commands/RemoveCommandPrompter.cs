@@ -17,7 +17,7 @@ internal sealed class RemoveCommandPrompter : IRemoveCommandPrompter
     {
         if (installed.Count == 0)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         var choices = installed.Select(s => (s, s));

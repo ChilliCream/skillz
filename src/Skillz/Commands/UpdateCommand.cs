@@ -17,7 +17,7 @@ internal sealed class UpdateCommand(
 {
     public const string CommandName = "update";
 
-    public static readonly IReadOnlyList<string> CommandAliases = new[] { "upgrade", "check" };
+    public static readonly IReadOnlyList<string> CommandAliases = ["upgrade", "check"];
 
     private readonly Argument<string[]> _skillsArgument = new("skills")
     {

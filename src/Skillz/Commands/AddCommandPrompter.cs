@@ -24,7 +24,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
     {
         if (skills.Count == 0)
         {
-            return Array.Empty<RemoteSkill>();
+            return [];
         }
 
         if (skills.Count == 1)
@@ -57,7 +57,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
     {
         if (available.Count == 0)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         // Try to get last-used agents as pre-selection defaults

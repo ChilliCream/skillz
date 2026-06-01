@@ -92,8 +92,8 @@ internal sealed class AddCommand(IInteractionService interaction, AddCommandExec
             source = null;
         }
         var global = parseResult.GetValue(_globalOption);
-        var agents = parseResult.GetValue(_agentOption) ?? Array.Empty<string>();
-        var skills = parseResult.GetValue(_skillOption) ?? Array.Empty<string>();
+        var agents = parseResult.GetValue(_agentOption) ?? [];
+        var skills = parseResult.GetValue(_skillOption) ?? [];
         var yes = parseResult.GetValue(_yesOption);
         var all = parseResult.GetValue(_allOption);
         var copy = parseResult.GetValue(_copyOption);
