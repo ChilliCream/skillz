@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Install;
 using Skillz.Skills;
 
@@ -5,12 +6,12 @@ namespace Skillz.Commands;
 
 internal interface IAddCommandPrompter
 {
-    Task<IReadOnlyList<RemoteSkill>> SelectSkillsAsync(
-        IReadOnlyList<RemoteSkill> skills,
+    Task<ImmutableArray<RemoteSkill>> SelectSkillsAsync(
+        ImmutableArray<RemoteSkill> skills,
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<string>> SelectAgentsAsync(
-        IReadOnlyList<string> available,
+    Task<ImmutableArray<string>> SelectAgentsAsync(
+        ImmutableArray<string> available,
         bool global,
         CancellationToken cancellationToken = default);
 
@@ -19,9 +20,9 @@ internal interface IAddCommandPrompter
     Task<InstallMode> SelectInstallModeAsync(CancellationToken cancellationToken = default);
 
     Task<bool> ConfirmInstallationAsync(
-        IReadOnlyList<RemoteSkill> skills,
-        IReadOnlyList<string> agents,
-        IReadOnlyList<OverwriteTarget> overwrites,
+        ImmutableArray<RemoteSkill> skills,
+        ImmutableArray<string> agents,
+        ImmutableArray<OverwriteTarget> overwrites,
         CancellationToken cancellationToken = default);
 }
 

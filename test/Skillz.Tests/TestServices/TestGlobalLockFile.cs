@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Lock;
 
 namespace Skillz.Tests.TestServices;
@@ -48,13 +49,13 @@ internal sealed class TestGlobalLockFile : IGlobalLockFile
 
     public Action<IReadOnlyList<string>>? OnSaveLastSelectedAgents { get; set; }
 
-    public Task<IReadOnlyList<string>?> GetLastSelectedAgentsAsync(CancellationToken cancellationToken = default)
+    public Task<ImmutableArray<string>?> GetLastSelectedAgentsAsync(CancellationToken cancellationToken = default)
     {
         var result = OnGetLastSelectedAgents?.Invoke();
-        return Task.FromResult(result);
+        return Task.FromResult<ImmutableArray<string>?>(result is null ? null : [.. result]);
     }
 
-    public Task SaveLastSelectedAgentsAsync(IReadOnlyList<string> agents, CancellationToken cancellationToken = default)
+    public Task SaveLastSelectedAgentsAsync(ImmutableArray<string> agents, CancellationToken cancellationToken = default)
     {
         OnSaveLastSelectedAgents?.Invoke(agents);
         return Task.CompletedTask;

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Interaction;
 using Spectre.Console;
 
@@ -124,7 +125,7 @@ internal sealed class TestInteractionService : IInteractionService
         return Task.FromResult(pairs.First(c => c.Label == selectedLabel).Value);
     }
 
-    public Task<IReadOnlyList<T>> MultiSelectAsync<T>(
+    public Task<ImmutableArray<T>> MultiSelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
         CancellationToken cancellationToken = default)
@@ -133,13 +134,13 @@ internal sealed class TestInteractionService : IInteractionService
         var pairs = choices.ToList();
         if (pairs.Count == 0)
         {
-            return Task.FromResult<IReadOnlyList<T>>(Array.Empty<T>());
+            return Task.FromResult<ImmutableArray<T>>([]);
         }
 
         var labels = pairs.Select(c => c.Label).ToList();
         var selectedLabels = OnMultiSelect is not null ? OnMultiSelect(message, labels) : Array.Empty<string>();
         var selectedSet = new HashSet<string>(selectedLabels, StringComparer.Ordinal);
-        IReadOnlyList<T> result = pairs.Where(c => selectedSet.Contains(c.Label)).Select(c => c.Value).ToList();
+        ImmutableArray<T> result = [.. pairs.Where(c => selectedSet.Contains(c.Label)).Select(c => c.Value)];
         return Task.FromResult(result);
     }
 }

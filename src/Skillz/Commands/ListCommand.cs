@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.CommandLine;
 using System.Text.Json;
 using Skillz.Install;
@@ -66,7 +67,7 @@ internal sealed class ListCommand(
         }
 
         var cwd = Directory.GetCurrentDirectory();
-        var agentFilter = agents.Length > 0 ? agents : registry.ListAgentTypes().ToArray();
+        ImmutableArray<string> agentFilter = agents.Length > 0 ? [.. agents] : registry.ListAgentTypes();
 
         var skills = await CollectInstalledSkillsAsync(installer, registry, agentFilter, global, cwd, cancellationToken)
             .ConfigureAwait(false);
@@ -87,7 +88,7 @@ internal sealed class ListCommand(
             return new CommandResult.Success();
         }
 
-        if (skills.Count == 0)
+        if (skills.Length == 0)
         {
             interaction.WriteDim(global ? "No global skills found." : "No project skills found.");
             if (!global)
@@ -135,10 +136,10 @@ internal sealed class ListCommand(
         return new CommandResult.Success();
     }
 
-    private static async Task<IReadOnlyList<InstalledSkill>> CollectInstalledSkillsAsync(
+    private static async Task<ImmutableArray<InstalledSkill>> CollectInstalledSkillsAsync(
         IInstaller installer,
         IAgentRegistry registry,
-        IReadOnlyList<string> agentFilter,
+        ImmutableArray<string> agentFilter,
         bool global,
         string cwd,
         CancellationToken cancellationToken)
@@ -227,7 +228,7 @@ internal sealed class ListCommand(
         }
 
         await Task.CompletedTask.ConfigureAwait(false);
-        return skills.Values.ToList();
+        return [.. skills.Values];
     }
 
     private static string ShortenPath(string path)

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Spectre.Console;
 
 namespace Skillz.Interaction;
@@ -37,7 +38,7 @@ internal interface IInteractionService
         CancellationToken cancellationToken = default)
         where T : notnull;
 
-    Task<IReadOnlyList<T>> MultiSelectAsync<T>(
+    Task<ImmutableArray<T>> MultiSelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
         CancellationToken cancellationToken = default)

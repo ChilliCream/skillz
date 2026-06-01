@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.CommandLine;
 using Skillz.Install;
 using Skillz.Interaction;
@@ -17,7 +18,7 @@ internal sealed class UpdateCommand(
 {
     public const string CommandName = "update";
 
-    public static readonly IReadOnlyList<string> CommandAliases = new[] { "upgrade", "check" };
+    public static readonly ImmutableArray<string> CommandAliases = ["upgrade", "check"];
 
     private readonly Argument<string[]> _skillsArgument = new("skills")
     {

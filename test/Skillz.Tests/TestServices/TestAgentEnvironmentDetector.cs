@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Install;
 
 namespace Skillz.Tests.TestServices;
@@ -32,8 +33,8 @@ internal sealed class TestAgentEnvironmentDetector : IAgentEnvironmentDetector
         return AgentTypes.GetValueOrDefault(agentName);
     }
 
-    public Task<IReadOnlyList<string>> DetectInstalledAgentsAsync()
+    public Task<ImmutableArray<string>> DetectInstalledAgentsAsync()
     {
-        return Task.FromResult(InstalledAgents);
+        return Task.FromResult<ImmutableArray<string>>([.. InstalledAgents]);
     }
 }

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Skills;
 
 namespace Skillz.Sources.Providers;
@@ -6,18 +7,18 @@ internal interface IProviderRegistry
 {
     IProvider Resolve(ParsedSource source);
 
-    IReadOnlyList<IProvider> Providers { get; }
+    ImmutableArray<IProvider> Providers { get; }
 }
 
 internal sealed class ProviderRegistry : IProviderRegistry
 {
-    private readonly IReadOnlyList<IProvider> _providers;
+    private readonly ImmutableArray<IProvider> _providers;
 
     public ProviderRegistry(IEnumerable<IProvider> providers)
     {
         ArgumentNullException.ThrowIfNull(providers);
 
-        var list = providers.ToList();
+        var list = providers.ToImmutableArray();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var provider in list)
         {
@@ -30,7 +31,7 @@ internal sealed class ProviderRegistry : IProviderRegistry
         _providers = list;
     }
 
-    public IReadOnlyList<IProvider> Providers => _providers;
+    public ImmutableArray<IProvider> Providers => _providers;
 
     public IProvider Resolve(ParsedSource source)
     {

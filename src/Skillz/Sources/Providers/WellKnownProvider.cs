@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -32,7 +33,7 @@ internal sealed partial class WellKnownProvider : IProvider
 
     public bool CanHandle(ParsedSource source) => source is ParsedSource.WellKnown;
 
-    public async Task<IReadOnlyList<RemoteSkill>> FetchSkillsAsync(
+    public async Task<ImmutableArray<RemoteSkill>> FetchSkillsAsync(
         ParsedSource source,
         ProviderOptions? options = null,
         CancellationToken cancellationToken = default)
@@ -46,7 +47,7 @@ internal sealed partial class WellKnownProvider : IProvider
 
         foreach (var candidate in candidates)
         {
-            var skills = new List<RemoteSkill>();
+            var skills = ImmutableArray.CreateBuilder<RemoteSkill>();
             foreach (var entry in candidate.Entries)
             {
                 var skill = await FetchSkillByEntryAsync(entry, cancellationToken).ConfigureAwait(false);
@@ -58,7 +59,7 @@ internal sealed partial class WellKnownProvider : IProvider
 
             if (skills.Count > 0)
             {
-                return skills;
+                return skills.ToImmutable();
             }
         }
 

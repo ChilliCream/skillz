@@ -107,6 +107,6 @@ internal sealed class AddCommand(IInteractionService interaction, AddCommandExec
             yes = true;
         }
 
-        return new AddCommandOptions(source, global, agents, skills, yes, all, copy, fullDepth, list);
+        return new AddCommandOptions(source, global, [.. agents], [.. skills], yes, all, copy, fullDepth, list);
     }
 }

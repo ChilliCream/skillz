@@ -38,7 +38,7 @@ internal sealed class AddCommandExecutor(
         if (detection.IsAgent)
         {
             var agents = options.Agents;
-            if (agents.Count == 0
+            if (agents.Length == 0
                 && detection.Name is { } name
                 && detector.GetAgentType(name) is { } mapped)
             {
@@ -160,13 +160,13 @@ internal sealed class AddCommandExecutor(
 
         var nonInteractive = await IsNonInteractiveAsync(options).ConfigureAwait(false);
 
-        var targetAgents = await SelectAgentsAsync(options, nonInteractive, cancellationToken).ConfigureAwait(false);
-        if (targetAgents is null)
+        var selectedAgents = await SelectAgentsAsync(options, nonInteractive, cancellationToken).ConfigureAwait(false);
+        if (selectedAgents is not { } targetAgents)
         {
             return new CommandResult.Cancelled();
         }
 
-        if (targetAgents.Count == 0)
+        if (targetAgents.Length == 0)
         {
             interaction.WriteError("No agents selected.");
             return new CommandResult.Failure(ExitCodeConstants.Failure);
@@ -246,7 +246,7 @@ internal sealed class AddCommandExecutor(
     }
 
     private void RenderInstallationSummary(
-        IReadOnlyList<string> targetAgents,
+        ImmutableArray<string> targetAgents,
         ImmutableArray<InstallEntry> successful,
         HashSet<string> existingSkills,
         bool installGlobally)
@@ -464,7 +464,7 @@ internal sealed class AddCommandExecutor(
             return ImmutableArray<RemoteSkill>.Empty;
         }
 
-        return (await prompter.SelectSkillsAsync(skills, cancellationToken).ConfigureAwait(false)).ToImmutableArray();
+        return await prompter.SelectSkillsAsync(skills, cancellationToken).ConfigureAwait(false);
     }
 
     private Task<bool> IsNonInteractiveAsync(AddCommandOptions options)
@@ -482,7 +482,7 @@ internal sealed class AddCommandExecutor(
         return Task.FromResult(false);
     }
 
-    private async Task<IReadOnlyList<string>?> SelectAgentsAsync(
+    private async Task<ImmutableArray<string>?> SelectAgentsAsync(
         AddCommandOptions options,
         bool nonInteractive,
         CancellationToken cancellationToken)
@@ -490,7 +490,7 @@ internal sealed class AddCommandExecutor(
         var validAgents = registry.ListAgentTypes();
 
         // --agent provided (incl. "*")
-        if (options.Agents.Count > 0)
+        if (options.Agents.Length > 0)
         {
             if (options.Agents.Contains("*", StringComparer.Ordinal))
             {
@@ -501,7 +501,7 @@ internal sealed class AddCommandExecutor(
             if (invalid.Count > 0)
             {
                 interaction.WriteError($"Invalid agents: {string.Join(", ", invalid)}");
-                return Array.Empty<string>();
+                return ImmutableArray<string>.Empty;
             }
 
             return options.Agents;
@@ -510,7 +510,7 @@ internal sealed class AddCommandExecutor(
         var installed = await detector.DetectInstalledAgentsAsync().ConfigureAwait(false);
 
         // Zero installed
-        if (installed.Count == 0)
+        if (installed.Length == 0)
         {
             if (nonInteractive)
             {
@@ -523,7 +523,7 @@ internal sealed class AddCommandExecutor(
         }
 
         // One installed OR non-interactive → no prompt
-        if (installed.Count == 1 || nonInteractive)
+        if (installed.Length == 1 || nonInteractive)
         {
             return EnsureUniversalAgents(installed);
         }
@@ -568,7 +568,7 @@ internal sealed class AddCommandExecutor(
 
     private async Task<ImmutableArray<InstallEntry>> InstallSkillsAsync(
         ImmutableArray<RemoteSkill> selectedSkills,
-        IReadOnlyList<string> targetAgents,
+        ImmutableArray<string> targetAgents,
         InstallOptions installOptions,
         CancellationToken cancellationToken)
     {

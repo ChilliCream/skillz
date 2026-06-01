@@ -1,10 +1,12 @@
+using System.Collections.Immutable;
+
 namespace Skillz.Commands;
 
 internal interface IRemoveCommandPrompter
 {
-    Task<IReadOnlyList<string>> SelectSkillsAsync(
-        IReadOnlyList<string> installed,
+    Task<ImmutableArray<string>> SelectSkillsAsync(
+        ImmutableArray<string> installed,
         CancellationToken cancellationToken = default);
 
-    Task<bool> ConfirmRemovalAsync(IReadOnlyList<string> skills, CancellationToken cancellationToken = default);
+    Task<bool> ConfirmRemovalAsync(ImmutableArray<string> skills, CancellationToken cancellationToken = default);
 }

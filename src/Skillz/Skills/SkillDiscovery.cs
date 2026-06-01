@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Plugins;
 
 namespace Skillz.Skills;
@@ -56,7 +57,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
         _pluginGrouping = pluginGrouping;
     }
 
-    public async Task<IReadOnlyList<Skill>> DiscoverAsync(
+    public async Task<ImmutableArray<Skill>> DiscoverAsync(
         string basePath,
         string? subpath = null,
         SkillDiscoveryOptions? options = null,
@@ -94,7 +95,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
 
                 if (!options.FullDepth)
                 {
-                    return skills;
+                    return [.. skills];
                 }
             }
         }
@@ -180,7 +181,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
             }
         }
 
-        return skills;
+        return [.. skills];
     }
 
     private static bool HasSkillMd(string dir)

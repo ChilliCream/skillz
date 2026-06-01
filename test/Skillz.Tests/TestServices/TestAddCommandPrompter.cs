@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Commands;
 using Skillz.Install;
 using Skillz.Skills;
@@ -17,23 +18,23 @@ internal sealed class TestAddCommandPrompter : IAddCommandPrompter
     public Func<IReadOnlyList<RemoteSkill>, IReadOnlyList<string>, IReadOnlyList<OverwriteTarget>, bool>?
         OnConfirmInstallation { get; set; }
 
-    public IReadOnlyList<OverwriteTarget> LastOverwriteTargets { get; private set; } = [];
+    public ImmutableArray<OverwriteTarget> LastOverwriteTargets { get; private set; } = [];
 
-    public Task<IReadOnlyList<RemoteSkill>> SelectSkillsAsync(
-        IReadOnlyList<RemoteSkill> skills,
+    public Task<ImmutableArray<RemoteSkill>> SelectSkillsAsync(
+        ImmutableArray<RemoteSkill> skills,
         CancellationToken cancellationToken = default)
     {
         var result = OnSelectSkills is not null ? OnSelectSkills(skills) : skills;
-        return Task.FromResult(result);
+        return Task.FromResult<ImmutableArray<RemoteSkill>>([.. result]);
     }
 
-    public Task<IReadOnlyList<string>> SelectAgentsAsync(
-        IReadOnlyList<string> available,
+    public Task<ImmutableArray<string>> SelectAgentsAsync(
+        ImmutableArray<string> available,
         bool global,
         CancellationToken cancellationToken = default)
     {
         var result = OnSelectAgents is not null ? OnSelectAgents(available, global) : available;
-        return Task.FromResult(result);
+        return Task.FromResult<ImmutableArray<string>>([.. result]);
     }
 
     public Task<bool> SelectGlobalScopeAsync(CancellationToken cancellationToken = default)
@@ -49,9 +50,9 @@ internal sealed class TestAddCommandPrompter : IAddCommandPrompter
     }
 
     public Task<bool> ConfirmInstallationAsync(
-        IReadOnlyList<RemoteSkill> skills,
-        IReadOnlyList<string> agents,
-        IReadOnlyList<OverwriteTarget> overwrites,
+        ImmutableArray<RemoteSkill> skills,
+        ImmutableArray<string> agents,
+        ImmutableArray<OverwriteTarget> overwrites,
         CancellationToken cancellationToken = default)
     {
         LastOverwriteTargets = overwrites;

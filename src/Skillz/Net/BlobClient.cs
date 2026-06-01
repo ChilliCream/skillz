@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -179,7 +180,7 @@ internal sealed class BlobClient : IBlobClient
                     return new BranchFetchResult(null, RateLimited: false);
                 }
 
-                var tree = new RepoTree(data.Sha, branch, data.Tree ?? []);
+                var tree = new RepoTree(data.Sha, branch, [.. data.Tree ?? []]);
                 return new BranchFetchResult(tree, RateLimited: false);
             }
 
@@ -223,7 +224,7 @@ internal sealed class BlobClient : IBlobClient
         var prefix = path.EndsWith('/') ? path : path + "/";
         var filtered = tree
             .Tree.Where(e => e.Path.StartsWith(prefix, StringComparison.Ordinal) || e.Path == path)
-            .ToList();
+            .ToImmutableArray();
 
         return new RepoTree(tree.Sha, tree.Branch, filtered);
     }

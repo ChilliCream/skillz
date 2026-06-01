@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Skills;
 
 namespace Skillz.Sources.Providers;
@@ -8,7 +9,7 @@ internal interface IProvider
 
     bool CanHandle(ParsedSource source);
 
-    Task<IReadOnlyList<RemoteSkill>> FetchSkillsAsync(
+    Task<ImmutableArray<RemoteSkill>> FetchSkillsAsync(
         ParsedSource source,
         ProviderOptions? options = null,
         CancellationToken cancellationToken = default);

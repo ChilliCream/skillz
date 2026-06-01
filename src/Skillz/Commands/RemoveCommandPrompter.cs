@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Interaction;
 
 namespace Skillz.Commands;
@@ -11,13 +12,13 @@ internal sealed class RemoveCommandPrompter : IRemoveCommandPrompter
         _interaction = interaction;
     }
 
-    public async Task<IReadOnlyList<string>> SelectSkillsAsync(
-        IReadOnlyList<string> installed,
+    public async Task<ImmutableArray<string>> SelectSkillsAsync(
+        ImmutableArray<string> installed,
         CancellationToken cancellationToken = default)
     {
-        if (installed.Count == 0)
+        if (installed.Length == 0)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         var choices = installed.Select(s => (s, s));
@@ -26,10 +27,10 @@ internal sealed class RemoveCommandPrompter : IRemoveCommandPrompter
             .ConfigureAwait(false);
     }
 
-    public Task<bool> ConfirmRemovalAsync(IReadOnlyList<string> skills, CancellationToken cancellationToken = default)
+    public Task<bool> ConfirmRemovalAsync(ImmutableArray<string> skills, CancellationToken cancellationToken = default)
     {
         var skillNames = string.Join(", ", skills);
-        var message = $"Are you sure you want to remove {skills.Count} skill(s) [{skillNames}]?";
+        var message = $"Are you sure you want to remove {skills.Length} skill(s) [{skillNames}]?";
         return _interaction.ConfirmAsync(message, defaultValue: false, cancellationToken);
     }
 }

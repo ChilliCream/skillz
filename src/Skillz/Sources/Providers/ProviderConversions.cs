@@ -1,22 +1,23 @@
+using System.Collections.Immutable;
 using Skillz.Skills;
 
 namespace Skillz.Sources.Providers;
 
 internal static class ProviderConversions
 {
-    public static IReadOnlyList<RemoteSkill> ToRemoteSkills(
-        IReadOnlyList<Skill> skills,
+    public static ImmutableArray<RemoteSkill> ToRemoteSkills(
+        ImmutableArray<Skill> skills,
         string providerId,
         string sourceIdentifier,
         string? cloneRoot = null,
         string? cleanupPath = null)
     {
-        if (skills.Count == 0)
+        if (skills.Length == 0)
         {
             return [];
         }
 
-        var result = new List<RemoteSkill>(skills.Count);
+        var result = ImmutableArray.CreateBuilder<RemoteSkill>(skills.Length);
         foreach (var skill in skills)
         {
             var content = skill.RawContent ?? string.Empty;
@@ -43,6 +44,6 @@ internal static class ProviderConversions
                     PluginName: skill.PluginName));
         }
 
-        return result;
+        return result.ToImmutable();
     }
 }

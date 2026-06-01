@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Skillz.Install;
 
 internal interface IAgentEnvironmentDetector
@@ -10,7 +12,7 @@ internal interface IAgentEnvironmentDetector
 
     string? GetAgentType(string agentName);
 
-    Task<IReadOnlyList<string>> DetectInstalledAgentsAsync();
+    Task<ImmutableArray<string>> DetectInstalledAgentsAsync();
 }
 
 internal sealed record AgentDetectionResult(bool IsAgent, string? Name);

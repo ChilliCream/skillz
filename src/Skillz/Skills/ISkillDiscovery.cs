@@ -1,8 +1,10 @@
+using System.Collections.Immutable;
+
 namespace Skillz.Skills;
 
 internal interface ISkillDiscovery
 {
-    Task<IReadOnlyList<Skill>> DiscoverAsync(
+    Task<ImmutableArray<Skill>> DiscoverAsync(
         string basePath,
         string? subpath = null,
         SkillDiscoveryOptions? options = null,

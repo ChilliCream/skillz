@@ -43,12 +43,12 @@ internal sealed class AgentRegistry : IAgentRegistry
         return false;
     }
 
-    public IReadOnlyList<string> ListAgentTypes()
+    public ImmutableArray<string> ListAgentTypes()
     {
         return [.. _agents.Keys];
     }
 
-    public IReadOnlyList<string> GetUniversalAgents()
+    public ImmutableArray<string> GetUniversalAgents()
     {
         return
         [
@@ -58,7 +58,7 @@ internal sealed class AgentRegistry : IAgentRegistry
         ];
     }
 
-    public IReadOnlyList<string> GetNonUniversalAgents()
+    public ImmutableArray<string> GetNonUniversalAgents()
     {
         return [.. _agents.Where(kv => kv.Value.SkillsDir != UniversalSkillsDir).Select(kv => kv.Key)];
     }

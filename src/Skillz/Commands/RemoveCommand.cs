@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.CommandLine;
 using Skillz.Install;
 using Skillz.Interaction;
@@ -76,7 +77,7 @@ internal sealed class RemoveCommand(
         var cwd = Directory.GetCurrentDirectory();
         var installed = await ScanInstalledSkillsAsync(installer, registry, global, cwd).ConfigureAwait(false);
 
-        if (installed.Count == 0)
+        if (installed.Length == 0)
         {
             interaction.WriteWarning("No skills found to remove.");
             return new CommandResult.Success();
@@ -88,7 +89,7 @@ internal sealed class RemoveCommand(
             || consoleEnvironment.IsInputRedirected
             || (await detector.DetectAgentAsync().ConfigureAwait(false)).IsAgent;
 
-        IReadOnlyList<string> selected;
+        ImmutableArray<string> selected;
         if (all)
         {
             selected = installed;
@@ -97,9 +98,9 @@ internal sealed class RemoveCommand(
         {
             selected = installed
                 .Where(s => requestedSkills.Any(r => string.Equals(r, s, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
+                .ToImmutableArray();
 
-            if (selected.Count == 0)
+            if (selected.Length == 0)
             {
                 interaction.WriteDim($"No matching skills found for: {string.Join(", ", requestedSkills)}");
                 return new CommandResult.Success();
@@ -113,7 +114,7 @@ internal sealed class RemoveCommand(
         else
         {
             selected = await prompter.SelectSkillsAsync(installed, cancellationToken).ConfigureAwait(false);
-            if (selected.Count == 0)
+            if (selected.Length == 0)
             {
                 interaction.WriteWarning("Removal cancelled");
                 return new CommandResult.Cancelled();
@@ -195,7 +196,7 @@ internal sealed class RemoveCommand(
         return new CommandResult.Success();
     }
 
-    private static async Task<IReadOnlyList<string>> ScanInstalledSkillsAsync(
+    private static async Task<ImmutableArray<string>> ScanInstalledSkillsAsync(
         IInstaller installer,
         IAgentRegistry registry,
         bool global,
@@ -231,7 +232,7 @@ internal sealed class RemoveCommand(
         }
 
         await Task.CompletedTask.ConfigureAwait(false);
-        return skills.OrderBy(s => s, StringComparer.Ordinal).ToList();
+        return [.. skills.OrderBy(s => s, StringComparer.Ordinal)];
     }
 
     private static bool IsCanonicalStillUsed(

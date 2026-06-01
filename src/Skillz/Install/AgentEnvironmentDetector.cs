@@ -79,7 +79,7 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
         return s_agentNameToType.GetValueOrDefault(agentName);
     }
 
-    public Task<IReadOnlyList<string>> DetectInstalledAgentsAsync()
+    public Task<ImmutableArray<string>> DetectInstalledAgentsAsync()
     {
         var installed = new List<string>();
         foreach (var (type, _) in _registry.All)
@@ -90,7 +90,7 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
             }
         }
 
-        return Task.FromResult<IReadOnlyList<string>>(installed);
+        return Task.FromResult<ImmutableArray<string>>([.. installed]);
     }
 
     private bool IsInstalled(string agentType)

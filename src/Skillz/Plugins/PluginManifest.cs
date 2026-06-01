@@ -1,15 +1,16 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 
 namespace Skillz.Plugins;
 
 internal interface IPluginManifest
 {
-    Task<IReadOnlyList<string>> GetPluginSkillPathsAsync(string basePath);
+    Task<ImmutableArray<string>> GetPluginSkillPathsAsync(string basePath);
 }
 
 internal sealed class PluginManifest : IPluginManifest
 {
-    public async Task<IReadOnlyList<string>> GetPluginSkillPathsAsync(string basePath)
+    public async Task<ImmutableArray<string>> GetPluginSkillPathsAsync(string basePath)
     {
         var searchDirs = new List<string>();
 
@@ -21,7 +22,7 @@ internal sealed class PluginManifest : IPluginManifest
             basePath,
             (skills, _) => AddPluginSkillPaths(basePath, basePath, skills, searchDirs));
 
-        return searchDirs;
+        return [.. searchDirs];
     }
 
     private static void AddPluginSkillPaths(

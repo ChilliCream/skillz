@@ -62,7 +62,7 @@ public class SkillDiscoveryTests : IDisposable
             options: new SkillDiscoveryOptions(FullDepth: true),
             cancellationToken: Token);
 
-        Assert.Equal(3, skills.Count);
+        Assert.Equal(3, skills.Length);
         var names = skills.Select(s => s.Name).OrderBy(n => n, StringComparer.Ordinal).ToArray();
         Assert.Equal(new[] { "nested-skill-1", "nested-skill-2", "root-skill" }, names);
     }
@@ -86,13 +86,13 @@ public class SkillDiscoveryTests : IDisposable
         WriteSkill("skills/skill-2", "skill-2", "Skill 2");
 
         var defaultSkills = await _discovery.DiscoverAsync(_testDir, cancellationToken: Token);
-        Assert.Equal(2, defaultSkills.Count);
+        Assert.Equal(2, defaultSkills.Length);
 
         var fullDepthSkills = await _discovery.DiscoverAsync(
             _testDir,
             options: new SkillDiscoveryOptions(FullDepth: true),
             cancellationToken: Token);
-        Assert.Equal(2, fullDepthSkills.Count);
+        Assert.Equal(2, fullDepthSkills.Length);
     }
 
     [Fact]
@@ -173,7 +173,7 @@ public class SkillDiscoveryTests : IDisposable
 
         var skills = await _discovery.DiscoverAsync(_testDir, cancellationToken: Token);
 
-        Assert.Equal(2, skills.Count);
+        Assert.Equal(2, skills.Length);
         var names = skills.Select(s => s.Name).OrderBy(n => n, StringComparer.Ordinal).ToArray();
         Assert.Equal(new[] { "claude-skill", "roo-skill" }, names);
     }

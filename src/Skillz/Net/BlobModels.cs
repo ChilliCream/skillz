@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json.Serialization;
 
 namespace Skillz.Net;
@@ -28,7 +29,7 @@ internal sealed class GitHubTreeResponse
 
 internal sealed class RepoTree
 {
-    public RepoTree(string sha, string branch, IReadOnlyList<TreeEntry> tree)
+    public RepoTree(string sha, string branch, ImmutableArray<TreeEntry> tree)
     {
         Sha = sha;
         Branch = branch;
@@ -39,5 +40,5 @@ internal sealed class RepoTree
 
     public string Branch { get; }
 
-    public IReadOnlyList<TreeEntry> Tree { get; }
+    public ImmutableArray<TreeEntry> Tree { get; }
 }

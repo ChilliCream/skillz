@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Spectre.Console;
 
 namespace Skillz.Interaction;
@@ -102,7 +103,7 @@ internal sealed class ConsoleInteractionService : IInteractionService
         return pairs.First(c => c.Label == selected).Value;
     }
 
-    public async Task<IReadOnlyList<T>> MultiSelectAsync<T>(
+    public async Task<ImmutableArray<T>> MultiSelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
         CancellationToken cancellationToken = default)
@@ -111,7 +112,7 @@ internal sealed class ConsoleInteractionService : IInteractionService
         var pairs = choices.ToList();
         if (pairs.Count == 0)
         {
-            return Array.Empty<T>();
+            return [];
         }
 
         var labels = pairs.Select(c => c.Label).ToArray();
@@ -119,6 +120,6 @@ internal sealed class ConsoleInteractionService : IInteractionService
 
         var selected = await _console.PromptAsync(prompt, cancellationToken).ConfigureAwait(false);
         var selectedSet = new HashSet<string>(selected, StringComparer.Ordinal);
-        return pairs.Where(c => selectedSet.Contains(c.Label)).Select(c => c.Value).ToList();
+        return [.. pairs.Where(c => selectedSet.Contains(c.Label)).Select(c => c.Value)];
     }
 }

@@ -152,7 +152,7 @@ public class AgentRegistryTests
         var registry = CreateRegistry();
         var keys = registry.ListAgentTypes();
 
-        Assert.Equal(registry.All.Count, keys.Count);
+        Assert.Equal(registry.All.Count, keys.Length);
         Assert.Contains("claude-code", keys);
     }
 

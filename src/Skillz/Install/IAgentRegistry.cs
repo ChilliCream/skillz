@@ -10,11 +10,11 @@ internal interface IAgentRegistry
 
     bool TryGetConfig(string agentType, out AgentConfig? config);
 
-    IReadOnlyList<string> ListAgentTypes();
+    ImmutableArray<string> ListAgentTypes();
 
-    IReadOnlyList<string> GetUniversalAgents();
+    ImmutableArray<string> GetUniversalAgents();
 
-    IReadOnlyList<string> GetNonUniversalAgents();
+    ImmutableArray<string> GetNonUniversalAgents();
 
     bool IsUniversalAgent(string agentType);
 }

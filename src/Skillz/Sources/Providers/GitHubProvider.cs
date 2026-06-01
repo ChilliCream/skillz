@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Git;
 using Skillz.Skills;
 
@@ -18,7 +19,7 @@ internal sealed class GitHubProvider : IProvider
 
     public bool CanHandle(ParsedSource source) => source is ParsedSource.GitHub;
 
-    public async Task<IReadOnlyList<RemoteSkill>> FetchSkillsAsync(
+    public async Task<ImmutableArray<RemoteSkill>> FetchSkillsAsync(
         ParsedSource source,
         ProviderOptions? options = null,
         CancellationToken cancellationToken = default)

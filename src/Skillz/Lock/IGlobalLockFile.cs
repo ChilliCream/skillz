@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 namespace Skillz.Lock;
 
 internal interface IGlobalLockFile
@@ -12,7 +14,7 @@ internal interface IGlobalLockFile
 
     Task<SkillLockEntry?> GetEntryAsync(string skillName, CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<string>?> GetLastSelectedAgentsAsync(CancellationToken cancellationToken = default);
+    Task<ImmutableArray<string>?> GetLastSelectedAgentsAsync(CancellationToken cancellationToken = default);
 
-    Task SaveLastSelectedAgentsAsync(IReadOnlyList<string> agents, CancellationToken cancellationToken = default);
+    Task SaveLastSelectedAgentsAsync(ImmutableArray<string> agents, CancellationToken cancellationToken = default);
 }

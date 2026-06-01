@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Lock;
@@ -18,16 +19,16 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
         _globalLock = globalLock;
     }
 
-    public async Task<IReadOnlyList<RemoteSkill>> SelectSkillsAsync(
-        IReadOnlyList<RemoteSkill> skills,
+    public async Task<ImmutableArray<RemoteSkill>> SelectSkillsAsync(
+        ImmutableArray<RemoteSkill> skills,
         CancellationToken cancellationToken = default)
     {
-        if (skills.Count == 0)
+        if (skills.Length == 0)
         {
-            return Array.Empty<RemoteSkill>();
+            return [];
         }
 
-        if (skills.Count == 1)
+        if (skills.Length == 1)
         {
             return skills;
         }
@@ -50,14 +51,14 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             .ConfigureAwait(false);
     }
 
-    public async Task<IReadOnlyList<string>> SelectAgentsAsync(
-        IReadOnlyList<string> available,
+    public async Task<ImmutableArray<string>> SelectAgentsAsync(
+        ImmutableArray<string> available,
         bool global,
         CancellationToken cancellationToken = default)
     {
-        if (available.Count == 0)
+        if (available.Length == 0)
         {
-            return Array.Empty<string>();
+            return [];
         }
 
         // Try to get last-used agents as pre-selection defaults
@@ -65,9 +66,9 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
         try
         {
             var lastUsed = await _globalLock.GetLastSelectedAgentsAsync(cancellationToken).ConfigureAwait(false);
-            if (lastUsed is { Count: > 0 })
+            if (lastUsed is { Length: > 0 } lastUsedAgents)
             {
-                defaults = lastUsed.Where(a => available.Contains(a, StringComparer.Ordinal)).ToList();
+                defaults = lastUsedAgents.Where(a => available.Contains(a, StringComparer.Ordinal)).ToList();
                 if (defaults.Count == 0)
                     defaults = null;
             }
@@ -91,7 +92,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             .ConfigureAwait(false);
 
         // Save selection for next time
-        if (selected.Count > 0)
+        if (selected.Length > 0)
         {
             try
             {
@@ -129,15 +130,15 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
     }
 
     public Task<bool> ConfirmInstallationAsync(
-        IReadOnlyList<RemoteSkill> skills,
-        IReadOnlyList<string> agents,
-        IReadOnlyList<OverwriteTarget> overwrites,
+        ImmutableArray<RemoteSkill> skills,
+        ImmutableArray<string> agents,
+        ImmutableArray<OverwriteTarget> overwrites,
         CancellationToken cancellationToken = default)
     {
         var skillNames = string.Join(", ", skills.Select(s => s.InstallName));
         var agentNames = string.Join(", ", agents);
-        var message = $"Install {skills.Count} skill(s) [{skillNames}] to {agents.Count} agent(s) [{agentNames}]?";
-        if (overwrites.Count > 0)
+        var message = $"Install {skills.Length} skill(s) [{skillNames}] to {agents.Length} agent(s) [{agentNames}]?";
+        if (overwrites.Length > 0)
         {
             var targets = string.Join(
                 Environment.NewLine,

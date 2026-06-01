@@ -83,15 +83,14 @@ public class UpdateCommandTests : IDisposable
             new RepoTree(
                 "tree-sha",
                 "main",
-                new List<TreeEntry>
-                {
+                [
                     new TreeEntry
                     {
                         Path = "skills/my-skill",
                         Type = "tree",
                         Sha = "abc123"
                     }
-                });
+                ]);
         var interaction = services.GetRequiredService<TestInteractionService>();
 
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -129,15 +128,14 @@ public class UpdateCommandTests : IDisposable
             new RepoTree(
                 "new-tree-sha",
                 "main",
-                new List<TreeEntry>
-                {
+                [
                     new TreeEntry
                     {
                         Path = "skills/my-skill",
                         Type = "tree",
                         Sha = "xyz789"
                     }
-                });
+                ]);
         var interaction = services.GetRequiredService<TestInteractionService>();
 
         var cmd = services.GetRequiredService<UpdateCommand>();

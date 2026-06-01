@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Text.Json;
 using Skillz.Install;
 using Skillz.Utils;
@@ -168,14 +169,14 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         return lockFile.Skills.TryGetValue(skillName, out var entry) ? entry : null;
     }
 
-    public async Task<IReadOnlyList<string>?> GetLastSelectedAgentsAsync(CancellationToken cancellationToken = default)
+    public async Task<ImmutableArray<string>?> GetLastSelectedAgentsAsync(CancellationToken cancellationToken = default)
     {
         try
         {
             var lockFile = await ReadAsync(cancellationToken).ConfigureAwait(false);
             if (lockFile.LastSelectedAgents is { Count: > 0 } agents)
             {
-                return agents;
+                return [.. agents];
             }
             return null;
         }
@@ -186,7 +187,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
     }
 
     public async Task SaveLastSelectedAgentsAsync(
-        IReadOnlyList<string> agents,
+        ImmutableArray<string> agents,
         CancellationToken cancellationToken = default)
     {
         var lockPath = _xdgPaths.GetGlobalLockPath();
