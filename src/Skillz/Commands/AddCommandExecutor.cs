@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text;
 using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Lock;
@@ -257,7 +258,7 @@ internal sealed class AddCommandExecutor(
                 ? installer.GetCanonicalPath(skillNames[0], installGlobally)
                 : installer.GetCanonicalSkillsDir(installGlobally);
 
-        var summary = new System.Text.StringBuilder();
+        var summary = new StringBuilder();
         summary.AppendLine($"[bold]Canonical:[/] [dim]{Markup.Escape(canonical)}[/]");
         if (universals.Count > 0)
         {
@@ -281,7 +282,7 @@ internal sealed class AddCommandExecutor(
                 .BorderColor(Color.Cyan1)
                 .Expand());
 
-        var installed = new System.Text.StringBuilder();
+        var installed = new StringBuilder();
         foreach (var skillName in skillNames)
         {
             var paths = successful
@@ -350,7 +351,7 @@ internal sealed class AddCommandExecutor(
 
     private void RenderErrorPanel(string title, string message, string? tip = null)
     {
-        var content = new System.Text.StringBuilder();
+        var content = new StringBuilder();
         content.Append($"[red]{Markup.Escape(message)}[/]");
         if (tip is not null)
         {

@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Skillz.Commands;
 using Skillz.Install;
+using Skillz.Interaction;
 using Skillz.Tests.TestServices;
 using Skillz.Tests.Utils;
 using Xunit;
@@ -78,7 +79,7 @@ public class ListCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(0, exitCode);
-        var interaction = (TestInteractionService)services.GetRequiredService<Skillz.Interaction.IInteractionService>();
+        var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
         Assert.Contains(interaction.Output, o => o.Contains("No project skills", StringComparison.OrdinalIgnoreCase));
     }
 
@@ -99,7 +100,7 @@ public class ListCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(0, exitCode);
-        var interaction = (TestInteractionService)services.GetRequiredService<Skillz.Interaction.IInteractionService>();
+        var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
         var output = string.Join("\n", interaction.Output);
         Assert.Contains("alpha", output);
         Assert.Contains("beta", output);
