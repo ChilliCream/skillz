@@ -52,7 +52,7 @@ internal sealed class AddCommandExecutor(
         }
 
         var skillFilters = MergeSkillFilters(options.SkillFilters, parsed);
-        interaction.WriteDim($"Source: {GetSourceDisplayString(parsed)}");
+        interaction.WriteDim($"Source: {parsed.DisplayString}");
 
         ImmutableArray<RemoteSkill> skills;
         try
@@ -94,17 +94,7 @@ internal sealed class AddCommandExecutor(
 
             if (options.List)
             {
-                var filtered =
-                    skillFilters.Length > 0 && !skillFilters.Contains("*", StringComparer.Ordinal)
-                        ? skills
-                            .Where(s =>
-                                skillFilters.Any(f =>
-                                    string.Equals(f, s.InstallName, StringComparison.OrdinalIgnoreCase)
-                                    || string.Equals(f, s.Name, StringComparison.OrdinalIgnoreCase)
-                                )
-                            )
-                            .ToImmutableArray()
-                        : skills;
+                var filtered = ApplyFilters(skills, skillFilters);
                 ListSkills(filtered);
                 return new CommandResult.Success();
             }
@@ -174,7 +164,7 @@ internal sealed class AddCommandExecutor(
             return new CommandResult.Cancelled();
         }
 
-        var nonInteractive = await IsNonInteractiveAsync(options);
+        var nonInteractive = IsNonInteractive(options);
 
         var selectedAgents = await SelectAgentsAsync(options, nonInteractive, cancellationToken);
         if (selectedAgents is not { } targetAgents)
@@ -437,19 +427,7 @@ internal sealed class AddCommandExecutor(
     {
         if (skillFilters.Length > 0)
         {
-            if (skillFilters.Contains("*", StringComparer.Ordinal))
-            {
-                return skills;
-            }
-
-            return skills
-                .Where(s =>
-                    skillFilters.Any(f =>
-                        string.Equals(f, s.InstallName, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(f, s.Name, StringComparison.OrdinalIgnoreCase)
-                    )
-                )
-                .ToImmutableArray();
+            return ApplyFilters(skills, skillFilters);
         }
 
         if (skills.Length == 1 || options.Yes)
@@ -466,20 +444,8 @@ internal sealed class AddCommandExecutor(
         return await prompter.SelectSkillsAsync(skills, cancellationToken);
     }
 
-    private Task<bool> IsNonInteractiveAsync(AddCommandOptions options)
-    {
-        if (options.Yes || options.All)
-        {
-            return Task.FromResult(true);
-        }
-
-        if (consoleEnvironment.IsInputRedirected)
-        {
-            return Task.FromResult(true);
-        }
-
-        return Task.FromResult(false);
-    }
+    private bool IsNonInteractive(AddCommandOptions options)
+        => options.Yes || options.All || consoleEnvironment.IsInputRedirected;
 
     private async Task<ImmutableArray<string>?> SelectAgentsAsync(
         AddCommandOptions options,
@@ -593,9 +559,9 @@ internal sealed class AddCommandExecutor(
         CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow.ToString("o");
-        var sourceUrl = GetSourceUrl(parsed);
-        var sourceType = GetSourceType(parsed);
-        var refValue = GetSourceRef(parsed);
+        var sourceUrl = parsed.Url;
+        var sourceType = parsed.SourceType;
+        var refValue = parsed.Ref;
         var ownerRepo = OwnerRepoParser.GetOwnerRepo(parsed);
         var source = ownerRepo ?? sourceUrl;
 
@@ -609,15 +575,7 @@ internal sealed class AddCommandExecutor(
             var installPath = entry.Result.Path;
             if (installGlobally)
             {
-                var skillFolderHash = string.Empty;
-                try
-                {
-                    if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
-                    {
-                        skillFolderHash = await projectLock.ComputeSkillFolderHashAsync(installPath, cancellationToken);
-                    }
-                }
-                catch { }
+                var skillFolderHash = await ComputeHashSafeAsync(installPath, cancellationToken);
 
                 var lockEntry = new SkillLockEntry
                 {
@@ -641,15 +599,7 @@ internal sealed class AddCommandExecutor(
             }
             else
             {
-                var computedHash = string.Empty;
-                try
-                {
-                    if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
-                    {
-                        computedHash = await projectLock.ComputeSkillFolderHashAsync(installPath, cancellationToken);
-                    }
-                }
-                catch { }
+                var computedHash = await ComputeHashSafeAsync(installPath, cancellationToken);
 
                 var lockEntry = new LocalSkillLockEntry
                 {
@@ -668,50 +618,38 @@ internal sealed class AddCommandExecutor(
         }
     }
 
-    private static string GetSourceUrl(ParsedSource source)
-        => source switch
-        {
-            ParsedSource.GitHub gh => gh.Url,
-            ParsedSource.GitLab gl => gl.Url,
-            ParsedSource.Git g => g.Url,
-            ParsedSource.Local l => l.Url,
-            ParsedSource.WellKnown w => w.Url,
-            _ => string.Empty
-        };
-
-    private static string GetSourceType(ParsedSource source)
-        => source switch
-        {
-            ParsedSource.GitHub => "github",
-            ParsedSource.GitLab => "gitlab",
-            ParsedSource.Git => "git",
-            ParsedSource.Local => "local",
-            ParsedSource.WellKnown => "well-known",
-            _ => "unknown"
-        };
-
-    private static string? GetSourceRef(ParsedSource source)
-        => source switch
-        {
-            ParsedSource.GitHub gh => gh.Ref,
-            ParsedSource.GitLab gl => gl.Ref,
-            ParsedSource.Git g => g.Ref,
-            _ => null
-        };
-
-    private static string GetSourceDisplayString(ParsedSource source)
+    private static ImmutableArray<RemoteSkill> ApplyFilters(
+        ImmutableArray<RemoteSkill> skills,
+        ImmutableArray<string> filters)
     {
-        var url = GetSourceUrl(source);
-        var @ref = GetSourceRef(source);
-        if (!string.IsNullOrEmpty(@ref))
+        if (filters.Length == 0 || filters.Contains("*", StringComparer.Ordinal))
         {
-            url += $" @ {@ref}";
+            return skills;
         }
-        if (source is ParsedSource.GitHub gh && !string.IsNullOrEmpty(gh.Subpath))
+
+        return skills
+            .Where(s =>
+                filters.Any(f =>
+                    string.Equals(f, s.InstallName, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(f, s.Name, StringComparison.OrdinalIgnoreCase)))
+            .ToImmutableArray();
+    }
+
+    private async Task<string> ComputeHashSafeAsync(string? path, CancellationToken cancellationToken)
+    {
+        try
         {
-            url += $" ({gh.Subpath})";
+            if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
+            {
+                return await projectLock.ComputeSkillFolderHashAsync(path, cancellationToken);
+            }
         }
-        return url;
+        catch
+        {
+            // Hash is advisory; on failure we fall back to an empty hash.
+        }
+
+        return string.Empty;
     }
 
     private sealed record InstallEntry(RemoteSkill Skill, string AgentType, InstallResult Result)
