@@ -200,7 +200,7 @@ internal sealed class RemoveCommand(
         IAgentRegistry registry,
         bool global,
         string cwd,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 

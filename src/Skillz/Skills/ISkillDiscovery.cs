@@ -6,9 +6,9 @@ internal interface ISkillDiscovery
 {
     Task<ImmutableArray<Skill>> DiscoverAsync(
         string basePath,
-        string? subpath = null,
-        SkillDiscoveryOptions? options = null,
-        CancellationToken cancellationToken = default);
+        string? subpath,
+        SkillDiscoveryOptions? options,
+        CancellationToken cancellationToken);
 }
 
 internal sealed record SkillDiscoveryOptions(bool IncludeInternal = false, bool FullDepth = false);

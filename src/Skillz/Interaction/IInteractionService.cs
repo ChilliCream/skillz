@@ -29,20 +29,20 @@ internal interface IInteractionService
 
     Task<string> PromptAsync(
         string message,
-        string? defaultValue = null,
-        CancellationToken cancellationToken = default);
+        string? defaultValue,
+        CancellationToken cancellationToken);
 
-    Task<bool> ConfirmAsync(string message, bool defaultValue = false, CancellationToken cancellationToken = default);
+    Task<bool> ConfirmAsync(string message, bool defaultValue, CancellationToken cancellationToken);
 
     Task<T> SelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
         where T : notnull;
 
     Task<ImmutableArray<T>> MultiSelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
         where T : notnull;
 }

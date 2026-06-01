@@ -4,14 +4,14 @@ internal interface IPluginGrouping
 {
     Task<Dictionary<string, string>> GetPluginGroupingsAsync(
         string basePath,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken);
 }
 
 internal sealed class PluginGrouping : IPluginGrouping
 {
     public async Task<Dictionary<string, string>> GetPluginGroupingsAsync(
         string basePath,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var groupings = new Dictionary<string, string>();
 

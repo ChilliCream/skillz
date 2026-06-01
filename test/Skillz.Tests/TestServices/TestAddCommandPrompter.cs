@@ -22,7 +22,7 @@ internal sealed class TestAddCommandPrompter : IAddCommandPrompter
 
     public Task<ImmutableArray<RemoteSkill>> SelectSkillsAsync(
         ImmutableArray<RemoteSkill> skills,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var result = OnSelectSkills is not null ? OnSelectSkills(skills) : skills;
         return Task.FromResult<ImmutableArray<RemoteSkill>>([.. result]);
@@ -31,19 +31,19 @@ internal sealed class TestAddCommandPrompter : IAddCommandPrompter
     public Task<ImmutableArray<string>> SelectAgentsAsync(
         ImmutableArray<string> available,
         bool global,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var result = OnSelectAgents is not null ? OnSelectAgents(available, global) : available;
         return Task.FromResult<ImmutableArray<string>>([.. result]);
     }
 
-    public Task<bool> SelectGlobalScopeAsync(CancellationToken cancellationToken = default)
+    public Task<bool> SelectGlobalScopeAsync(CancellationToken cancellationToken)
     {
         var result = OnSelectGlobalScope is not null && OnSelectGlobalScope();
         return Task.FromResult(result);
     }
 
-    public Task<InstallMode> SelectInstallModeAsync(CancellationToken cancellationToken = default)
+    public Task<InstallMode> SelectInstallModeAsync(CancellationToken cancellationToken)
     {
         var result = OnSelectInstallMode is not null ? OnSelectInstallMode() : InstallMode.Symlink;
         return Task.FromResult(result);
@@ -53,7 +53,7 @@ internal sealed class TestAddCommandPrompter : IAddCommandPrompter
         ImmutableArray<RemoteSkill> skills,
         ImmutableArray<string> agents,
         ImmutableArray<OverwriteTarget> overwrites,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         LastOverwriteTargets = overwrites;
         var result = OnConfirmInstallation is null || OnConfirmInstallation(skills, agents, overwrites);

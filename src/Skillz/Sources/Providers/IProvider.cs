@@ -11,8 +11,8 @@ internal interface IProvider
 
     Task<ImmutableArray<RemoteSkill>> FetchSkillsAsync(
         ParsedSource source,
-        ProviderOptions? options = null,
-        CancellationToken cancellationToken = default);
+        ProviderOptions? options,
+        CancellationToken cancellationToken);
 }
 
 internal sealed record ProviderOptions(bool FullDepth = false, bool IncludeInternal = false);

@@ -20,7 +20,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         _utcNow = utcNow;
     }
 
-    public async Task<SkillLockFile> ReadAsync(CancellationToken cancellationToken = default)
+    public async Task<SkillLockFile> ReadAsync(CancellationToken cancellationToken)
     {
         var lockPath = _xdgPaths.GetGlobalLockPath();
 
@@ -64,7 +64,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         }
     }
 
-    public async Task WriteAsync(SkillLockFile lockFile, CancellationToken cancellationToken = default)
+    public async Task WriteAsync(SkillLockFile lockFile, CancellationToken cancellationToken)
     {
         var lockPath = _xdgPaths.GetGlobalLockPath();
         var directory = Path.GetDirectoryName(lockPath);
@@ -86,13 +86,14 @@ internal sealed class GlobalLockFile : IGlobalLockFile
 
                     await WriteInternalAsync(lockFile, cancellationToken);
                 },
-                cancellationToken: cancellationToken);
+                FileLock.DefaultTimeoutMs,
+                cancellationToken);
     }
 
     public async Task AddEntryAsync(
         string skillName,
         SkillLockEntry entry,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var lockPath = _xdgPaths.GetGlobalLockPath();
         var directory = Path.GetDirectoryName(lockPath);
@@ -124,10 +125,11 @@ internal sealed class GlobalLockFile : IGlobalLockFile
 
                     await WriteInternalAsync(lockFile, cancellationToken);
                 },
-                cancellationToken: cancellationToken);
+                FileLock.DefaultTimeoutMs,
+                cancellationToken);
     }
 
-    public async Task<bool> RemoveEntryAsync(string skillName, CancellationToken cancellationToken = default)
+    public async Task<bool> RemoveEntryAsync(string skillName, CancellationToken cancellationToken)
     {
         var lockPath = _xdgPaths.GetGlobalLockPath();
         var directory = Path.GetDirectoryName(lockPath);
@@ -154,18 +156,19 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                         await WriteInternalAsync(lockFile, cancellationToken);
                     }
                 },
-                cancellationToken: cancellationToken);
+                FileLock.DefaultTimeoutMs,
+                cancellationToken);
 
         return removed;
     }
 
-    public async Task<SkillLockEntry?> GetEntryAsync(string skillName, CancellationToken cancellationToken = default)
+    public async Task<SkillLockEntry?> GetEntryAsync(string skillName, CancellationToken cancellationToken)
     {
         var lockFile = await ReadAsync(cancellationToken);
         return lockFile.Skills.TryGetValue(skillName, out var entry) ? entry : null;
     }
 
-    public async Task<ImmutableArray<string>?> GetLastSelectedAgentsAsync(CancellationToken cancellationToken = default)
+    public async Task<ImmutableArray<string>?> GetLastSelectedAgentsAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -184,7 +187,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
 
     public async Task SaveLastSelectedAgentsAsync(
         ImmutableArray<string> agents,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var lockPath = _xdgPaths.GetGlobalLockPath();
         var directory = Path.GetDirectoryName(lockPath);
@@ -207,7 +210,8 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                     lockFile.LastSelectedAgents = agents.ToList();
                     await WriteInternalAsync(lockFile, cancellationToken);
                 },
-                cancellationToken: cancellationToken);
+                FileLock.DefaultTimeoutMs,
+                cancellationToken);
     }
 
     private async Task<SkillLockFile> ReadInternalAsync(bool throwOnCorrupt, CancellationToken cancellationToken)

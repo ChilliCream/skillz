@@ -88,7 +88,7 @@ internal sealed class Installer : IInstaller
         Skill skill,
         string agentType,
         InstallOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var config = _registry.GetConfig(agentType);
         var isGlobal = options.Global;
@@ -181,7 +181,7 @@ internal sealed class Installer : IInstaller
         RemoteSkill skill,
         string agentType,
         InstallOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var config = _registry.GetConfig(agentType);
         var isGlobal = options.Global;

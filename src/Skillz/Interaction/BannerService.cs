@@ -19,7 +19,7 @@ internal sealed class BannerService(
 
     private static readonly string[] s_grays = { "grey78", "grey74", "grey69", "grey62", "grey58", "grey50" };
 
-    public async Task ShowLogoAsync(CancellationToken cancellationToken = default)
+    public async Task ShowLogoAsync(CancellationToken cancellationToken)
     {
         if (await ShouldSkipAsync(cancellationToken))
         {
@@ -35,7 +35,7 @@ internal sealed class BannerService(
         }
     }
 
-    public async Task ShowBannerAsync(CancellationToken cancellationToken = default)
+    public async Task ShowBannerAsync(CancellationToken cancellationToken)
     {
         if (await ShouldSkipAsync(cancellationToken))
         {
@@ -98,7 +98,7 @@ internal sealed class BannerService(
         interaction.WriteLine();
     }
 
-    private async Task<bool> ShouldSkipAsync(CancellationToken cancellationToken = default)
+    private async Task<bool> ShouldSkipAsync(CancellationToken cancellationToken)
     {
         if (context.IsJsonOutput)
         {

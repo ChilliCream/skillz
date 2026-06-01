@@ -334,7 +334,7 @@ internal sealed class UpdateCommand(
         string[]? skillFilter,
         CancellationToken cancellationToken)
     {
-        var localLock = await projectLockFile.ReadAsync(cancellationToken: cancellationToken);
+        var localLock = await projectLockFile.ReadAsync(cwd: null, cancellationToken);
 
         var projectSkills = new List<(string Name, LocalSkillLockEntry Entry)>();
         foreach (var (name, entry) in localLock.Skills)

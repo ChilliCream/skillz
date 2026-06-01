@@ -15,7 +15,7 @@ internal sealed class ProjectLockFile : IProjectLockFile
         return Path.Combine(cwd ?? Directory.GetCurrentDirectory(), LockFileName);
     }
 
-    public async Task<LocalSkillLockFile> ReadAsync(string? cwd = null, CancellationToken cancellationToken = default)
+    public async Task<LocalSkillLockFile> ReadAsync(string? cwd, CancellationToken cancellationToken)
     {
         var lockPath = GetLockPath(cwd);
 
@@ -54,8 +54,8 @@ internal sealed class ProjectLockFile : IProjectLockFile
 
     public async Task WriteAsync(
         LocalSkillLockFile lockFile,
-        string? cwd = null,
-        CancellationToken cancellationToken = default)
+        string? cwd,
+        CancellationToken cancellationToken)
     {
         var lockPath = GetLockPath(cwd);
         var sorted = SortedCopy(lockFile);
@@ -73,14 +73,15 @@ internal sealed class ProjectLockFile : IProjectLockFile
 
                     await WriteInternalAsync(sorted, cwd, cancellationToken);
                 },
-                cancellationToken: cancellationToken);
+                FileLock.DefaultTimeoutMs,
+                cancellationToken);
     }
 
     public async Task AddEntryAsync(
         string skillName,
         LocalSkillLockEntry entry,
-        string? cwd = null,
-        CancellationToken cancellationToken = default)
+        string? cwd,
+        CancellationToken cancellationToken)
     {
         var lockPath = GetLockPath(cwd);
         await FileLock
@@ -97,13 +98,14 @@ internal sealed class ProjectLockFile : IProjectLockFile
                     lockFile.Skills[skillName] = entry;
                     await WriteInternalAsync(lockFile, cwd, cancellationToken);
                 },
-                cancellationToken: cancellationToken);
+                FileLock.DefaultTimeoutMs,
+                cancellationToken);
     }
 
     public async Task<bool> RemoveEntryAsync(
         string skillName,
-        string? cwd = null,
-        CancellationToken cancellationToken = default)
+        string? cwd,
+        CancellationToken cancellationToken)
     {
         var lockPath = GetLockPath(cwd);
         var removed = false;
@@ -124,15 +126,16 @@ internal sealed class ProjectLockFile : IProjectLockFile
                         await WriteInternalAsync(lockFile, cwd, cancellationToken);
                     }
                 },
-                cancellationToken: cancellationToken);
+                FileLock.DefaultTimeoutMs,
+                cancellationToken);
 
         return removed;
     }
 
     public async Task<bool> HasSkillAsync(
         string skillName,
-        string? cwd = null,
-        CancellationToken cancellationToken = default)
+        string? cwd,
+        CancellationToken cancellationToken)
     {
         var lockFile = await ReadAsync(cwd, cancellationToken);
         return lockFile.Skills.ContainsKey(skillName);
@@ -140,7 +143,7 @@ internal sealed class ProjectLockFile : IProjectLockFile
 
     public async Task<string> ComputeSkillFolderHashAsync(
         string skillDirectory,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var files = new List<(string RelativePath, byte[] Content)>();
         await CollectFilesAsync(skillDirectory, skillDirectory, files, cancellationToken);

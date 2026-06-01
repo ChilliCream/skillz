@@ -21,7 +21,7 @@ internal sealed class TestInstaller : IInstaller
         Skill skill,
         string agentType,
         InstallOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var result = OnInstallSkill is not null
             ? OnInstallSkill(skill, agentType, options)
@@ -33,7 +33,7 @@ internal sealed class TestInstaller : IInstaller
         RemoteSkill skill,
         string agentType,
         InstallOptions options,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var result = OnInstallRemoteSkill is not null
             ? OnInstallRemoteSkill(skill, agentType, options)

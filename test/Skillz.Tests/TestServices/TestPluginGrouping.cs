@@ -8,7 +8,7 @@ internal sealed class TestPluginGrouping : IPluginGrouping
 
     public Task<Dictionary<string, string>> GetPluginGroupingsAsync(
         string basePath,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var result = OnGetPluginGroupings is not null
             ? OnGetPluginGroupings(basePath)

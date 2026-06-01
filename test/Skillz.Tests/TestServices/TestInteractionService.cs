@@ -118,8 +118,8 @@ internal sealed class TestInteractionService : IInteractionService
 
     public Task<string> PromptAsync(
         string message,
-        string? defaultValue = null,
-        CancellationToken cancellationToken = default)
+        string? defaultValue,
+        CancellationToken cancellationToken)
     {
         var result = OnPrompt is not null ? OnPrompt(message, defaultValue) : defaultValue ?? string.Empty;
         return Task.FromResult(result);
@@ -127,8 +127,8 @@ internal sealed class TestInteractionService : IInteractionService
 
     public Task<bool> ConfirmAsync(
         string message,
-        bool defaultValue = false,
-        CancellationToken cancellationToken = default)
+        bool defaultValue,
+        CancellationToken cancellationToken)
     {
         var result = OnConfirm is not null ? OnConfirm(message, defaultValue) : defaultValue;
         return Task.FromResult(result);
@@ -137,7 +137,7 @@ internal sealed class TestInteractionService : IInteractionService
     public Task<T> SelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
         where T : notnull
     {
         var pairs = choices.ToList();
@@ -154,7 +154,7 @@ internal sealed class TestInteractionService : IInteractionService
     public Task<ImmutableArray<T>> MultiSelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
         where T : notnull
     {
         var pairs = choices.ToList();

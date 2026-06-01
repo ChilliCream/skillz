@@ -3,13 +3,13 @@ namespace Skillz.Utils;
 internal static class FileLock
 {
     private const int DefaultRetryDelayMs = 50;
-    private const int DefaultTimeoutMs = 10_000;
+    public const int DefaultTimeoutMs = 10_000;
 
     public static async Task<T> WithLockAsync<T>(
         string targetPath,
         Func<Task<T>> action,
-        int timeoutMs = DefaultTimeoutMs,
-        CancellationToken cancellationToken = default)
+        int timeoutMs,
+        CancellationToken cancellationToken)
     {
         var lockPath = targetPath + ".lock";
         var lockDir = Path.GetDirectoryName(lockPath);
@@ -67,8 +67,8 @@ internal static class FileLock
     public static Task WithLockAsync(
         string targetPath,
         Func<Task> action,
-        int timeoutMs = DefaultTimeoutMs,
-        CancellationToken cancellationToken = default)
+        int timeoutMs,
+        CancellationToken cancellationToken)
     {
         return WithLockAsync<object?>(
             targetPath,

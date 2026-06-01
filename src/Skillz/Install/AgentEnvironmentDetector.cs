@@ -50,7 +50,7 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
         _cwdProvider = cwdProvider;
     }
 
-    public Task<AgentDetectionResult> DetectAgentAsync(CancellationToken cancellationToken = default)
+    public Task<AgentDetectionResult> DetectAgentAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -64,13 +64,13 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
         return Task.FromResult(_cachedResult);
     }
 
-    public async Task<bool> IsRunningInAgentAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> IsRunningInAgentAsync(CancellationToken cancellationToken)
     {
         var result = await DetectAgentAsync(cancellationToken);
         return result.IsAgent;
     }
 
-    public async Task<string?> GetAgentNameAsync(CancellationToken cancellationToken = default)
+    public async Task<string?> GetAgentNameAsync(CancellationToken cancellationToken)
     {
         var result = await DetectAgentAsync(cancellationToken);
         return result.IsAgent ? result.Name : null;
@@ -81,7 +81,7 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
         return s_agentNameToType.GetValueOrDefault(agentName);
     }
 
-    public Task<ImmutableArray<string>> DetectInstalledAgentsAsync(CancellationToken cancellationToken = default)
+    public Task<ImmutableArray<string>> DetectInstalledAgentsAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 

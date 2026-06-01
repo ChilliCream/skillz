@@ -97,7 +97,7 @@ public class CliTestHelperTests
         interaction.OnConfirm = (_, _) => true;
 
         var prompt = await interaction.PromptAsync("name?", "default", ct);
-        var confirm = await interaction.ConfirmAsync("ok?", cancellationToken: ct);
+        var confirm = await interaction.ConfirmAsync("ok?", defaultValue: false, ct);
 
         Assert.Equal("typed value", prompt);
         Assert.True(confirm);

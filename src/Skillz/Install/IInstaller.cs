@@ -8,13 +8,13 @@ internal interface IInstaller
         Skill skill,
         string agentType,
         InstallOptions options,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken);
 
     Task<InstallResult> InstallRemoteSkillForAgentAsync(
         RemoteSkill skill,
         string agentType,
         InstallOptions options,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken);
 
     string GetCanonicalSkillsDir(bool global, string? cwd = null);
 

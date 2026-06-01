@@ -11,13 +11,13 @@ internal sealed class TestRemoveCommandPrompter : IRemoveCommandPrompter
 
     public Task<ImmutableArray<string>> SelectSkillsAsync(
         ImmutableArray<string> installed,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var result = OnSelectSkills is not null ? OnSelectSkills(installed) : installed;
         return Task.FromResult<ImmutableArray<string>>([.. result]);
     }
 
-    public Task<bool> ConfirmRemovalAsync(ImmutableArray<string> skills, CancellationToken cancellationToken = default)
+    public Task<bool> ConfirmRemovalAsync(ImmutableArray<string> skills, CancellationToken cancellationToken)
     {
         var result = OnConfirmRemoval is null || OnConfirmRemoval(skills);
         return Task.FromResult(result);

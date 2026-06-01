@@ -9,9 +9,9 @@ internal sealed class TestSkillDiscovery : ISkillDiscovery
 
     public Task<ImmutableArray<Skill>> DiscoverAsync(
         string basePath,
-        string? subpath = null,
-        SkillDiscoveryOptions? options = null,
-        CancellationToken cancellationToken = default)
+        string? subpath,
+        SkillDiscoveryOptions? options,
+        CancellationToken cancellationToken)
     {
         var result = OnDiscover is not null ? OnDiscover(basePath, subpath, options) : [];
         return Task.FromResult<ImmutableArray<Skill>>([.. result]);

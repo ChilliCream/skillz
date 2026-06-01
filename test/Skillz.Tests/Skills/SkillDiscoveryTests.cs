@@ -43,6 +43,7 @@ public class SkillDiscoveryTests : IDisposable
 
         var skills = await _discovery.DiscoverAsync(
             _testDir,
+            subpath: null,
             options: new SkillDiscoveryOptions(FullDepth: false),
             cancellationToken: Token);
 
@@ -59,6 +60,7 @@ public class SkillDiscoveryTests : IDisposable
 
         var skills = await _discovery.DiscoverAsync(
             _testDir,
+            subpath: null,
             options: new SkillDiscoveryOptions(FullDepth: true),
             cancellationToken: Token);
 
@@ -73,7 +75,7 @@ public class SkillDiscoveryTests : IDisposable
         WriteSkill(".", "root-skill", "Root level skill");
         WriteSkill("skills/nested-skill", "nested-skill", "Nested skill");
 
-        var skills = await _discovery.DiscoverAsync(_testDir, cancellationToken: Token);
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
 
         Assert.Single(skills);
         Assert.Equal("root-skill", skills[0].Name);
@@ -85,11 +87,12 @@ public class SkillDiscoveryTests : IDisposable
         WriteSkill("skills/skill-1", "skill-1", "Skill 1");
         WriteSkill("skills/skill-2", "skill-2", "Skill 2");
 
-        var defaultSkills = await _discovery.DiscoverAsync(_testDir, cancellationToken: Token);
+        var defaultSkills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
         Assert.Equal(2, defaultSkills.Length);
 
         var fullDepthSkills = await _discovery.DiscoverAsync(
             _testDir,
+            subpath: null,
             options: new SkillDiscoveryOptions(FullDepth: true),
             cancellationToken: Token);
         Assert.Equal(2, fullDepthSkills.Length);
@@ -103,6 +106,7 @@ public class SkillDiscoveryTests : IDisposable
 
         var skills = await _discovery.DiscoverAsync(
             _testDir,
+            subpath: null,
             options: new SkillDiscoveryOptions(FullDepth: true),
             cancellationToken: Token);
 
@@ -114,7 +118,7 @@ public class SkillDiscoveryTests : IDisposable
     public async Task Rejects_Subpath_Escaping_BasePath()
     {
         await Assert.ThrowsAsync<CliException>(async () =>
-            await _discovery.DiscoverAsync(_testDir, subpath: "../escape", cancellationToken: Token)
+            await _discovery.DiscoverAsync(_testDir, subpath: "../escape", options: null, cancellationToken: Token)
         );
     }
 
@@ -123,7 +127,7 @@ public class SkillDiscoveryTests : IDisposable
     {
         WriteSkill("nested/skills/sub-skill", "sub-skill", "Skill under subpath");
 
-        var skills = await _discovery.DiscoverAsync(_testDir, subpath: "nested", cancellationToken: Token);
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: "nested", options: null, cancellationToken: Token);
 
         Assert.Single(skills);
         Assert.Equal("sub-skill", skills[0].Name);
@@ -135,7 +139,7 @@ public class SkillDiscoveryTests : IDisposable
         WriteSkill("node_modules/should-not-find", "hidden-skill", "Should be skipped");
         WriteSkill("regular-dir/visible-skill", "visible-skill", "Should be found");
 
-        var skills = await _discovery.DiscoverAsync(_testDir, cancellationToken: Token);
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
 
         Assert.Single(skills);
         Assert.Equal("visible-skill", skills[0].Name);
@@ -148,7 +152,7 @@ public class SkillDiscoveryTests : IDisposable
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "SKILL.md"), "---\ndescription: missing name\n---\nBody\n");
 
-        var skills = await _discovery.DiscoverAsync(_testDir, cancellationToken: Token);
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
 
         Assert.Empty(skills);
     }
@@ -160,7 +164,7 @@ public class SkillDiscoveryTests : IDisposable
         Directory.CreateDirectory(dir);
         File.WriteAllText(Path.Combine(dir, "SKILL.md"), "---\nname: only-name\n---\nBody\n");
 
-        var skills = await _discovery.DiscoverAsync(_testDir, cancellationToken: Token);
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
 
         Assert.Empty(skills);
     }
@@ -171,7 +175,7 @@ public class SkillDiscoveryTests : IDisposable
         WriteSkill(".claude/skills/claude-skill", "claude-skill", "Claude-specific skill");
         WriteSkill(".roo/skills/roo-skill", "roo-skill", "Roo-specific skill");
 
-        var skills = await _discovery.DiscoverAsync(_testDir, cancellationToken: Token);
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
 
         Assert.Equal(2, skills.Length);
         var names = skills.Select(s => s.Name).OrderBy(n => n, StringComparer.Ordinal).ToArray();
@@ -181,7 +185,7 @@ public class SkillDiscoveryTests : IDisposable
     [Fact]
     public async Task Returns_Empty_When_BasePath_Has_No_Skills()
     {
-        var skills = await _discovery.DiscoverAsync(_testDir, cancellationToken: Token);
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
 
         Assert.Empty(skills);
     }
@@ -191,7 +195,7 @@ public class SkillDiscoveryTests : IDisposable
     {
         WriteSkill("skills/my-skill", "my-skill", "A skill");
 
-        var skills = await _discovery.DiscoverAsync(_testDir, cancellationToken: Token);
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
 
         Assert.Single(skills);
         Assert.Equal(Path.GetFullPath(Path.Combine(_testDir, "skills", "my-skill")), Path.GetFullPath(skills[0].Path));
@@ -202,7 +206,7 @@ public class SkillDiscoveryTests : IDisposable
     {
         WriteSkill("skills/my-skill", "my-skill", "Has content");
 
-        var skills = await _discovery.DiscoverAsync(_testDir, cancellationToken: Token);
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
 
         Assert.Single(skills);
         Assert.NotNull(skills[0].RawContent);

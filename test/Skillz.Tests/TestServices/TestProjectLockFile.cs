@@ -25,7 +25,7 @@ internal sealed class TestProjectLockFile : IProjectLockFile
             : Path.Combine(cwd ?? Directory.GetCurrentDirectory(), "skillz.lock");
     }
 
-    public Task<LocalSkillLockFile> ReadAsync(string? cwd = null, CancellationToken cancellationToken = default)
+    public Task<LocalSkillLockFile> ReadAsync(string? cwd, CancellationToken cancellationToken)
     {
         var result = OnRead is not null ? OnRead(cwd) : new LocalSkillLockFile { Version = 1 };
         return Task.FromResult(result);
@@ -33,8 +33,8 @@ internal sealed class TestProjectLockFile : IProjectLockFile
 
     public Task WriteAsync(
         LocalSkillLockFile lockFile,
-        string? cwd = null,
-        CancellationToken cancellationToken = default)
+        string? cwd,
+        CancellationToken cancellationToken)
     {
         OnWrite?.Invoke(lockFile, cwd);
         return Task.CompletedTask;
@@ -43,8 +43,8 @@ internal sealed class TestProjectLockFile : IProjectLockFile
     public Task AddEntryAsync(
         string skillName,
         LocalSkillLockEntry entry,
-        string? cwd = null,
-        CancellationToken cancellationToken = default)
+        string? cwd,
+        CancellationToken cancellationToken)
     {
         OnAddEntry?.Invoke(skillName, entry, cwd);
         return Task.CompletedTask;
@@ -52,14 +52,14 @@ internal sealed class TestProjectLockFile : IProjectLockFile
 
     public Task<bool> RemoveEntryAsync(
         string skillName,
-        string? cwd = null,
-        CancellationToken cancellationToken = default)
+        string? cwd,
+        CancellationToken cancellationToken)
     {
         var result = OnRemoveEntry is not null && OnRemoveEntry(skillName, cwd);
         return Task.FromResult(result);
     }
 
-    public Task<bool> HasSkillAsync(string skillName, string? cwd = null, CancellationToken cancellationToken = default)
+    public Task<bool> HasSkillAsync(string skillName, string? cwd, CancellationToken cancellationToken)
     {
         var result = OnHasSkill is not null && OnHasSkill(skillName, cwd);
         return Task.FromResult(result);
@@ -67,7 +67,7 @@ internal sealed class TestProjectLockFile : IProjectLockFile
 
     public Task<string> ComputeSkillFolderHashAsync(
         string skillDirectory,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var result = OnComputeSkillFolderHash is not null ? OnComputeSkillFolderHash(skillDirectory) : string.Empty;
         return Task.FromResult(result);

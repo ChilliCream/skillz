@@ -7,14 +7,14 @@ internal interface IPluginManifest
 {
     Task<ImmutableArray<string>> GetPluginSkillPathsAsync(
         string basePath,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken);
 }
 
 internal sealed class PluginManifest : IPluginManifest
 {
     public async Task<ImmutableArray<string>> GetPluginSkillPathsAsync(
         string basePath,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var searchDirs = new List<string>();
 
@@ -70,7 +70,7 @@ internal sealed class PluginManifest : IPluginManifest
     internal static async Task TryReadMarketplaceAsync(
         string basePath,
         Action<string, List<string>?, string?> onPlugin,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var marketplacePath = Path.Combine(basePath, ".claude-plugin", "marketplace.json");
         MarketplaceManifest? manifest;
@@ -144,7 +144,7 @@ internal sealed class PluginManifest : IPluginManifest
     internal static async Task TryReadPluginJsonAsync(
         string basePath,
         Action<List<string>?, string?> onPlugin,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var pluginPath = Path.Combine(basePath, ".claude-plugin", "plugin.json");
         SinglePluginManifest? manifest;

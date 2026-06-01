@@ -59,9 +59,9 @@ internal sealed class SkillDiscovery : ISkillDiscovery
 
     public async Task<ImmutableArray<Skill>> DiscoverAsync(
         string basePath,
-        string? subpath = null,
-        SkillDiscoveryOptions? options = null,
-        CancellationToken cancellationToken = default)
+        string? subpath,
+        SkillDiscoveryOptions? options,
+        CancellationToken cancellationToken)
     {
         options ??= new SkillDiscoveryOptions();
 

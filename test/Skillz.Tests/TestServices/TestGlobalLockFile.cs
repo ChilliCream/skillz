@@ -15,31 +15,31 @@ internal sealed class TestGlobalLockFile : IGlobalLockFile
 
     public Func<string, SkillLockEntry?>? OnGetEntry { get; set; }
 
-    public Task<SkillLockFile> ReadAsync(CancellationToken cancellationToken = default)
+    public Task<SkillLockFile> ReadAsync(CancellationToken cancellationToken)
     {
         var result = OnRead is not null ? OnRead() : new SkillLockFile { Version = 1 };
         return Task.FromResult(result);
     }
 
-    public Task WriteAsync(SkillLockFile lockFile, CancellationToken cancellationToken = default)
+    public Task WriteAsync(SkillLockFile lockFile, CancellationToken cancellationToken)
     {
         OnWrite?.Invoke(lockFile);
         return Task.CompletedTask;
     }
 
-    public Task AddEntryAsync(string skillName, SkillLockEntry entry, CancellationToken cancellationToken = default)
+    public Task AddEntryAsync(string skillName, SkillLockEntry entry, CancellationToken cancellationToken)
     {
         OnAddEntry?.Invoke(skillName, entry);
         return Task.CompletedTask;
     }
 
-    public Task<bool> RemoveEntryAsync(string skillName, CancellationToken cancellationToken = default)
+    public Task<bool> RemoveEntryAsync(string skillName, CancellationToken cancellationToken)
     {
         var result = OnRemoveEntry is not null && OnRemoveEntry(skillName);
         return Task.FromResult(result);
     }
 
-    public Task<SkillLockEntry?> GetEntryAsync(string skillName, CancellationToken cancellationToken = default)
+    public Task<SkillLockEntry?> GetEntryAsync(string skillName, CancellationToken cancellationToken)
     {
         var result = OnGetEntry?.Invoke(skillName);
         return Task.FromResult(result);
@@ -49,13 +49,13 @@ internal sealed class TestGlobalLockFile : IGlobalLockFile
 
     public Action<IReadOnlyList<string>>? OnSaveLastSelectedAgents { get; set; }
 
-    public Task<ImmutableArray<string>?> GetLastSelectedAgentsAsync(CancellationToken cancellationToken = default)
+    public Task<ImmutableArray<string>?> GetLastSelectedAgentsAsync(CancellationToken cancellationToken)
     {
         var result = OnGetLastSelectedAgents?.Invoke();
         return Task.FromResult<ImmutableArray<string>?>(result is null ? null : [.. result]);
     }
 
-    public Task SaveLastSelectedAgentsAsync(ImmutableArray<string> agents, CancellationToken cancellationToken = default)
+    public Task SaveLastSelectedAgentsAsync(ImmutableArray<string> agents, CancellationToken cancellationToken)
     {
         OnSaveLastSelectedAgents?.Invoke(agents);
         return Task.CompletedTask;

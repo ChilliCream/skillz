@@ -81,8 +81,8 @@ internal sealed class ConsoleInteractionService : IInteractionService
 
     public Task<string> PromptAsync(
         string message,
-        string? defaultValue = null,
-        CancellationToken cancellationToken = default)
+        string? defaultValue,
+        CancellationToken cancellationToken)
     {
         var prompt = new TextPrompt<string>(Markup.Escape(message)) { AllowEmpty = true };
 
@@ -96,8 +96,8 @@ internal sealed class ConsoleInteractionService : IInteractionService
 
     public Task<bool> ConfirmAsync(
         string message,
-        bool defaultValue = false,
-        CancellationToken cancellationToken = default)
+        bool defaultValue,
+        CancellationToken cancellationToken)
     {
         var prompt = new ConfirmationPrompt(Markup.Escape(message)) { DefaultValue = defaultValue };
 
@@ -107,7 +107,7 @@ internal sealed class ConsoleInteractionService : IInteractionService
     public async Task<T> SelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
         where T : notnull
     {
         var pairs = choices.ToList();
@@ -126,7 +126,7 @@ internal sealed class ConsoleInteractionService : IInteractionService
     public async Task<ImmutableArray<T>> MultiSelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
         where T : notnull
     {
         var pairs = choices.ToList();

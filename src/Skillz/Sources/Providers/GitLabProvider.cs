@@ -21,8 +21,8 @@ internal sealed class GitLabProvider : IProvider
 
     public async Task<ImmutableArray<RemoteSkill>> FetchSkillsAsync(
         ParsedSource source,
-        ProviderOptions? options = null,
-        CancellationToken cancellationToken = default)
+        ProviderOptions? options,
+        CancellationToken cancellationToken)
     {
         if (source is not ParsedSource.GitLab gitlab)
         {

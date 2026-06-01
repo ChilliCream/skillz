@@ -21,7 +21,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
 
     public async Task<ImmutableArray<RemoteSkill>> SelectSkillsAsync(
         ImmutableArray<RemoteSkill> skills,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (skills.Length == 0)
         {
@@ -53,7 +53,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
     public async Task<ImmutableArray<string>> SelectAgentsAsync(
         ImmutableArray<string> available,
         bool global,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         if (available.Length == 0)
         {
@@ -107,7 +107,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
         return selected;
     }
 
-    public async Task<bool> SelectGlobalScopeAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> SelectGlobalScopeAsync(CancellationToken cancellationToken)
     {
         var choices = new (string Label, bool Value)[]
         {
@@ -118,7 +118,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
         return await _interaction.SelectAsync("Installation scope", choices, cancellationToken);
     }
 
-    public async Task<InstallMode> SelectInstallModeAsync(CancellationToken cancellationToken = default)
+    public async Task<InstallMode> SelectInstallModeAsync(CancellationToken cancellationToken)
     {
         var choices = new (string Label, InstallMode Value)[]
         {
@@ -133,7 +133,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
         ImmutableArray<RemoteSkill> skills,
         ImmutableArray<string> agents,
         ImmutableArray<OverwriteTarget> overwrites,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var skillNames = string.Join(", ", skills.Select(s => s.InstallName));
         var agentNames = string.Join(", ", agents);

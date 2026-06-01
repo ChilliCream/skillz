@@ -9,7 +9,7 @@ internal sealed class TestPluginManifest : IPluginManifest
 
     public Task<ImmutableArray<string>> GetPluginSkillPathsAsync(
         string basePath,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken)
     {
         var result = OnGetPluginSkillPaths is not null ? OnGetPluginSkillPaths(basePath) : [];
         return Task.FromResult<ImmutableArray<string>>([.. result]);
