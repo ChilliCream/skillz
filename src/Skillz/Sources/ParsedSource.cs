@@ -5,7 +5,8 @@ internal abstract record ParsedSource
     private ParsedSource() { }
 
     public sealed record GitHub(string Url, string? Ref = null, string? Subpath = null, string? SkillFilter = null)
-        : ParsedSource;
+        : ParsedSource
+        , ISkillFilterable;
 
     public sealed record GitLab(string Url, string? Ref = null, string? Subpath = null) : ParsedSource;
 
@@ -14,4 +15,9 @@ internal abstract record ParsedSource
     public sealed record Local(string Url, string LocalPath) : ParsedSource;
 
     public sealed record WellKnown(string Url) : ParsedSource;
+
+    public interface ISkillFilterable
+    {
+        string? SkillFilter { get; init; }
+    }
 }

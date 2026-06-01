@@ -57,36 +57,20 @@ internal sealed class AddCommandExecutor(
         ImmutableArray<RemoteSkill> skills;
         try
         {
-            var provider = providerRegistry.Resolve(parsed);
-            var providerOptions = new ProviderOptions(
-                FullDepth: options.FullDepth,
-                IncludeInternal: skillFilters.Length > 0);
-
-            skills = await interaction
-                .StatusAsync(
-                    "Fetching skills...",
-                    async () =>
-                    {
-                        var fetched = await provider.FetchSkillsAsync(parsed, providerOptions, cancellationToken);
-                        return fetched.ToImmutableArray();
-                    });
+            skills = await FetchSkillsAsync(parsed, options, skillFilters, cancellationToken);
         }
         catch (CliException ex)
         {
-            interaction.WriteError(ex.Message);
+            if (ex.Title is { } title)
+            {
+                interaction.WriteErrorPanel(title, ex.Message, ex.Hint);
+            }
+            else
+            {
+                interaction.WriteError(ex.Message);
+            }
+
             return new CommandResult.Failure(ex.ExitCode);
-        }
-        catch (Exception ex)
-        {
-            var message =
-                ex is AggregateException agg && agg.InnerException is not null
-                    ? agg.InnerException.Message
-                    : ex.Message;
-            interaction.WriteErrorPanel(
-                "Failed to fetch skills",
-                message,
-                "Tip: use the --yes (-y) and --global (-g) flags to install without prompts.");
-            return new CommandResult.Failure(ExitCodeConstants.Failure);
         }
 
         try
@@ -130,6 +114,39 @@ internal sealed class AddCommandExecutor(
         finally
         {
             CleanupStagingPaths(skills);
+        }
+    }
+
+    private async Task<ImmutableArray<RemoteSkill>> FetchSkillsAsync(
+        ParsedSource parsed,
+        AddCommandOptions options,
+        ImmutableArray<string> skillFilters,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var provider = providerRegistry.Resolve(parsed);
+            var providerOptions = new ProviderOptions(
+                FullDepth: options.FullDepth,
+                IncludeInternal: skillFilters.Length > 0);
+
+            return await interaction.StatusAsync(
+                "Fetching skills...",
+                async () =>
+                {
+                    var fetched = await provider.FetchSkillsAsync(parsed, providerOptions, cancellationToken);
+                    return fetched.ToImmutableArray();
+                });
+        }
+        catch (Exception ex) when (ex is not CliException and not OperationCanceledException)
+        {
+            // Reframe arbitrary fetch failures (network, parsing, …) as a presented CliException;
+            // CliException and cancellation pass through untouched and are handled at the boundary.
+            throw new CliException(
+                ExitCodeConstants.Failure,
+                ex.Message,
+                title: "Failed to fetch skills",
+                hint: "Tip: use the --yes (-y) and --global (-g) flags to install without prompts.");
         }
     }
 
@@ -198,8 +215,11 @@ internal sealed class AddCommandExecutor(
 
         if (!nonInteractive)
         {
-            var confirmed = await prompter
-                .ConfirmInstallationAsync(selectedSkills, targetAgents, overwriteTargets, cancellationToken);
+            var confirmed = await prompter.ConfirmInstallationAsync(
+                selectedSkills,
+                targetAgents,
+                overwriteTargets,
+                cancellationToken);
             if (!confirmed)
             {
                 interaction.WriteWarning("Installation cancelled");
@@ -349,13 +369,14 @@ internal sealed class AddCommandExecutor(
         return config.DisplayName;
     }
 
-    private static ImmutableArray<string> MergeSkillFilters(IReadOnlyList<string> existing, ParsedSource parsed)
+    private static ImmutableArray<string> MergeSkillFilters(ImmutableArray<string> existing, ParsedSource parsed)
     {
-        if (parsed is ParsedSource.GitHub github && !string.IsNullOrEmpty(github.SkillFilter))
+        if (parsed is ParsedSource.ISkillFilterable filterable
+            && !string.IsNullOrEmpty(filterable.SkillFilter))
         {
-            if (!existing.Contains(github.SkillFilter, StringComparer.OrdinalIgnoreCase))
+            if (!existing.Contains(filterable.SkillFilter, StringComparer.OrdinalIgnoreCase))
             {
-                return [.. existing, github.SkillFilter];
+                return [.. existing, filterable.SkillFilter];
             }
         }
 
@@ -495,8 +516,7 @@ internal sealed class AddCommandExecutor(
                 return registry.GetUniversalAgents();
             }
 
-            return await prompter
-                .SelectAgentsAsync(validAgents, options.Global, cancellationToken);
+            return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken);
         }
 
         // One installed OR non-interactive → no prompt
@@ -550,16 +570,18 @@ internal sealed class AddCommandExecutor(
         CancellationToken cancellationToken)
     {
         var results = ImmutableArray.CreateBuilder<InstallEntry>();
-        await interaction
-            .StatusAsync("Installing skills...", async () => { foreach (var skill in selectedSkills)
+        await interaction.StatusAsync("Installing skills...", async () => { foreach (var skill in selectedSkills)
+            {
+                foreach (var agentType in targetAgents)
                 {
-                    foreach (var agentType in targetAgents)
-                    {
-                        var result = await installer
-                            .InstallRemoteSkillForAgentAsync(skill, agentType, installOptions, cancellationToken);
-                        results.Add(new InstallEntry(skill, agentType, result));
-                    }
-                } });
+                    var result = await installer.InstallRemoteSkillForAgentAsync(
+                        skill,
+                        agentType,
+                        installOptions,
+                        cancellationToken);
+                    results.Add(new InstallEntry(skill, agentType, result));
+                }
+            } });
 
         return results.ToImmutable();
     }
@@ -592,8 +614,7 @@ internal sealed class AddCommandExecutor(
                 {
                     if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
                     {
-                        skillFolderHash = await projectLock
-                            .ComputeSkillFolderHashAsync(installPath, cancellationToken);
+                        skillFolderHash = await projectLock.ComputeSkillFolderHashAsync(installPath, cancellationToken);
                     }
                 }
                 catch { }
@@ -613,8 +634,7 @@ internal sealed class AddCommandExecutor(
                 {
                     try
                     {
-                        await globalLock
-                            .AddEntryAsync(entry.Skill.InstallName, lockEntry, cancellationToken);
+                        await globalLock.AddEntryAsync(entry.Skill.InstallName, lockEntry, cancellationToken);
                     }
                     catch { }
                 }
@@ -626,8 +646,7 @@ internal sealed class AddCommandExecutor(
                 {
                     if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
                     {
-                        computedHash = await projectLock
-                            .ComputeSkillFolderHashAsync(installPath, cancellationToken);
+                        computedHash = await projectLock.ComputeSkillFolderHashAsync(installPath, cancellationToken);
                     }
                 }
                 catch { }
@@ -642,8 +661,7 @@ internal sealed class AddCommandExecutor(
                 };
                 try
                 {
-                    await projectLock
-                        .AddEntryAsync(entry.Skill.InstallName, lockEntry, cwd: null, cancellationToken);
+                    await projectLock.AddEntryAsync(entry.Skill.InstallName, lockEntry, cwd: null, cancellationToken);
                 }
                 catch { }
             }

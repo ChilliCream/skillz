@@ -86,11 +86,6 @@ internal sealed class AddCommand(IInteractionService interaction, AddCommandExec
     private AddCommandOptions ParseOptions(ParseResult parseResult)
     {
         var source = parseResult.GetValue(_sourceArgument);
-        // A doubled "--" (e.g. `skillz add -- --`) binds the second "--" as a literal source value; treat it as "no source".
-        if (source == "--")
-        {
-            source = null;
-        }
         var global = parseResult.GetValue(_globalOption);
         var agents = parseResult.GetValue(_agentOption) ?? [];
         var skills = parseResult.GetValue(_skillOption) ?? [];

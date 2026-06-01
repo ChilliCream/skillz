@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.ExceptionServices;
 using System.Text;
 using Spectre.Console;
 
@@ -69,14 +70,31 @@ internal sealed class ConsoleInteractionService : IInteractionService
         _console.MarkupLineInterpolated($"[dim]{text}[/]");
     }
 
-    public Task<T> StatusAsync<T>(string status, Func<Task<T>> action)
+    public async Task<T> StatusAsync<T>(string status, Func<Task<T>> action)
     {
-        return _console.Status().StartAsync(status, _ => action());
+        try
+        {
+            return await _console.Status().StartAsync(status, _ => action());
+        }
+        catch (AggregateException ex) when (ex.InnerException is { } inner)
+        {
+            // Spectre's Status spinner faults the action onto a background task and surfaces it
+            // wrapped; unwrap here so callers see the real exception, not the wrapper.
+            ExceptionDispatchInfo.Capture(inner).Throw();
+            throw; // unreachable
+        }
     }
 
-    public Task StatusAsync(string status, Func<Task> action)
+    public async Task StatusAsync(string status, Func<Task> action)
     {
-        return _console.Status().StartAsync(status, _ => action());
+        try
+        {
+            await _console.Status().StartAsync(status, _ => action());
+        }
+        catch (AggregateException ex) when (ex.InnerException is { } inner)
+        {
+            ExceptionDispatchInfo.Capture(inner).Throw();
+        }
     }
 
     public Task<string> PromptAsync(

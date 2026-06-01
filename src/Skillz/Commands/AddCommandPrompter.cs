@@ -46,8 +46,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             return ($"{s.InstallName} - {hint}", s);
         });
 
-        return await _interaction
-            .MultiSelectAsync("Select skills to install", choices, cancellationToken);
+        return await _interaction.MultiSelectAsync("Select skills to install", choices, cancellationToken);
     }
 
     public async Task<ImmutableArray<string>> SelectAgentsAsync(
@@ -88,8 +87,10 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             return ($"{config.DisplayName} ({a})", a);
         });
 
-        var selected = await _interaction
-            .MultiSelectAsync("Which agents do you want to install to?", choices, cancellationToken);
+        var selected = await _interaction.MultiSelectAsync(
+            "Which agents do you want to install to?",
+            choices,
+            cancellationToken);
 
         // Save selection for next time
         if (selected.Length > 0)
