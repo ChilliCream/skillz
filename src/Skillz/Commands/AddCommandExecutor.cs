@@ -64,10 +64,11 @@ internal sealed class AddCommandExecutor(
             skills = await interaction
                 .StatusAsync(
                     "Fetching skills...",
-                    () =>
-                        provider
-                            .FetchSkillsAsync(parsed, providerOptions, cancellationToken)
-                            .ContinueWith(t => t.Result.ToImmutableArray(), cancellationToken));
+                    async () =>
+                    {
+                        var fetched = await provider.FetchSkillsAsync(parsed, providerOptions, cancellationToken);
+                        return fetched.ToImmutableArray();
+                    });
         }
         catch (CliException ex)
         {
