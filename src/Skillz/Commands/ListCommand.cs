@@ -48,7 +48,7 @@ internal sealed class ListCommand(
         CancellationToken cancellationToken)
     {
         var global = parseResult.GetValue(_globalOption);
-        var agents = parseResult.GetValue(_agentOption) ?? Array.Empty<string>();
+        var agents = parseResult.GetValue(_agentOption) ?? [];
         var format = parseResult.GetValue(_formatOption);
         var jsonFlag = parseResult.GetValue(_jsonOption);
         var jsonOutput = jsonFlag || string.Equals(format, "json", StringComparison.OrdinalIgnoreCase);
@@ -69,8 +69,7 @@ internal sealed class ListCommand(
         var cwd = Directory.GetCurrentDirectory();
         ImmutableArray<string> agentFilter = agents.Length > 0 ? [.. agents] : registry.ListAgentTypes();
 
-        var skills = await CollectInstalledSkillsAsync(installer, registry, agentFilter, global, cwd, cancellationToken)
-            .ConfigureAwait(false);
+        var skills = await CollectInstalledSkillsAsync(installer, registry, agentFilter, global, cwd, cancellationToken);
 
         if (jsonOutput)
         {
@@ -165,7 +164,7 @@ internal sealed class ListCommand(
                     continue;
                 }
 
-                skills[name] = new InstalledSkill(name, entry, new List<string>());
+                skills[name] = new InstalledSkill(name, entry, []);
             }
         }
 
@@ -216,7 +215,7 @@ internal sealed class ListCommand(
 
                 if (!skills.TryGetValue(name, out var existing))
                 {
-                    existing = new InstalledSkill(name, entry, new List<string>());
+                    existing = new InstalledSkill(name, entry, []);
                     skills[name] = existing;
                 }
 
@@ -227,7 +226,7 @@ internal sealed class ListCommand(
             }
         }
 
-        await Task.CompletedTask.ConfigureAwait(false);
+        await Task.CompletedTask;
         return [.. skills.Values];
     }
 

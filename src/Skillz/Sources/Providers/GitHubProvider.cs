@@ -32,7 +32,7 @@ internal sealed class GitHubProvider : IProvider
         var tempDir = Path.Combine(Path.GetTempPath(), "skillz-" + Guid.NewGuid().ToString("N"));
         try
         {
-            await _gitClient.CloneAsync(github.Url, tempDir, github.Ref, cancellationToken).ConfigureAwait(false);
+            await _gitClient.CloneAsync(github.Url, tempDir, github.Ref, cancellationToken);
 
             var includeInternal = !string.IsNullOrEmpty(github.SkillFilter) || (options?.IncludeInternal ?? false);
             var discoveryOpts = new SkillDiscoveryOptions(
@@ -40,8 +40,7 @@ internal sealed class GitHubProvider : IProvider
                 FullDepth: options?.FullDepth ?? false);
 
             var skills = await _skillDiscovery
-                .DiscoverAsync(tempDir, github.Subpath, discoveryOpts, cancellationToken)
-                .ConfigureAwait(false);
+                .DiscoverAsync(tempDir, github.Subpath, discoveryOpts, cancellationToken);
 
             return ProviderConversions.ToRemoteSkills(skills, Id, github.Url, tempDir, cleanupPath: tempDir);
         }

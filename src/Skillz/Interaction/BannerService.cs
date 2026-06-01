@@ -19,9 +19,9 @@ internal sealed class BannerService(
 
     private static readonly string[] s_grays = { "grey78", "grey74", "grey69", "grey62", "grey58", "grey50" };
 
-    public async Task ShowLogoAsync()
+    public async Task ShowLogoAsync(CancellationToken cancellationToken = default)
     {
-        if (await ShouldSkipAsync().ConfigureAwait(false))
+        if (await ShouldSkipAsync(cancellationToken))
         {
             return;
         }
@@ -35,14 +35,14 @@ internal sealed class BannerService(
         }
     }
 
-    public async Task ShowBannerAsync()
+    public async Task ShowBannerAsync(CancellationToken cancellationToken = default)
     {
-        if (await ShouldSkipAsync().ConfigureAwait(false))
+        if (await ShouldSkipAsync(cancellationToken))
         {
             return;
         }
 
-        await ShowLogoAsync().ConfigureAwait(false);
+        await ShowLogoAsync(cancellationToken);
         interaction.WriteLine();
         interaction.WriteDim("The open agent skills ecosystem");
         interaction.WriteLine();
@@ -98,13 +98,13 @@ internal sealed class BannerService(
         interaction.WriteLine();
     }
 
-    private async Task<bool> ShouldSkipAsync()
+    private async Task<bool> ShouldSkipAsync(CancellationToken cancellationToken = default)
     {
         if (context.IsJsonOutput)
         {
             return true;
         }
 
-        return await detector.IsRunningInAgentAsync().ConfigureAwait(false);
+        return await detector.IsRunningInAgentAsync(cancellationToken);
     }
 }

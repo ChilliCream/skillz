@@ -2,12 +2,16 @@ namespace Skillz.Plugins;
 
 internal interface IPluginGrouping
 {
-    Task<Dictionary<string, string>> GetPluginGroupingsAsync(string basePath);
+    Task<Dictionary<string, string>> GetPluginGroupingsAsync(
+        string basePath,
+        CancellationToken cancellationToken = default);
 }
 
 internal sealed class PluginGrouping : IPluginGrouping
 {
-    public async Task<Dictionary<string, string>> GetPluginGroupingsAsync(string basePath)
+    public async Task<Dictionary<string, string>> GetPluginGroupingsAsync(
+        string basePath,
+        CancellationToken cancellationToken = default)
     {
         var groupings = new Dictionary<string, string>();
 
@@ -49,7 +53,8 @@ internal sealed class PluginGrouping : IPluginGrouping
                         }
                     }
                 }
-            });
+            },
+            cancellationToken);
 
         await PluginManifest.TryReadPluginJsonAsync(
             basePath,
@@ -81,7 +86,8 @@ internal sealed class PluginGrouping : IPluginGrouping
                         groupings[fullPath] = name;
                     }
                 }
-            });
+            },
+            cancellationToken);
 
         return groupings;
     }

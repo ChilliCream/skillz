@@ -46,7 +46,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         var expected = Path.Combine(_testDir, "plugins", "test-plugin", "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));
@@ -70,7 +70,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         var expected = Path.Combine(_testDir, "plugins", "my-plugin", "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));
@@ -88,7 +88,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         var expected = Path.Combine(_testDir, "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));
@@ -111,7 +111,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         Assert.Empty(dirs);
     }
@@ -119,7 +119,7 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task MissingManifest_ReturnsEmpty()
     {
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         Assert.Empty(dirs);
     }
@@ -129,7 +129,7 @@ public class PluginManifestTests : IDisposable
     {
         WriteManifest(".claude-plugin/marketplace.json", "not valid json");
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         Assert.Empty(dirs);
     }
@@ -147,7 +147,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         Assert.All(dirs, d => Assert.True(PathContainment.IsContainedIn(d, _testDir)));
     }
@@ -165,7 +165,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         Assert.All(dirs, d => Assert.True(PathContainment.IsContainedIn(d, _testDir)));
     }
@@ -181,7 +181,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         var conventional = Path.Combine(_testDir, "skills");
         Assert.Single(dirs);
@@ -202,7 +202,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         var bareSkills = Path.Combine(_testDir, "bare-plugin", "skills");
         var validSkills = Path.Combine(_testDir, "valid-plugin", "skills");
@@ -225,7 +225,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         Assert.Empty(dirs);
     }
@@ -241,7 +241,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         var validParent = Path.Combine(_testDir, "valid-loc");
         var invalidParent = Path.Combine(_testDir, "invalid-loc");
@@ -263,7 +263,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         var expected = Path.Combine(_testDir, "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));
@@ -280,7 +280,7 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
-        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir);
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         var expected = Path.Combine(_testDir, "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));

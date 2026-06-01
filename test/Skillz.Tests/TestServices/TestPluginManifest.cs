@@ -7,7 +7,9 @@ internal sealed class TestPluginManifest : IPluginManifest
 {
     public Func<string, IReadOnlyList<string>>? OnGetPluginSkillPaths { get; set; }
 
-    public Task<ImmutableArray<string>> GetPluginSkillPathsAsync(string basePath)
+    public Task<ImmutableArray<string>> GetPluginSkillPathsAsync(
+        string basePath,
+        CancellationToken cancellationToken = default)
     {
         var result = OnGetPluginSkillPaths is not null ? OnGetPluginSkillPaths(basePath) : [];
         return Task.FromResult<ImmutableArray<string>>([.. result]);

@@ -85,7 +85,7 @@ internal static class Program
         builder.Services.AddTransient<SkillzRootCommand>();
 
         using var host = builder.Build();
-        await host.StartAsync(cts.Token).ConfigureAwait(false);
+        await host.StartAsync(cts.Token);
 
         try
         {
@@ -94,7 +94,7 @@ internal static class Program
             if (args.Length == 0)
             {
                 var banner = host.Services.GetRequiredService<BannerService>();
-                await banner.ShowBannerAsync().ConfigureAwait(false);
+                await banner.ShowBannerAsync(cts.Token);
                 return ExitCodeConstants.Success;
             }
 
@@ -102,7 +102,7 @@ internal static class Program
             if (args.Length == 1 && args[0] is "--help" or "-h" or "-?")
             {
                 var banner = host.Services.GetRequiredService<BannerService>();
-                await banner.ShowLogoAsync().ConfigureAwait(false);
+                await banner.ShowLogoAsync(cts.Token);
                 banner.ShowCuratedHelp();
                 return ExitCodeConstants.Success;
             }
@@ -113,10 +113,10 @@ internal static class Program
             if (commandName is "add" or "init")
             {
                 var banner = host.Services.GetRequiredService<BannerService>();
-                await banner.ShowLogoAsync().ConfigureAwait(false);
+                await banner.ShowLogoAsync(cts.Token);
             }
 
-            return await parseResult.InvokeAsync(cancellationToken: cts.Token).ConfigureAwait(false);
+            return await parseResult.InvokeAsync(cancellationToken: cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -136,7 +136,7 @@ internal static class Program
         {
             Console.CancelKeyPress -= cancelKeyHandler;
             AppDomain.CurrentDomain.ProcessExit -= unloadHandler;
-            await host.StopAsync().ConfigureAwait(false);
+            await host.StopAsync();
         }
     }
 

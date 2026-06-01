@@ -13,17 +13,17 @@ internal sealed class TestAgentEnvironmentDetector : IAgentEnvironmentDetector
 
     public Dictionary<string, string?> AgentTypes { get; set; } = new(StringComparer.Ordinal);
 
-    public Task<AgentDetectionResult> DetectAgentAsync()
+    public Task<AgentDetectionResult> DetectAgentAsync(CancellationToken cancellationToken = default)
     {
         return Task.FromResult(DetectionResult);
     }
 
-    public Task<bool> IsRunningInAgentAsync()
+    public Task<bool> IsRunningInAgentAsync(CancellationToken cancellationToken = default)
     {
         return Task.FromResult(DetectionResult.IsAgent);
     }
 
-    public Task<string?> GetAgentNameAsync()
+    public Task<string?> GetAgentNameAsync(CancellationToken cancellationToken = default)
     {
         return Task.FromResult(AgentName);
     }
@@ -33,7 +33,7 @@ internal sealed class TestAgentEnvironmentDetector : IAgentEnvironmentDetector
         return AgentTypes.GetValueOrDefault(agentName);
     }
 
-    public Task<ImmutableArray<string>> DetectInstalledAgentsAsync()
+    public Task<ImmutableArray<string>> DetectInstalledAgentsAsync(CancellationToken cancellationToken = default)
     {
         return Task.FromResult<ImmutableArray<string>>([.. InstalledAgents]);
     }

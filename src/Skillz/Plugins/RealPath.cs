@@ -231,7 +231,7 @@ internal static class RealPath
         }
 
         foreach (var part in relativePath.Split(
-            new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar },
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
             StringSplitOptions.RemoveEmptyEntries))
         {
             current = Path.Combine(current, part);

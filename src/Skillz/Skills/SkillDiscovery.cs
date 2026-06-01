@@ -74,7 +74,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
 
         var searchPath = subpath is null ? basePath : Path.Combine(basePath, subpath);
 
-        var groupings = await _pluginGrouping.GetPluginGroupingsAsync(searchPath).ConfigureAwait(false);
+        var groupings = await _pluginGrouping.GetPluginGroupingsAsync(searchPath, cancellationToken);
 
         var skills = new List<Skill>();
         var seenNames = new HashSet<string>(StringComparer.Ordinal);
@@ -84,8 +84,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
             var rootSkill = await ParseSkillMdAsync(
                     Path.Combine(searchPath, KnownConfigNames.SkillFileName),
                     options,
-                    cancellationToken)
-                .ConfigureAwait(false);
+                    cancellationToken);
 
             if (rootSkill is not null)
             {
@@ -106,7 +105,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
             prioritySearchDirs.Add(relative.Length == 0 ? searchPath : Path.Combine(searchPath, relative));
         }
 
-        var pluginPaths = await _pluginManifest.GetPluginSkillPathsAsync(searchPath).ConfigureAwait(false);
+        var pluginPaths = await _pluginManifest.GetPluginSkillPathsAsync(searchPath, cancellationToken);
         prioritySearchDirs.AddRange(pluginPaths);
 
         foreach (var dir in prioritySearchDirs)
@@ -133,8 +132,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
                 var skill = await ParseSkillMdAsync(
                         Path.Combine(skillDir, KnownConfigNames.SkillFileName),
                         options,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                        cancellationToken);
 
                 if (skill is null)
                 {
@@ -162,8 +160,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
                 var skill = await ParseSkillMdAsync(
                         Path.Combine(skillDir, KnownConfigNames.SkillFileName),
                         options,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                        cancellationToken);
 
                 if (skill is null)
                 {
@@ -255,7 +252,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
         string content;
         try
         {
-            content = await File.ReadAllTextAsync(skillMdPath, cancellationToken).ConfigureAwait(false);
+            content = await File.ReadAllTextAsync(skillMdPath, cancellationToken);
         }
         catch
         {

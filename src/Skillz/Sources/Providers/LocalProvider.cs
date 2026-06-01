@@ -36,8 +36,7 @@ internal sealed class LocalProvider : IProvider
             FullDepth: options?.FullDepth ?? false);
 
         var skills = await _skillDiscovery
-            .DiscoverAsync(local.LocalPath, subpath: null, discoveryOptions, cancellationToken)
-            .ConfigureAwait(false);
+            .DiscoverAsync(local.LocalPath, subpath: null, discoveryOptions, cancellationToken);
 
         return ProviderConversions.ToRemoteSkills(skills, Id, local.LocalPath);
     }

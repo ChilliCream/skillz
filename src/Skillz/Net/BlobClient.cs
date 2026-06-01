@@ -45,7 +45,7 @@ internal sealed class BlobClient : IBlobClient
 
         if (rateLimitedAtStart)
         {
-            var token = await _tokenProvider.GetTokenAsync(cancellationToken).ConfigureAwait(false);
+            var token = await _tokenProvider.GetTokenAsync(cancellationToken);
             if (token is null)
             {
                 return null;
@@ -53,8 +53,7 @@ internal sealed class BlobClient : IBlobClient
 
             foreach (var branch in branches)
             {
-                var result = await FetchTreeBranchAsync(ownerRepo, branch, token, cancellationToken)
-                    .ConfigureAwait(false);
+                var result = await FetchTreeBranchAsync(ownerRepo, branch, token, cancellationToken);
                 if (result.Tree is not null)
                 {
                     return ApplySubpath(result.Tree, path);
@@ -67,8 +66,7 @@ internal sealed class BlobClient : IBlobClient
         var rateLimited = false;
         foreach (var branch in branches)
         {
-            var result = await FetchTreeBranchAsync(ownerRepo, branch, token: null, cancellationToken)
-                .ConfigureAwait(false);
+            var result = await FetchTreeBranchAsync(ownerRepo, branch, token: null, cancellationToken);
             if (result.Tree is not null)
             {
                 return ApplySubpath(result.Tree, path);
@@ -87,7 +85,7 @@ internal sealed class BlobClient : IBlobClient
         }
 
         MarkRateLimited();
-        var fallbackToken = await _tokenProvider.GetTokenAsync(cancellationToken).ConfigureAwait(false);
+        var fallbackToken = await _tokenProvider.GetTokenAsync(cancellationToken);
         if (fallbackToken is null)
         {
             return null;
@@ -95,8 +93,7 @@ internal sealed class BlobClient : IBlobClient
 
         foreach (var branch in branches)
         {
-            var result = await FetchTreeBranchAsync(ownerRepo, branch, fallbackToken, cancellationToken)
-                .ConfigureAwait(false);
+            var result = await FetchTreeBranchAsync(ownerRepo, branch, fallbackToken, cancellationToken);
             if (result.Tree is not null)
             {
                 return ApplySubpath(result.Tree, path);
@@ -124,13 +121,13 @@ internal sealed class BlobClient : IBlobClient
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(s_fetchTimeout);
 
-            using var response = await client.SendAsync(request, timeoutCts.Token).ConfigureAwait(false);
+            using var response = await client.SendAsync(request, timeoutCts.Token);
             if (!response.IsSuccessStatusCode)
             {
                 return null;
             }
 
-            return await response.Content.ReadAsStringAsync(timeoutCts.Token).ConfigureAwait(false);
+            return await response.Content.ReadAsStringAsync(timeoutCts.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
@@ -165,15 +162,13 @@ internal sealed class BlobClient : IBlobClient
             using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             timeoutCts.CancelAfter(s_fetchTimeout);
 
-            using var response = await client.SendAsync(request, timeoutCts.Token).ConfigureAwait(false);
+            using var response = await client.SendAsync(request, timeoutCts.Token);
             if (response.IsSuccessStatusCode)
             {
                 await using var stream = await response
-                    .Content.ReadAsStreamAsync(timeoutCts.Token)
-                    .ConfigureAwait(false);
+                    .Content.ReadAsStreamAsync(timeoutCts.Token);
                 var data = await JsonSerializer
-                    .DeserializeAsync(stream, JsonSourceGenerationContext.Default.GitHubTreeResponse, timeoutCts.Token)
-                    .ConfigureAwait(false);
+                    .DeserializeAsync(stream, JsonSourceGenerationContext.Default.GitHubTreeResponse, timeoutCts.Token);
 
                 if (data is null)
                 {

@@ -50,8 +50,10 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
         _cwdProvider = cwdProvider;
     }
 
-    public Task<AgentDetectionResult> DetectAgentAsync()
+    public Task<AgentDetectionResult> DetectAgentAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (_cachedResult is not null)
         {
             return Task.FromResult(_cachedResult);
@@ -62,15 +64,15 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
         return Task.FromResult(_cachedResult);
     }
 
-    public async Task<bool> IsRunningInAgentAsync()
+    public async Task<bool> IsRunningInAgentAsync(CancellationToken cancellationToken = default)
     {
-        var result = await DetectAgentAsync().ConfigureAwait(false);
+        var result = await DetectAgentAsync(cancellationToken);
         return result.IsAgent;
     }
 
-    public async Task<string?> GetAgentNameAsync()
+    public async Task<string?> GetAgentNameAsync(CancellationToken cancellationToken = default)
     {
-        var result = await DetectAgentAsync().ConfigureAwait(false);
+        var result = await DetectAgentAsync(cancellationToken);
         return result.IsAgent ? result.Name : null;
     }
 
@@ -79,8 +81,10 @@ internal sealed class AgentEnvironmentDetector : IAgentEnvironmentDetector
         return s_agentNameToType.GetValueOrDefault(agentName);
     }
 
-    public Task<ImmutableArray<string>> DetectInstalledAgentsAsync()
+    public Task<ImmutableArray<string>> DetectInstalledAgentsAsync(CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var installed = new List<string>();
         foreach (var (type, _) in _registry.All)
         {

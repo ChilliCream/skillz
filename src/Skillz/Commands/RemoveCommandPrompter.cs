@@ -23,8 +23,7 @@ internal sealed class RemoveCommandPrompter : IRemoveCommandPrompter
 
         var choices = installed.Select(s => (s, s));
         return await _interaction
-            .MultiSelectAsync("Select skills to remove", choices, cancellationToken)
-            .ConfigureAwait(false);
+            .MultiSelectAsync("Select skills to remove", choices, cancellationToken);
     }
 
     public Task<bool> ConfirmRemovalAsync(ImmutableArray<string> skills, CancellationToken cancellationToken = default)
