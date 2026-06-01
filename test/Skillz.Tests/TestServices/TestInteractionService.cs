@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text;
 using Skillz.Interaction;
 using Spectre.Console;
 
@@ -58,6 +59,31 @@ internal sealed class TestInteractionService : IInteractionService
     {
         _output.Add($"ERROR: {message}");
         _console.MarkupLineInterpolated($"[red]{message}[/]");
+    }
+
+    public void WriteErrorPanel(string title, string message, string? tip = null)
+    {
+        _output.Add($"ERROR: {title}: {message}");
+        if (tip is not null)
+        {
+            _output.Add($"TIP: {tip}");
+        }
+
+        var content = new StringBuilder();
+        content.Append($"[red]{Markup.Escape(message)}[/]");
+        if (tip is not null)
+        {
+            content.AppendLine();
+            content.AppendLine();
+            content.Append($"[dim]{Markup.Escape(tip)}[/]");
+        }
+
+        _console.WriteLine();
+        _console.Write(
+            new Panel(new Markup(content.ToString()))
+                .Header($"[bold red]{Markup.Escape(title)}[/]")
+                .BorderColor(Color.Red)
+                .Expand());
     }
 
     public void WriteWarning(string message)

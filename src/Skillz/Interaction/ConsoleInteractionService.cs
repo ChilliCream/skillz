@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text;
 using Spectre.Console;
 
 namespace Skillz.Interaction;
@@ -32,6 +33,25 @@ internal sealed class ConsoleInteractionService : IInteractionService
     public void WriteError(string message)
     {
         _console.MarkupLineInterpolated($"[red]{message}[/]");
+    }
+
+    public void WriteErrorPanel(string title, string message, string? tip = null)
+    {
+        var content = new StringBuilder();
+        content.Append($"[red]{Markup.Escape(message)}[/]");
+        if (tip is not null)
+        {
+            content.AppendLine();
+            content.AppendLine();
+            content.Append($"[dim]{Markup.Escape(tip)}[/]");
+        }
+
+        WriteLine();
+        _console.Write(
+            new Panel(new Markup(content.ToString()))
+                .Header($"[bold red]{Markup.Escape(title)}[/]")
+                .BorderColor(Color.Red)
+                .Expand());
     }
 
     public void WriteWarning(string message)

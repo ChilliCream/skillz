@@ -15,6 +15,8 @@ internal interface IInteractionService
 
     void WriteError(string message);
 
+    void WriteErrorPanel(string title, string message, string? tip = null);
+
     void WriteWarning(string message);
 
     void WriteSuccess(string message);

@@ -82,7 +82,7 @@ internal sealed class AddCommandExecutor(
                 ex is AggregateException agg && agg.InnerException is not null
                     ? agg.InnerException.Message
                     : ex.Message;
-            RenderErrorPanel(
+            interaction.WriteErrorPanel(
                 "Failed to fetch skills",
                 message,
                 "Tip: use the --yes (-y) and --global (-g) flags to install without prompts.");
@@ -235,7 +235,7 @@ internal sealed class AddCommandExecutor(
             var detail = string.Join(
                 Environment.NewLine,
                 failed.Select(r => $"{r.SkillName} → {r.AgentType}: {r.Result.Error}"));
-            RenderErrorPanel("Installation failed", detail);
+            interaction.WriteErrorPanel("Installation failed", detail);
             return new CommandResult.Failure(ExitCodeConstants.Failure);
         }
 
@@ -347,25 +347,6 @@ internal sealed class AddCommandExecutor(
     {
         var config = registry.GetConfig(agentType);
         return config.DisplayName;
-    }
-
-    private void RenderErrorPanel(string title, string message, string? tip = null)
-    {
-        var content = new StringBuilder();
-        content.Append($"[red]{Markup.Escape(message)}[/]");
-        if (tip is not null)
-        {
-            content.AppendLine();
-            content.AppendLine();
-            content.Append($"[dim]{Markup.Escape(tip)}[/]");
-        }
-
-        interaction.WriteLine();
-        interaction.Console.Write(
-            new Panel(new Markup(content.ToString()))
-                .Header($"[bold red]{Markup.Escape(title)}[/]")
-                .BorderColor(Color.Red)
-                .Expand());
     }
 
     private static ImmutableArray<string> MergeSkillFilters(IReadOnlyList<string> existing, ParsedSource parsed)
