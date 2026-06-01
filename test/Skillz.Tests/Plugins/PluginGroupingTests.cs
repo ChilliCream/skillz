@@ -51,7 +51,7 @@ public class PluginGroupingTests : IDisposable
             }
             """);
 
-        var groupings = await _grouping.GetPluginGroupingsAsync(_testDir);
+        var groupings = await _grouping.GetPluginGroupingsAsync(_testDir, TestContext.Current.CancellationToken);
 
         var xlsxPath = Path.GetFullPath(Path.Combine(_testDir, "skills", "xlsx"));
         var docxPath = Path.GetFullPath(Path.Combine(_testDir, "skills", "docx"));
@@ -79,7 +79,7 @@ public class PluginGroupingTests : IDisposable
             }
             """);
 
-        var groupings = await _grouping.GetPluginGroupingsAsync(_testDir);
+        var groupings = await _grouping.GetPluginGroupingsAsync(_testDir, TestContext.Current.CancellationToken);
 
         var expected = Path.GetFullPath(Path.Combine(_testDir, "plugins", "my-plugin", "skills", "deep"));
         Assert.Equal("nested-plugin", groupings[expected]);
@@ -97,7 +97,7 @@ public class PluginGroupingTests : IDisposable
             }
             """);
 
-        var groupings = await _grouping.GetPluginGroupingsAsync(_testDir);
+        var groupings = await _grouping.GetPluginGroupingsAsync(_testDir, TestContext.Current.CancellationToken);
 
         var onePath = Path.GetFullPath(Path.Combine(_testDir, "skills", "one"));
         var twoPath = Path.GetFullPath(Path.Combine(_testDir, "skills", "two"));
@@ -119,7 +119,7 @@ public class PluginGroupingTests : IDisposable
             }
             """);
 
-        var groupings = await _grouping.GetPluginGroupingsAsync(_testDir);
+        var groupings = await _grouping.GetPluginGroupingsAsync(_testDir, TestContext.Current.CancellationToken);
 
         Assert.Empty(groupings);
     }
@@ -141,7 +141,7 @@ public class PluginGroupingTests : IDisposable
             }
             """);
 
-        var groupings = await _grouping.GetPluginGroupingsAsync(_testDir);
+        var groupings = await _grouping.GetPluginGroupingsAsync(_testDir, TestContext.Current.CancellationToken);
 
         Assert.Empty(groupings);
     }

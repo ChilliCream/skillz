@@ -42,14 +42,14 @@ internal sealed partial class WellKnownProvider : IProvider
             throw new ArgumentException($"WellKnownProvider cannot handle {source.GetType().Name}.", nameof(source));
         }
 
-        var candidates = await FetchIndexCandidatesAsync(wellKnown.Url, cancellationToken).ConfigureAwait(false);
+        var candidates = await FetchIndexCandidatesAsync(wellKnown.Url, cancellationToken);
 
         foreach (var candidate in candidates)
         {
             var skills = new List<RemoteSkill>();
             foreach (var entry in candidate.Entries)
             {
-                var skill = await FetchSkillByEntryAsync(entry, cancellationToken).ConfigureAwait(false);
+                var skill = await FetchSkillByEntryAsync(entry, cancellationToken);
                 if (skill is not null)
                 {
                     skills.Add(skill);
@@ -106,13 +106,13 @@ internal sealed partial class WellKnownProvider : IProvider
         {
             try
             {
-                using var response = await client.GetAsync(indexUrl, cancellationToken).ConfigureAwait(false);
+                using var response = await client.GetAsync(indexUrl, cancellationToken);
                 if (!response.IsSuccessStatusCode)
                 {
                     continue;
                 }
 
-                var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                var json = await response.Content.ReadAsStringAsync(cancellationToken);
                 var normalized = NormalizeIndex(json, indexUrl, resolvedBase, wellKnownPath);
                 if (normalized is not null)
                 {
@@ -234,12 +234,12 @@ internal sealed partial class WellKnownProvider : IProvider
 
         if (entry.Version == "0.1.0")
         {
-            return await FetchLegacySkillAsync(client, entry, cancellationToken).ConfigureAwait(false);
+            return await FetchLegacySkillAsync(client, entry, cancellationToken);
         }
 
         if (entry.Type == "skill-md")
         {
-            return await FetchSkillMdArtifactAsync(client, entry, cancellationToken).ConfigureAwait(false);
+            return await FetchSkillMdArtifactAsync(client, entry, cancellationToken);
         }
 
         return null;
@@ -258,14 +258,14 @@ internal sealed partial class WellKnownProvider : IProvider
             var skillBaseUrl = $"{entry.BaseUrl!.TrimEnd('/')}/{entry.WellKnownPath}/{entry.Name}";
             var skillMdUrl = $"{skillBaseUrl}/SKILL.md";
 
-            using var response = await client.GetAsync(skillMdUrl, cancellationToken).ConfigureAwait(false);
+            using var response = await client.GetAsync(skillMdUrl, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 TempDirCleanup.SafeDelete(stagingRoot);
                 return null;
             }
 
-            var content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var content = await response.Content.ReadAsStringAsync(cancellationToken);
             var fm = FrontmatterParser.Parse(content);
             if (!fm.Data.TryGetValue("name", out var nameObj)
                 || nameObj is not string skillName
@@ -277,8 +277,7 @@ internal sealed partial class WellKnownProvider : IProvider
             }
 
             Directory.CreateDirectory(skillDir);
-            await File.WriteAllTextAsync(Path.Combine(skillDir, "SKILL.md"), content, cancellationToken)
-                .ConfigureAwait(false);
+            await File.WriteAllTextAsync(Path.Combine(skillDir, "SKILL.md"), content, cancellationToken);
 
             if (entry.Files is not null)
             {
@@ -298,16 +297,14 @@ internal sealed partial class WellKnownProvider : IProvider
                     try
                     {
                         using var fileResponse = await client
-                            .GetAsync(fileUrl, cancellationToken)
-                            .ConfigureAwait(false);
+                            .GetAsync(fileUrl, cancellationToken);
                         if (!fileResponse.IsSuccessStatusCode)
                         {
                             continue;
                         }
 
                         var bytes = await fileResponse
-                            .Content.ReadAsByteArrayAsync(cancellationToken)
-                            .ConfigureAwait(false);
+                            .Content.ReadAsByteArrayAsync(cancellationToken);
                         var normalizedRelative = relativeFile.Replace('\\', '/');
                         var destination = Path.Combine(
                             skillDir,
@@ -324,7 +321,7 @@ internal sealed partial class WellKnownProvider : IProvider
                             Directory.CreateDirectory(parent);
                         }
 
-                        await File.WriteAllBytesAsync(destination, bytes, cancellationToken).ConfigureAwait(false);
+                        await File.WriteAllBytesAsync(destination, bytes, cancellationToken);
                     }
                     catch (HttpRequestException) { }
                     catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { }
@@ -366,13 +363,13 @@ internal sealed partial class WellKnownProvider : IProvider
     {
         try
         {
-            using var response = await client.GetAsync(entry.ArtifactUrl, cancellationToken).ConfigureAwait(false);
+            using var response = await client.GetAsync(entry.ArtifactUrl, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
                 return null;
             }
 
-            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
             if (ComputeDigest(bytes) != entry.Digest)
             {
                 return null;

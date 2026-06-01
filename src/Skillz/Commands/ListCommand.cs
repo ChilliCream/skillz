@@ -68,8 +68,7 @@ internal sealed class ListCommand(
         var cwd = Directory.GetCurrentDirectory();
         var agentFilter = agents.Length > 0 ? agents : registry.ListAgentTypes().ToArray();
 
-        var skills = await CollectInstalledSkillsAsync(installer, registry, agentFilter, global, cwd, cancellationToken)
-            .ConfigureAwait(false);
+        var skills = await CollectInstalledSkillsAsync(installer, registry, agentFilter, global, cwd, cancellationToken);
 
         if (jsonOutput)
         {
@@ -226,7 +225,7 @@ internal sealed class ListCommand(
             }
         }
 
-        await Task.CompletedTask.ConfigureAwait(false);
+        await Task.CompletedTask;
         return skills.Values.ToList();
     }
 

@@ -36,7 +36,7 @@ internal static class FileLock
                         options: FileOptions.DeleteOnClose | FileOptions.Asynchronous)
                 )
                 {
-                    return await action().ConfigureAwait(false);
+                    return await action();
                 }
             }
             catch (IOException)
@@ -59,7 +59,7 @@ internal static class FileLock
                 catch (IOException) { }
                 catch (UnauthorizedAccessException) { }
 
-                await Task.Delay(DefaultRetryDelayMs, cancellationToken).ConfigureAwait(false);
+                await Task.Delay(DefaultRetryDelayMs, cancellationToken);
             }
         }
     }
@@ -74,7 +74,7 @@ internal static class FileLock
             targetPath,
             async () =>
             {
-                await action().ConfigureAwait(false);
+                await action();
                 return null;
             },
             timeoutMs,

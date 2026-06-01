@@ -60,7 +60,7 @@ internal sealed class UpdateCommand(
             Yes: parseResult.GetValue(_yesOption),
             Skills: skillFilter);
 
-        var scope = await ResolveScopeAsync(options, cancellationToken).ConfigureAwait(false);
+        var scope = await ResolveScopeAsync(options, cancellationToken);
 
         if (skillFilter is not null)
         {
@@ -84,7 +84,7 @@ internal sealed class UpdateCommand(
                 interaction.WriteMarkupLine("[bold]Global Skills[/]");
             }
 
-            var globalResult = await UpdateGlobalSkillsAsync(skillFilter, cancellationToken).ConfigureAwait(false);
+            var globalResult = await UpdateGlobalSkillsAsync(skillFilter, cancellationToken);
             totalUpdatesAvailable += globalResult.UpdatesAvailableCount;
             totalFail += globalResult.FailCount;
             totalFound += globalResult.CheckedCount;
@@ -102,7 +102,7 @@ internal sealed class UpdateCommand(
                 interaction.WriteMarkupLine("[bold]Project Skills[/]");
             }
 
-            var projectResult = await UpdateProjectSkillsAsync(skillFilter, cancellationToken).ConfigureAwait(false);
+            var projectResult = await UpdateProjectSkillsAsync(skillFilter, cancellationToken);
             totalUpdatesAvailable += projectResult.UpdatesAvailableCount;
             totalFail += projectResult.FailCount;
             totalFound += projectResult.FoundCount;
@@ -164,7 +164,7 @@ internal sealed class UpdateCommand(
 
         if (options.Yes || consoleEnvironment.IsInputRedirected)
         {
-            return await HasProjectSkillsAsync(cancellationToken).ConfigureAwait(false)
+            return await HasProjectSkillsAsync(cancellationToken)
                 ? UpdateScope.Project
                 : UpdateScope.Global;
         }
@@ -178,8 +178,7 @@ internal sealed class UpdateCommand(
                     ("Global (update skills in home directory)", UpdateScope.Global),
                     ("Both (update all skills)", UpdateScope.Both)
                 },
-                cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken);
 
         return choice;
     }
@@ -226,7 +225,7 @@ internal sealed class UpdateCommand(
         string[]? skillFilter,
         CancellationToken cancellationToken)
     {
-        var lockFile = await globalLockFile.ReadAsync(cancellationToken).ConfigureAwait(false);
+        var lockFile = await globalLockFile.ReadAsync(cancellationToken);
 
         if (lockFile.Skills.Count == 0)
         {
@@ -276,8 +275,7 @@ internal sealed class UpdateCommand(
                     entry.Source,
                     entry.SkillPath!,
                     entry.Ref,
-                    cancellationToken)
-                .ConfigureAwait(false);
+                    cancellationToken);
             if (latestHash is not null
                 && !string.Equals(latestHash, entry.SkillFolderHash, StringComparison.Ordinal))
             {
@@ -335,7 +333,7 @@ internal sealed class UpdateCommand(
         string[]? skillFilter,
         CancellationToken cancellationToken)
     {
-        var localLock = await projectLockFile.ReadAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        var localLock = await projectLockFile.ReadAsync(cancellationToken: cancellationToken);
 
         var projectSkills = new List<(string Name, LocalSkillLockEntry Entry)>();
         foreach (var (name, entry) in localLock.Skills)
@@ -387,7 +385,7 @@ internal sealed class UpdateCommand(
         }
 
         PrintLegacyProjectSkills(legacy);
-        await Task.CompletedTask.ConfigureAwait(false);
+        await Task.CompletedTask;
 
         return (updatesAvailableCount, 0, projectSkills.Count);
     }
@@ -410,8 +408,7 @@ internal sealed class UpdateCommand(
         try
         {
             var tree = await blobClient
-                .FetchTreeAsync(owner, repo, @ref, path: null, cancellationToken)
-                .ConfigureAwait(false);
+                .FetchTreeAsync(owner, repo, @ref, path: null, cancellationToken);
             if (tree is null)
             {
                 return null;

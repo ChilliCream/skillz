@@ -136,13 +136,13 @@ internal sealed class Installer : IInstaller
             if (installMode == InstallMode.Copy)
             {
                 CleanAndCreateDirectory(agentDir, agentBase);
-                await CopyDirectoryAsync(skill.Path, agentDir, cancellationToken).ConfigureAwait(false);
+                await CopyDirectoryAsync(skill.Path, agentDir, cancellationToken);
 
                 return new InstallResult(true, agentDir, Mode: InstallMode.Copy);
             }
 
             CleanAndCreateDirectory(canonicalDir, canonicalBase);
-            await CopyDirectoryAsync(skill.Path, canonicalDir, cancellationToken).ConfigureAwait(false);
+            await CopyDirectoryAsync(skill.Path, canonicalDir, cancellationToken);
 
             if (isGlobal && _registry.IsUniversalAgent(agentType))
             {
@@ -164,7 +164,7 @@ internal sealed class Installer : IInstaller
             if (!symlinkCreated)
             {
                 CleanAndCreateDirectory(agentDir, agentBase);
-                await CopyDirectoryAsync(skill.Path, agentDir, cancellationToken).ConfigureAwait(false);
+                await CopyDirectoryAsync(skill.Path, agentDir, cancellationToken);
 
                 return new InstallResult(true, agentDir, canonicalDir, InstallMode.Symlink, SymlinkFailed: true);
             }
@@ -230,12 +230,12 @@ internal sealed class Installer : IInstaller
                 CleanAndCreateDirectory(agentDir, agentBase);
                 if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
                 {
-                    await CopyDirectoryAsync(skill.SourcePath, agentDir, cancellationToken).ConfigureAwait(false);
+                    await CopyDirectoryAsync(skill.SourcePath, agentDir, cancellationToken);
                 }
                 else
                 {
                     var agentSkillMd = Path.Combine(agentDir, KnownConfigNames.SkillFileName);
-                    await File.WriteAllTextAsync(agentSkillMd, skill.Content, cancellationToken).ConfigureAwait(false);
+                    await File.WriteAllTextAsync(agentSkillMd, skill.Content, cancellationToken);
                 }
 
                 return new InstallResult(true, agentDir, Mode: InstallMode.Copy);
@@ -244,12 +244,12 @@ internal sealed class Installer : IInstaller
             CleanAndCreateDirectory(canonicalDir, canonicalBase);
             if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
             {
-                await CopyDirectoryAsync(skill.SourcePath, canonicalDir, cancellationToken).ConfigureAwait(false);
+                await CopyDirectoryAsync(skill.SourcePath, canonicalDir, cancellationToken);
             }
             else
             {
                 var canonicalSkillMd = Path.Combine(canonicalDir, KnownConfigNames.SkillFileName);
-                await File.WriteAllTextAsync(canonicalSkillMd, skill.Content, cancellationToken).ConfigureAwait(false);
+                await File.WriteAllTextAsync(canonicalSkillMd, skill.Content, cancellationToken);
             }
 
             if (isGlobal && _registry.IsUniversalAgent(agentType))
@@ -274,13 +274,12 @@ internal sealed class Installer : IInstaller
                 CleanAndCreateDirectory(agentDir, agentBase);
                 if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
                 {
-                    await CopyDirectoryAsync(skill.SourcePath, agentDir, cancellationToken).ConfigureAwait(false);
+                    await CopyDirectoryAsync(skill.SourcePath, agentDir, cancellationToken);
                 }
                 else
                 {
                     var fallbackSkillMd = Path.Combine(agentDir, KnownConfigNames.SkillFileName);
-                    await File.WriteAllTextAsync(fallbackSkillMd, skill.Content, cancellationToken)
-                        .ConfigureAwait(false);
+                    await File.WriteAllTextAsync(fallbackSkillMd, skill.Content, cancellationToken);
                 }
 
                 return new InstallResult(true, agentDir, canonicalDir, InstallMode.Symlink, SymlinkFailed: true);
@@ -333,7 +332,7 @@ internal sealed class Installer : IInstaller
         var sourceRoot = RealPath.TryGetRealPath(src)
             ?? throw new InvalidOperationException($"Source path cannot be resolved: {src}");
 
-        await CopyDirectoryAsync(src, dest, sourceRoot, cancellationToken).ConfigureAwait(false);
+        await CopyDirectoryAsync(src, dest, sourceRoot, cancellationToken);
     }
 
     private static async Task CopyDirectoryAsync(
@@ -363,11 +362,11 @@ internal sealed class Installer : IInstaller
 
             if (isReparsePoint)
             {
-                await CopyReparsePointTargetAsync(entry, destPath, sourceRoot, cancellationToken).ConfigureAwait(false);
+                await CopyReparsePointTargetAsync(entry, destPath, sourceRoot, cancellationToken);
             }
             else if (isDirectory)
             {
-                await CopyDirectoryAsync(srcPath, destPath, sourceRoot, cancellationToken).ConfigureAwait(false);
+                await CopyDirectoryAsync(srcPath, destPath, sourceRoot, cancellationToken);
             }
             else
             {
@@ -375,7 +374,7 @@ internal sealed class Installer : IInstaller
             }
         }
 
-        await Task.CompletedTask.ConfigureAwait(false);
+        await Task.CompletedTask;
     }
 
     private static async Task CopyReparsePointTargetAsync(
@@ -417,7 +416,7 @@ internal sealed class Installer : IInstaller
                 File.Copy(file.FullName, destPath, overwrite: true);
                 break;
             case DirectoryInfo dir:
-                await CopyDirectoryAsync(dir.FullName, destPath, sourceRoot, cancellationToken).ConfigureAwait(false);
+                await CopyDirectoryAsync(dir.FullName, destPath, sourceRoot, cancellationToken);
                 break;
             default:
                 throw new InvalidOperationException($"Refusing to copy unsupported symlink target: {entry.FullName}");

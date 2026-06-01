@@ -80,7 +80,7 @@ internal sealed class AddCommand(IInteractionService interaction, AddCommandExec
             return new CommandResult.Failure(ExitCodeConstants.Failure);
         }
 
-        return await executor.RunAsync(options, cancellationToken).ConfigureAwait(false);
+        return await executor.RunAsync(options, cancellationToken);
     }
 
     private AddCommandOptions ParseOptions(ParseResult parseResult)

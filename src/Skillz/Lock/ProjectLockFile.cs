@@ -23,8 +23,7 @@ internal sealed class ProjectLockFile : IProjectLockFile
         {
             await using var stream = File.OpenRead(lockPath);
             var parsed = await JsonSerializer
-                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken)
-                .ConfigureAwait(false);
+                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken);
 
             if (parsed is null || parsed.Skills is null)
             {
@@ -66,16 +65,15 @@ internal sealed class ProjectLockFile : IProjectLockFile
                 lockPath,
                 async () =>
                 {
-                    var existing = await ReadInternalAsync(cwd, true, cancellationToken).ConfigureAwait(false);
+                    var existing = await ReadInternalAsync(cwd, true, cancellationToken);
                     if (existing.Version > CurrentVersion)
                     {
                         throw CreateNewerVersionException(lockPath, existing.Version);
                     }
 
-                    await WriteInternalAsync(sorted, cwd, cancellationToken).ConfigureAwait(false);
+                    await WriteInternalAsync(sorted, cwd, cancellationToken);
                 },
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken: cancellationToken);
     }
 
     public async Task AddEntryAsync(
@@ -90,17 +88,16 @@ internal sealed class ProjectLockFile : IProjectLockFile
                 lockPath,
                 async () =>
                 {
-                    var lockFile = await ReadInternalAsync(cwd, true, cancellationToken).ConfigureAwait(false);
+                    var lockFile = await ReadInternalAsync(cwd, true, cancellationToken);
                     if (lockFile.Version > CurrentVersion)
                     {
                         throw CreateNewerVersionException(lockPath, lockFile.Version);
                     }
 
                     lockFile.Skills[skillName] = entry;
-                    await WriteInternalAsync(lockFile, cwd, cancellationToken).ConfigureAwait(false);
+                    await WriteInternalAsync(lockFile, cwd, cancellationToken);
                 },
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken: cancellationToken);
     }
 
     public async Task<bool> RemoveEntryAsync(
@@ -115,7 +112,7 @@ internal sealed class ProjectLockFile : IProjectLockFile
                 lockPath,
                 async () =>
                 {
-                    var lockFile = await ReadInternalAsync(cwd, true, cancellationToken).ConfigureAwait(false);
+                    var lockFile = await ReadInternalAsync(cwd, true, cancellationToken);
                     if (lockFile.Version > CurrentVersion)
                     {
                         throw CreateNewerVersionException(lockPath, lockFile.Version);
@@ -124,11 +121,10 @@ internal sealed class ProjectLockFile : IProjectLockFile
                     removed = lockFile.Skills.Remove(skillName);
                     if (removed)
                     {
-                        await WriteInternalAsync(lockFile, cwd, cancellationToken).ConfigureAwait(false);
+                        await WriteInternalAsync(lockFile, cwd, cancellationToken);
                     }
                 },
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken: cancellationToken);
 
         return removed;
     }
@@ -138,7 +134,7 @@ internal sealed class ProjectLockFile : IProjectLockFile
         string? cwd = null,
         CancellationToken cancellationToken = default)
     {
-        var lockFile = await ReadAsync(cwd, cancellationToken).ConfigureAwait(false);
+        var lockFile = await ReadAsync(cwd, cancellationToken);
         return lockFile.Skills.ContainsKey(skillName);
     }
 
@@ -147,7 +143,7 @@ internal sealed class ProjectLockFile : IProjectLockFile
         CancellationToken cancellationToken = default)
     {
         var files = new List<(string RelativePath, byte[] Content)>();
-        await CollectFilesAsync(skillDirectory, skillDirectory, files, cancellationToken).ConfigureAwait(false);
+        await CollectFilesAsync(skillDirectory, skillDirectory, files, cancellationToken);
 
         files.Sort((a, b) => string.CompareOrdinal(a.RelativePath, b.RelativePath));
 
@@ -185,11 +181,11 @@ internal sealed class ProjectLockFile : IProjectLockFile
                     continue;
                 }
 
-                await CollectFilesAsync(baseDir, entry, results, cancellationToken).ConfigureAwait(false);
+                await CollectFilesAsync(baseDir, entry, results, cancellationToken);
             }
             else if (File.Exists(entry))
             {
-                var content = await File.ReadAllBytesAsync(entry, cancellationToken).ConfigureAwait(false);
+                var content = await File.ReadAllBytesAsync(entry, cancellationToken);
                 var relative = Path.GetRelativePath(baseDir, entry).Replace('\\', '/');
                 results.Add((relative, content));
             }
@@ -207,8 +203,7 @@ internal sealed class ProjectLockFile : IProjectLockFile
         {
             await using var stream = File.OpenRead(lockPath);
             var parsed = await JsonSerializer
-                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken)
-                .ConfigureAwait(false);
+                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken);
 
             if (parsed is null || parsed.Skills is null)
             {
@@ -264,11 +259,10 @@ internal sealed class ProjectLockFile : IProjectLockFile
                              options: FileOptions.Asynchronous))
             {
                 await JsonSerializer
-                    .SerializeAsync(stream, sorted, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken)
-                    .ConfigureAwait(false);
+                    .SerializeAsync(stream, sorted, JsonSourceGenerationContext.Default.LocalSkillLockFile, cancellationToken);
 
-                await stream.WriteAsync("\n"u8.ToArray(), cancellationToken).ConfigureAwait(false);
-                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                await stream.WriteAsync("\n"u8.ToArray(), cancellationToken);
+                await stream.FlushAsync(cancellationToken);
             }
 
             File.Move(tempPath, lockPath, overwrite: true);

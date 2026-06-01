@@ -12,7 +12,7 @@ internal abstract class BaseCommand : Command
         SetAction(
             async (parseResult, cancellationToken) =>
             {
-                var result = await ExecuteAsync(parseResult, cancellationToken).ConfigureAwait(false);
+                var result = await ExecuteAsync(parseResult, cancellationToken);
 
                 if (result is CommandResult.DisplayHelp)
                 {

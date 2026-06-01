@@ -33,7 +33,7 @@ internal sealed class AddCommandExecutor(
             return new CommandResult.Failure(ExitCodeConstants.Failure);
         }
 
-        var detection = await detector.DetectAgentAsync().ConfigureAwait(false);
+        var detection = await detector.DetectAgentAsync(cancellationToken);
         if (detection.IsAgent)
         {
             var agents = options.Agents;
@@ -66,8 +66,7 @@ internal sealed class AddCommandExecutor(
                     () =>
                         provider
                             .FetchSkillsAsync(parsed, providerOptions, cancellationToken)
-                            .ContinueWith(t => (IReadOnlyList<RemoteSkill>)t.Result, cancellationToken))
-                .ConfigureAwait(false);
+                            .ContinueWith(t => (IReadOnlyList<RemoteSkill>)t.Result, cancellationToken));
         }
         catch (CliException ex)
         {
@@ -123,8 +122,7 @@ internal sealed class AddCommandExecutor(
                 return new CommandResult.Success();
             }
 
-            return await RunInstallationAsync(parsed, skills, skillFilters, options, cancellationToken)
-                .ConfigureAwait(false);
+            return await RunInstallationAsync(parsed, skills, skillFilters, options, cancellationToken);
         }
         finally
         {
@@ -139,8 +137,7 @@ internal sealed class AddCommandExecutor(
         AddCommandOptions options,
         CancellationToken cancellationToken)
     {
-        var selectedSkills = await SelectSkillsAsync(skills, skillFilters, options, cancellationToken)
-            .ConfigureAwait(false);
+        var selectedSkills = await SelectSkillsAsync(skills, skillFilters, options, cancellationToken);
         if (selectedSkills.Count == 0)
         {
             if (skillFilters.Count > 0)
@@ -157,9 +154,9 @@ internal sealed class AddCommandExecutor(
             return new CommandResult.Cancelled();
         }
 
-        var nonInteractive = await IsNonInteractiveAsync(options).ConfigureAwait(false);
+        var nonInteractive = await IsNonInteractiveAsync(options);
 
-        var targetAgents = await SelectAgentsAsync(options, nonInteractive, cancellationToken).ConfigureAwait(false);
+        var targetAgents = await SelectAgentsAsync(options, nonInteractive, cancellationToken);
         if (targetAgents is null)
         {
             return new CommandResult.Cancelled();
@@ -177,7 +174,7 @@ internal sealed class AddCommandExecutor(
             var supportsGlobal = targetAgents.Any(a => registry.GetConfig(a).GlobalSkillsDir is not null);
             if (supportsGlobal)
             {
-                installGlobally = await prompter.SelectGlobalScopeAsync(cancellationToken).ConfigureAwait(false);
+                installGlobally = await prompter.SelectGlobalScopeAsync(cancellationToken);
             }
         }
 
@@ -191,7 +188,7 @@ internal sealed class AddCommandExecutor(
         }
         else if (!options.Copy && !nonInteractive)
         {
-            installMode = await prompter.SelectInstallModeAsync(cancellationToken).ConfigureAwait(false);
+            installMode = await prompter.SelectInstallModeAsync(cancellationToken);
         }
 
         var overwriteTargets = GetOverwriteTargets(selectedSkills, installGlobally);
@@ -199,8 +196,7 @@ internal sealed class AddCommandExecutor(
         if (!nonInteractive)
         {
             var confirmed = await prompter
-                .ConfirmInstallationAsync(selectedSkills, targetAgents, overwriteTargets, cancellationToken)
-                .ConfigureAwait(false);
+                .ConfirmInstallationAsync(selectedSkills, targetAgents, overwriteTargets, cancellationToken);
             if (!confirmed)
             {
                 interaction.WriteWarning("Installation cancelled");
@@ -219,15 +215,14 @@ internal sealed class AddCommandExecutor(
             }
         }
 
-        var results = await InstallSkillsAsync(selectedSkills, targetAgents, installOptions, cancellationToken)
-            .ConfigureAwait(false);
+        var results = await InstallSkillsAsync(selectedSkills, targetAgents, installOptions, cancellationToken);
 
         var successful = results.Where(r => r.Result.Success).ToList();
         var failed = results.Where(r => !r.Result.Success).ToList();
 
         if (successful.Count > 0)
         {
-            await UpdateLocksAsync(parsed, successful, installGlobally, cancellationToken).ConfigureAwait(false);
+            await UpdateLocksAsync(parsed, successful, installGlobally, cancellationToken);
 
             RenderInstallationSummary(targetAgents, successful, existingSkills, installGlobally);
         }
@@ -464,7 +459,7 @@ internal sealed class AddCommandExecutor(
             return [];
         }
 
-        return await prompter.SelectSkillsAsync(skills, cancellationToken).ConfigureAwait(false);
+        return await prompter.SelectSkillsAsync(skills, cancellationToken);
     }
 
     private Task<bool> IsNonInteractiveAsync(AddCommandOptions options)
@@ -507,7 +502,7 @@ internal sealed class AddCommandExecutor(
             return options.Agents;
         }
 
-        var installed = await detector.DetectInstalledAgentsAsync().ConfigureAwait(false);
+        var installed = await detector.DetectInstalledAgentsAsync(cancellationToken);
 
         // Zero installed
         if (installed.Count == 0)
@@ -518,8 +513,7 @@ internal sealed class AddCommandExecutor(
             }
 
             return await prompter
-                .SelectAgentsAsync(validAgents, options.Global, cancellationToken)
-                .ConfigureAwait(false);
+                .SelectAgentsAsync(validAgents, options.Global, cancellationToken);
         }
 
         // One installed OR non-interactive → no prompt
@@ -529,7 +523,7 @@ internal sealed class AddCommandExecutor(
         }
 
         // Multiple installed → prompt
-        return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken).ConfigureAwait(false);
+        return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken);
     }
 
     private IReadOnlyList<string> EnsureUniversalAgents(IReadOnlyList<string> agents)
@@ -579,12 +573,10 @@ internal sealed class AddCommandExecutor(
                     foreach (var agentType in targetAgents)
                     {
                         var result = await installer
-                            .InstallRemoteSkillForAgentAsync(skill, agentType, installOptions, cancellationToken)
-                            .ConfigureAwait(false);
+                            .InstallRemoteSkillForAgentAsync(skill, agentType, installOptions, cancellationToken);
                         results.Add(new InstallEntry(skill, agentType, result));
                     }
-                } })
-            .ConfigureAwait(false);
+                } });
 
         return results;
     }
@@ -618,8 +610,7 @@ internal sealed class AddCommandExecutor(
                     if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
                     {
                         skillFolderHash = await projectLock
-                            .ComputeSkillFolderHashAsync(installPath, cancellationToken)
-                            .ConfigureAwait(false);
+                            .ComputeSkillFolderHashAsync(installPath, cancellationToken);
                     }
                 }
                 catch { }
@@ -640,8 +631,7 @@ internal sealed class AddCommandExecutor(
                     try
                     {
                         await globalLock
-                            .AddEntryAsync(entry.Skill.InstallName, lockEntry, cancellationToken)
-                            .ConfigureAwait(false);
+                            .AddEntryAsync(entry.Skill.InstallName, lockEntry, cancellationToken);
                     }
                     catch { }
                 }
@@ -654,8 +644,7 @@ internal sealed class AddCommandExecutor(
                     if (!string.IsNullOrEmpty(installPath) && Directory.Exists(installPath))
                     {
                         computedHash = await projectLock
-                            .ComputeSkillFolderHashAsync(installPath, cancellationToken)
-                            .ConfigureAwait(false);
+                            .ComputeSkillFolderHashAsync(installPath, cancellationToken);
                     }
                 }
                 catch { }
@@ -671,8 +660,7 @@ internal sealed class AddCommandExecutor(
                 try
                 {
                     await projectLock
-                        .AddEntryAsync(entry.Skill.InstallName, lockEntry, cwd: null, cancellationToken)
-                        .ConfigureAwait(false);
+                        .AddEntryAsync(entry.Skill.InstallName, lockEntry, cwd: null, cancellationToken);
                 }
                 catch { }
             }

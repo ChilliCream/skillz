@@ -74,7 +74,7 @@ internal sealed class RemoveCommand(
         }
 
         var cwd = Directory.GetCurrentDirectory();
-        var installed = await ScanInstalledSkillsAsync(installer, registry, global, cwd).ConfigureAwait(false);
+        var installed = await ScanInstalledSkillsAsync(installer, registry, global, cwd, cancellationToken);
 
         if (installed.Count == 0)
         {
@@ -86,7 +86,7 @@ internal sealed class RemoveCommand(
             yes
             || all
             || consoleEnvironment.IsInputRedirected
-            || (await detector.DetectAgentAsync().ConfigureAwait(false)).IsAgent;
+            || (await detector.DetectAgentAsync(cancellationToken)).IsAgent;
 
         IReadOnlyList<string> selected;
         if (all)
@@ -112,7 +112,7 @@ internal sealed class RemoveCommand(
         }
         else
         {
-            selected = await prompter.SelectSkillsAsync(installed, cancellationToken).ConfigureAwait(false);
+            selected = await prompter.SelectSkillsAsync(installed, cancellationToken);
             if (selected.Count == 0)
             {
                 interaction.WriteWarning("Removal cancelled");
@@ -124,7 +124,7 @@ internal sealed class RemoveCommand(
 
         if (!nonInteractive)
         {
-            var confirmed = await prompter.ConfirmRemovalAsync(selected, cancellationToken).ConfigureAwait(false);
+            var confirmed = await prompter.ConfirmRemovalAsync(selected, cancellationToken);
             if (!confirmed)
             {
                 interaction.WriteWarning("Removal cancelled");
@@ -160,11 +160,11 @@ internal sealed class RemoveCommand(
 
                         if (global)
                         {
-                            await globalLock.RemoveEntryAsync(skillName, cancellationToken).ConfigureAwait(false);
+                            await globalLock.RemoveEntryAsync(skillName, cancellationToken);
                         }
                         else
                         {
-                            await projectLock.RemoveEntryAsync(skillName, cwd, cancellationToken).ConfigureAwait(false);
+                            await projectLock.RemoveEntryAsync(skillName, cwd, cancellationToken);
                         }
 
                         removed++;
@@ -173,8 +173,7 @@ internal sealed class RemoveCommand(
                     {
                         failures.Add((skillName, ex.Message));
                     }
-                } })
-            .ConfigureAwait(false);
+                } });
 
         if (removed > 0)
         {
@@ -199,8 +198,11 @@ internal sealed class RemoveCommand(
         IInstaller installer,
         IAgentRegistry registry,
         bool global,
-        string cwd)
+        string cwd,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var skills = new HashSet<string>(StringComparer.Ordinal);
         var directoriesToScan = new HashSet<string>(GetPathComparer());
 
@@ -230,7 +232,7 @@ internal sealed class RemoveCommand(
             }
         }
 
-        await Task.CompletedTask.ConfigureAwait(false);
+        await Task.CompletedTask;
         return skills.OrderBy(s => s, StringComparer.Ordinal).ToList();
     }
 

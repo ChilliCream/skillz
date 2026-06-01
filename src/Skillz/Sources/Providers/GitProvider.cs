@@ -31,15 +31,14 @@ internal sealed class GitProvider : IProvider
         var tempDir = Path.Combine(Path.GetTempPath(), "skillz-" + Guid.NewGuid().ToString("N"));
         try
         {
-            await _gitClient.CloneAsync(git.Url, tempDir, git.Ref, cancellationToken).ConfigureAwait(false);
+            await _gitClient.CloneAsync(git.Url, tempDir, git.Ref, cancellationToken);
 
             var discoveryOpts = new SkillDiscoveryOptions(
                 IncludeInternal: options?.IncludeInternal ?? false,
                 FullDepth: options?.FullDepth ?? false);
 
             var skills = await _skillDiscovery
-                .DiscoverAsync(tempDir, subpath: null, discoveryOpts, cancellationToken)
-                .ConfigureAwait(false);
+                .DiscoverAsync(tempDir, subpath: null, discoveryOpts, cancellationToken);
 
             return ProviderConversions.ToRemoteSkills(skills, Id, git.Url, tempDir, cleanupPath: tempDir);
         }

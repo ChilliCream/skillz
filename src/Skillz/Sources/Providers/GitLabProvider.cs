@@ -31,7 +31,7 @@ internal sealed class GitLabProvider : IProvider
         var tempDir = Path.Combine(Path.GetTempPath(), "skillz-" + Guid.NewGuid().ToString("N"));
         try
         {
-            await _gitClient.CloneAsync(gitlab.Url, tempDir, gitlab.Ref, cancellationToken).ConfigureAwait(false);
+            await _gitClient.CloneAsync(gitlab.Url, tempDir, gitlab.Ref, cancellationToken);
 
             var includeInternal = options?.IncludeInternal ?? false;
             var discoveryOpts = new SkillDiscoveryOptions(
@@ -39,8 +39,7 @@ internal sealed class GitLabProvider : IProvider
                 FullDepth: options?.FullDepth ?? false);
 
             var skills = await _skillDiscovery
-                .DiscoverAsync(tempDir, gitlab.Subpath, discoveryOpts, cancellationToken)
-                .ConfigureAwait(false);
+                .DiscoverAsync(tempDir, gitlab.Subpath, discoveryOpts, cancellationToken);
 
             return ProviderConversions.ToRemoteSkills(skills, Id, gitlab.Url, tempDir, cleanupPath: tempDir);
         }

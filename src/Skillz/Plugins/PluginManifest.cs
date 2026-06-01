@@ -4,22 +4,28 @@ namespace Skillz.Plugins;
 
 internal interface IPluginManifest
 {
-    Task<IReadOnlyList<string>> GetPluginSkillPathsAsync(string basePath);
+    Task<IReadOnlyList<string>> GetPluginSkillPathsAsync(
+        string basePath,
+        CancellationToken cancellationToken = default);
 }
 
 internal sealed class PluginManifest : IPluginManifest
 {
-    public async Task<IReadOnlyList<string>> GetPluginSkillPathsAsync(string basePath)
+    public async Task<IReadOnlyList<string>> GetPluginSkillPathsAsync(
+        string basePath,
+        CancellationToken cancellationToken = default)
     {
         var searchDirs = new List<string>();
 
         await TryReadMarketplaceAsync(
             basePath,
-            (pluginBase, skills, _) => AddPluginSkillPaths(basePath, pluginBase, skills, searchDirs));
+            (pluginBase, skills, _) => AddPluginSkillPaths(basePath, pluginBase, skills, searchDirs),
+            cancellationToken);
 
         await TryReadPluginJsonAsync(
             basePath,
-            (skills, _) => AddPluginSkillPaths(basePath, basePath, skills, searchDirs));
+            (skills, _) => AddPluginSkillPaths(basePath, basePath, skills, searchDirs),
+            cancellationToken);
 
         return searchDirs;
     }
@@ -60,7 +66,10 @@ internal sealed class PluginManifest : IPluginManifest
         searchDirs.Add(Path.Combine(pluginBase, "skills"));
     }
 
-    internal static async Task TryReadMarketplaceAsync(string basePath, Action<string, List<string>?, string?> onPlugin)
+    internal static async Task TryReadMarketplaceAsync(
+        string basePath,
+        Action<string, List<string>?, string?> onPlugin,
+        CancellationToken cancellationToken = default)
     {
         var marketplacePath = Path.Combine(basePath, ".claude-plugin", "marketplace.json");
         MarketplaceManifest? manifest;
@@ -69,7 +78,8 @@ internal sealed class PluginManifest : IPluginManifest
             await using var stream = File.OpenRead(marketplacePath);
             manifest = await JsonSerializer.DeserializeAsync(
                 stream,
-                JsonSourceGenerationContext.Default.MarketplaceManifest);
+                JsonSourceGenerationContext.Default.MarketplaceManifest,
+                cancellationToken);
         }
         catch (FileNotFoundException)
         {
@@ -130,7 +140,10 @@ internal sealed class PluginManifest : IPluginManifest
         }
     }
 
-    internal static async Task TryReadPluginJsonAsync(string basePath, Action<List<string>?, string?> onPlugin)
+    internal static async Task TryReadPluginJsonAsync(
+        string basePath,
+        Action<List<string>?, string?> onPlugin,
+        CancellationToken cancellationToken = default)
     {
         var pluginPath = Path.Combine(basePath, ".claude-plugin", "plugin.json");
         SinglePluginManifest? manifest;
@@ -139,7 +152,8 @@ internal sealed class PluginManifest : IPluginManifest
             await using var stream = File.OpenRead(pluginPath);
             manifest = await JsonSerializer.DeserializeAsync(
                 stream,
-                JsonSourceGenerationContext.Default.SinglePluginManifest);
+                JsonSourceGenerationContext.Default.SinglePluginManifest,
+                cancellationToken);
         }
         catch (FileNotFoundException)
         {

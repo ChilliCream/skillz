@@ -98,7 +98,7 @@ internal sealed class ConsoleInteractionService : IInteractionService
         var labels = pairs.Select(c => c.Label).ToArray();
         var prompt = new SelectionPrompt<string>().Title(Markup.Escape(message)).EnableSearch().AddChoices(labels);
 
-        var selected = await _console.PromptAsync(prompt, cancellationToken).ConfigureAwait(false);
+        var selected = await _console.PromptAsync(prompt, cancellationToken);
         return pairs.First(c => c.Label == selected).Value;
     }
 
@@ -117,7 +117,7 @@ internal sealed class ConsoleInteractionService : IInteractionService
         var labels = pairs.Select(c => c.Label).ToArray();
         var prompt = new MultiSelectionPrompt<string>().Title(Markup.Escape(message)).PageSize(20).AddChoices(labels);
 
-        var selected = await _console.PromptAsync(prompt, cancellationToken).ConfigureAwait(false);
+        var selected = await _console.PromptAsync(prompt, cancellationToken);
         var selectedSet = new HashSet<string>(selected, StringComparer.Ordinal);
         return pairs.Where(c => selectedSet.Contains(c.Label)).Select(c => c.Value).ToList();
     }

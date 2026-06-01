@@ -56,7 +56,7 @@ public class AgentEnvironmentDetectorTests
     public async Task DetectAgent_NoEnv_ReturnsNotAgent()
     {
         var (detector, _) = Create();
-        var result = await detector.DetectAgentAsync();
+        var result = await detector.DetectAgentAsync(TestContext.Current.CancellationToken);
 
         Assert.False(result.IsAgent);
         Assert.Null(result.Name);
@@ -67,7 +67,7 @@ public class AgentEnvironmentDetectorTests
     {
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CURSOR_TRACE_ID"] = "abc123" };
         var (detector, _) = Create(env);
-        var result = await detector.DetectAgentAsync();
+        var result = await detector.DetectAgentAsync(TestContext.Current.CancellationToken);
 
         Assert.True(result.IsAgent);
         Assert.Equal("cursor", result.Name);
@@ -78,7 +78,7 @@ public class AgentEnvironmentDetectorTests
     {
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CLAUDECODE"] = "1" };
         var (detector, _) = Create(env);
-        var result = await detector.DetectAgentAsync();
+        var result = await detector.DetectAgentAsync(TestContext.Current.CancellationToken);
 
         Assert.True(result.IsAgent);
         Assert.Equal("claude", result.Name);
@@ -90,8 +90,8 @@ public class AgentEnvironmentDetectorTests
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CURSOR_AGENT"] = "1" };
         var (detector, _) = Create(env);
 
-        var first = await detector.DetectAgentAsync();
-        var second = await detector.DetectAgentAsync();
+        var first = await detector.DetectAgentAsync(TestContext.Current.CancellationToken);
+        var second = await detector.DetectAgentAsync(TestContext.Current.CancellationToken);
 
         Assert.Same(first, second);
     }
@@ -102,21 +102,21 @@ public class AgentEnvironmentDetectorTests
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["REPL_ID"] = "id" };
         var (detector, _) = Create(env);
 
-        Assert.True(await detector.IsRunningInAgentAsync());
+        Assert.True(await detector.IsRunningInAgentAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task IsRunningInAgent_FalseWhenNoAgent()
     {
         var (detector, _) = Create();
-        Assert.False(await detector.IsRunningInAgentAsync());
+        Assert.False(await detector.IsRunningInAgentAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task GetAgentName_ReturnsNullWhenNotInAgent()
     {
         var (detector, _) = Create();
-        Assert.Null(await detector.GetAgentNameAsync());
+        Assert.Null(await detector.GetAgentNameAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -125,14 +125,14 @@ public class AgentEnvironmentDetectorTests
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["OPENCODE_CLIENT"] = "1" };
         var (detector, _) = Create(env);
 
-        Assert.Equal("opencode", await detector.GetAgentNameAsync());
+        Assert.Equal("opencode", await detector.GetAgentNameAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task DetectInstalledAgents_NoDirs_ReturnsEmpty()
     {
         var (detector, _) = Create();
-        var installed = await detector.DetectInstalledAgentsAsync();
+        var installed = await detector.DetectInstalledAgentsAsync(TestContext.Current.CancellationToken);
         Assert.Empty(installed);
     }
 
@@ -142,7 +142,7 @@ public class AgentEnvironmentDetectorTests
         var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".claude") };
         var (detector, _) = Create(existingDirs: existing);
 
-        var installed = await detector.DetectInstalledAgentsAsync();
+        var installed = await detector.DetectInstalledAgentsAsync(TestContext.Current.CancellationToken);
         Assert.Contains("claude-code", installed);
     }
 
@@ -152,7 +152,7 @@ public class AgentEnvironmentDetectorTests
         var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".cursor") };
         var (detector, _) = Create(existingDirs: existing);
 
-        var installed = await detector.DetectInstalledAgentsAsync();
+        var installed = await detector.DetectInstalledAgentsAsync(TestContext.Current.CancellationToken);
         Assert.Contains("cursor", installed);
     }
 
@@ -162,7 +162,7 @@ public class AgentEnvironmentDetectorTests
         var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".clawdbot") };
         var (detector, _) = Create(existingDirs: existing);
 
-        var installed = await detector.DetectInstalledAgentsAsync();
+        var installed = await detector.DetectInstalledAgentsAsync(TestContext.Current.CancellationToken);
         Assert.Contains("openclaw", installed);
     }
 
@@ -172,7 +172,7 @@ public class AgentEnvironmentDetectorTests
         var existing = new HashSet<string>(StringComparer.Ordinal) { "/my-project/.replit" };
         var (detector, _) = Create(existingDirs: existing, cwd: "/my-project");
 
-        var installed = await detector.DetectInstalledAgentsAsync();
+        var installed = await detector.DetectInstalledAgentsAsync(TestContext.Current.CancellationToken);
         Assert.Contains("replit", installed);
     }
 
@@ -182,7 +182,7 @@ public class AgentEnvironmentDetectorTests
         var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".codex") };
         var (detector, _) = Create(existingDirs: existing);
 
-        var installed = await detector.DetectInstalledAgentsAsync();
+        var installed = await detector.DetectInstalledAgentsAsync(TestContext.Current.CancellationToken);
         Assert.Contains("codex", installed);
     }
 
@@ -192,7 +192,7 @@ public class AgentEnvironmentDetectorTests
         var existing = new HashSet<string>(StringComparer.Ordinal) { "/etc/codex" };
         var (detector, _) = Create(existingDirs: existing);
 
-        var installed = await detector.DetectInstalledAgentsAsync();
+        var installed = await detector.DetectInstalledAgentsAsync(TestContext.Current.CancellationToken);
         Assert.Contains("codex", installed);
     }
 
@@ -202,7 +202,7 @@ public class AgentEnvironmentDetectorTests
         var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".agents", "skills") };
         var (detector, _) = Create(existingDirs: existing);
 
-        var installed = await detector.DetectInstalledAgentsAsync();
+        var installed = await detector.DetectInstalledAgentsAsync(TestContext.Current.CancellationToken);
         Assert.DoesNotContain("universal", installed);
     }
 }

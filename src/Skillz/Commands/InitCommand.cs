@@ -47,7 +47,7 @@ internal sealed class InitCommand(IInteractionService interaction)
         }
 
         var content = BuildSkillTemplate(skillName);
-        await File.WriteAllTextAsync(skillFile, content, cancellationToken).ConfigureAwait(false);
+        await File.WriteAllTextAsync(skillFile, content, cancellationToken);
 
         interaction.WriteSuccess($"Initialized skill: {skillName}");
         interaction.WriteLine();

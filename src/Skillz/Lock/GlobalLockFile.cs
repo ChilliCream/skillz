@@ -27,8 +27,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         {
             await using var stream = File.OpenRead(lockPath);
             var parsed = await JsonSerializer
-                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken)
-                .ConfigureAwait(false);
+                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken);
 
             if (parsed is null || parsed.Skills is null)
             {
@@ -78,16 +77,15 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                 lockPath,
                 async () =>
                 {
-                    var existing = await ReadInternalAsync(true, cancellationToken).ConfigureAwait(false);
+                    var existing = await ReadInternalAsync(true, cancellationToken);
                     if (existing.Version > CurrentVersion)
                     {
                         throw CreateNewerVersionException(lockPath, existing.Version);
                     }
 
-                    await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
+                    await WriteInternalAsync(lockFile, cancellationToken);
                 },
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken: cancellationToken);
     }
 
     public async Task AddEntryAsync(
@@ -107,7 +105,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                 lockPath,
                 async () =>
                 {
-                    var lockFile = await ReadInternalAsync(true, cancellationToken).ConfigureAwait(false);
+                    var lockFile = await ReadInternalAsync(true, cancellationToken);
                     if (lockFile.Version > CurrentVersion)
                     {
                         throw CreateNewerVersionException(lockPath, lockFile.Version);
@@ -123,10 +121,9 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                     entry.UpdatedAt = now;
                     lockFile.Skills[skillName] = entry;
 
-                    await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
+                    await WriteInternalAsync(lockFile, cancellationToken);
                 },
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken: cancellationToken);
     }
 
     public async Task<bool> RemoveEntryAsync(string skillName, CancellationToken cancellationToken = default)
@@ -144,7 +141,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                 lockPath,
                 async () =>
                 {
-                    var lockFile = await ReadInternalAsync(true, cancellationToken).ConfigureAwait(false);
+                    var lockFile = await ReadInternalAsync(true, cancellationToken);
                     if (lockFile.Version > CurrentVersion)
                     {
                         throw CreateNewerVersionException(lockPath, lockFile.Version);
@@ -153,18 +150,17 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                     removed = lockFile.Skills.Remove(skillName);
                     if (removed)
                     {
-                        await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
+                        await WriteInternalAsync(lockFile, cancellationToken);
                     }
                 },
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken: cancellationToken);
 
         return removed;
     }
 
     public async Task<SkillLockEntry?> GetEntryAsync(string skillName, CancellationToken cancellationToken = default)
     {
-        var lockFile = await ReadAsync(cancellationToken).ConfigureAwait(false);
+        var lockFile = await ReadAsync(cancellationToken);
         return lockFile.Skills.TryGetValue(skillName, out var entry) ? entry : null;
     }
 
@@ -172,7 +168,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
     {
         try
         {
-            var lockFile = await ReadAsync(cancellationToken).ConfigureAwait(false);
+            var lockFile = await ReadAsync(cancellationToken);
             if (lockFile.LastSelectedAgents is { Count: > 0 } agents)
             {
                 return agents;
@@ -201,17 +197,16 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                 lockPath,
                 async () =>
                 {
-                    var lockFile = await ReadInternalAsync(true, cancellationToken).ConfigureAwait(false);
+                    var lockFile = await ReadInternalAsync(true, cancellationToken);
                     if (lockFile.Version > CurrentVersion)
                     {
                         throw CreateNewerVersionException(lockPath, lockFile.Version);
                     }
 
                     lockFile.LastSelectedAgents = agents.ToList();
-                    await WriteInternalAsync(lockFile, cancellationToken).ConfigureAwait(false);
+                    await WriteInternalAsync(lockFile, cancellationToken);
                 },
-                cancellationToken: cancellationToken)
-            .ConfigureAwait(false);
+                cancellationToken: cancellationToken);
     }
 
     private async Task<SkillLockFile> ReadInternalAsync(bool throwOnCorrupt, CancellationToken cancellationToken)
@@ -222,8 +217,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         {
             await using var stream = File.OpenRead(lockPath);
             var parsed = await JsonSerializer
-                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken)
-                .ConfigureAwait(false);
+                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken);
 
             if (parsed is null || parsed.Skills is null)
             {
@@ -294,9 +288,8 @@ internal sealed class GlobalLockFile : IGlobalLockFile
                              options: FileOptions.Asynchronous))
             {
                 await JsonSerializer
-                    .SerializeAsync(stream, lockFile, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken)
-                    .ConfigureAwait(false);
-                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                    .SerializeAsync(stream, lockFile, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken);
+                await stream.FlushAsync(cancellationToken);
             }
 
             File.Move(tempPath, lockPath, overwrite: true);

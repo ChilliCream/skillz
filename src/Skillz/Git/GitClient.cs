@@ -95,15 +95,14 @@ public sealed partial class GitClient : IGitClient
                 .WithEnvironmentVariables(env => env.Set("GIT_TERMINAL_PROMPT", "0").Set("GIT_LFS_SKIP_SMUDGE", "1"))
                 .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdErrBuilder))
                 .WithValidation(CommandResultValidation.ZeroExitCode)
-                .ExecuteAsync(timeoutCts.Token)
-                .ConfigureAwait(false);
+                .ExecuteAsync(timeoutCts.Token);
 
             return targetDir;
         }
         catch (OperationCanceledException)
             when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
         {
-            await SafeCleanupAsync(targetDir).ConfigureAwait(false);
+            await SafeCleanupAsync(targetDir);
             var seconds = (int)Math.Round(timeoutMs / 1000.0);
             throw new GitCloneException(
                 $"Clone timed out after {seconds}s. Common causes:\n"
@@ -117,7 +116,7 @@ public sealed partial class GitClient : IGitClient
         }
         catch (CommandExecutionException)
         {
-            await SafeCleanupAsync(targetDir).ConfigureAwait(false);
+            await SafeCleanupAsync(targetDir);
             var errorMessage = stdErrBuilder.ToString();
             ThrowMappedError(url, errorMessage);
             throw;
@@ -173,8 +172,7 @@ public sealed partial class GitClient : IGitClient
                 .WithArguments(BuildLsRemoteArguments(url))
                 .WithEnvironmentVariables(env => env.Set("GIT_TERMINAL_PROMPT", "0").Set("GIT_LFS_SKIP_SMUDGE", "1"))
                 .WithValidation(CommandResultValidation.ZeroExitCode)
-                .ExecuteBufferedAsync(cancellationToken)
-                .ConfigureAwait(false);
+                .ExecuteBufferedAsync(cancellationToken);
 
             foreach (var line in result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
