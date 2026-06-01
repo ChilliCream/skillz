@@ -6,15 +6,15 @@ internal interface IAgentRegistry
 {
     ImmutableDictionary<string, AgentConfig> All { get; }
 
+    ImmutableArray<string> AgentTypes { get; }
+
+    ImmutableArray<string> UniversalAgents { get; }
+
+    ImmutableArray<string> NonUniversalAgents { get; }
+
     AgentConfig GetConfig(string agentType);
 
     bool TryGetConfig(string agentType, out AgentConfig? config);
-
-    ImmutableArray<string> ListAgentTypes();
-
-    ImmutableArray<string> GetUniversalAgents();
-
-    ImmutableArray<string> GetNonUniversalAgents();
 
     bool IsUniversalAgent(string agentType);
 }

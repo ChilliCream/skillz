@@ -6,8 +6,6 @@ internal sealed class AgentRegistry : IAgentRegistry
 {
     public const string UniversalSkillsDir = ".agents/skills";
 
-    private readonly ImmutableDictionary<string, AgentConfig> _agents;
-
     public AgentRegistry()
         : this(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -16,14 +14,30 @@ internal sealed class AgentRegistry : IAgentRegistry
 
     public AgentRegistry(string home, Func<string, string?> envReader, Func<string, bool> directoryExists)
     {
-        _agents = BuildAgents(home, envReader, directoryExists);
+        var all = BuildAgents(home, envReader, directoryExists);
+
+        All = all;
+        AgentTypes = all.Keys.ToImmutableArray();
+        UniversalAgents = all.Where(kv => kv.Value.SkillsDir == UniversalSkillsDir && kv.Value.ShowInUniversalList)
+            .Select(kv => kv.Key)
+            .ToImmutableArray();
+
+        NonUniversalAgents = all.Where(kv => kv.Value.SkillsDir != UniversalSkillsDir)
+            .Select(kv => kv.Key)
+            .ToImmutableArray();
     }
 
-    public ImmutableDictionary<string, AgentConfig> All => _agents;
+    public ImmutableDictionary<string, AgentConfig> All { get; }
+
+    public ImmutableArray<string> AgentTypes { get; }
+
+    public ImmutableArray<string> UniversalAgents { get; }
+
+    public ImmutableArray<string> NonUniversalAgents { get; }
 
     public AgentConfig GetConfig(string agentType)
     {
-        if (!_agents.TryGetValue(agentType, out var config))
+        if (!All.TryGetValue(agentType, out var config))
         {
             throw new ArgumentException($"Unknown agent type: {agentType}", nameof(agentType));
         }
@@ -33,7 +47,7 @@ internal sealed class AgentRegistry : IAgentRegistry
 
     public bool TryGetConfig(string agentType, out AgentConfig? config)
     {
-        if (_agents.TryGetValue(agentType, out var found))
+        if (All.TryGetValue(agentType, out var found))
         {
             config = found;
             return true;
@@ -43,29 +57,9 @@ internal sealed class AgentRegistry : IAgentRegistry
         return false;
     }
 
-    public ImmutableArray<string> ListAgentTypes()
-    {
-        return [.. _agents.Keys];
-    }
-
-    public ImmutableArray<string> GetUniversalAgents()
-    {
-        return
-        [
-            .. _agents
-                .Where(kv => kv.Value.SkillsDir == UniversalSkillsDir && kv.Value.ShowInUniversalList)
-                .Select(kv => kv.Key)
-        ];
-    }
-
-    public ImmutableArray<string> GetNonUniversalAgents()
-    {
-        return [.. _agents.Where(kv => kv.Value.SkillsDir != UniversalSkillsDir).Select(kv => kv.Key)];
-    }
-
     public bool IsUniversalAgent(string agentType)
     {
-        return _agents.TryGetValue(agentType, out var config) && config.SkillsDir == UniversalSkillsDir;
+        return All.TryGetValue(agentType, out var config) && config.SkillsDir == UniversalSkillsDir;
     }
 
     public static string GetOpenClawGlobalSkillsDir(string home, Func<string, bool> directoryExists)
