@@ -69,7 +69,9 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             {
                 defaults = lastUsed.Where(a => available.Contains(a, StringComparer.Ordinal)).ToList();
                 if (defaults.Count == 0)
+                {
                     defaults = null;
+                }
             }
         }
         catch

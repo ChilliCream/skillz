@@ -135,18 +135,32 @@ internal sealed class UpdateCommand(
         if (options.Skills is { Length: > 0 })
         {
             if (options.Global)
+            {
                 return UpdateScope.Global;
+            }
+
             if (options.Project)
+            {
                 return UpdateScope.Project;
+            }
+
             return UpdateScope.Both;
         }
 
         if (options.Global && options.Project)
+        {
             return UpdateScope.Both;
+        }
+
         if (options.Global)
+        {
             return UpdateScope.Global;
+        }
+
         if (options.Project)
+        {
             return UpdateScope.Project;
+        }
 
         if (options.Yes || consoleEnvironment.IsInputRedirected)
         {
@@ -231,7 +245,9 @@ internal sealed class UpdateCommand(
         foreach (var (name, entry) in lockFile.Skills)
         {
             if (!MatchesSkillFilter(name, skillFilter))
+            {
                 continue;
+            }
 
             if (string.IsNullOrEmpty(entry.SkillFolderHash) || string.IsNullOrEmpty(entry.SkillPath))
             {
@@ -325,7 +341,10 @@ internal sealed class UpdateCommand(
         foreach (var (name, entry) in localLock.Skills)
         {
             if (!MatchesSkillFilter(name, skillFilter))
+            {
                 continue;
+            }
+
             if (string.Equals(entry.SourceType, "node_modules", StringComparison.Ordinal)
                 || string.Equals(entry.SourceType, "local", StringComparison.Ordinal))
             {
@@ -444,7 +463,10 @@ internal sealed class UpdateCommand(
     private static bool MatchesSkillFilter(string name, string[]? filter)
     {
         if (filter is null || filter.Length == 0)
+        {
             return true;
+        }
+
         foreach (var f in filter)
         {
             if (string.Equals(name, f, StringComparison.OrdinalIgnoreCase))
@@ -458,22 +480,40 @@ internal sealed class UpdateCommand(
     private static string GetSkipReason(SkillLockEntry entry)
     {
         if (string.Equals(entry.SourceType, "local", StringComparison.Ordinal))
+        {
             return "Local path";
+        }
+
         if (string.Equals(entry.SourceType, "git", StringComparison.Ordinal))
+        {
             return "Git URL";
+        }
+
         if (string.Equals(entry.SourceType, "well-known", StringComparison.Ordinal))
+        {
             return "Well-known skill";
+        }
+
         if (string.IsNullOrEmpty(entry.SkillFolderHash))
+        {
             return "Private or deleted repo";
+        }
+
         if (string.IsNullOrEmpty(entry.SkillPath))
+        {
             return "No skill path recorded";
+        }
+
         return "No version tracking";
     }
 
     private void PrintSkippedSkills(IReadOnlyList<SkippedSkill> skipped)
     {
         if (skipped.Count == 0)
+        {
             return;
+        }
+
         interaction.WriteLine();
         interaction.WriteDim($"{skipped.Count} skill(s) cannot be checked automatically:");
         foreach (var skill in skipped)
@@ -488,7 +528,10 @@ internal sealed class UpdateCommand(
     private void PrintLegacyProjectSkills(IReadOnlyList<(string Name, LocalSkillLockEntry Entry)> legacy)
     {
         if (legacy.Count == 0)
+        {
             return;
+        }
+
         interaction.WriteLine();
         interaction.WriteDim(
             $"{legacy.Count} project skill(s) cannot be updated automatically (installed before skillPath tracking):");
