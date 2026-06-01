@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Lock;
@@ -52,13 +53,13 @@ internal sealed class AddCommandExecutor(
         var skillFilters = MergeSkillFilters(options.SkillFilters, parsed);
         interaction.WriteDim($"Source: {GetSourceDisplayString(parsed)}");
 
-        IReadOnlyList<RemoteSkill> skills;
+        ImmutableArray<RemoteSkill> skills;
         try
         {
             var provider = providerRegistry.Resolve(parsed);
             var providerOptions = new ProviderOptions(
                 FullDepth: options.FullDepth,
-                IncludeInternal: skillFilters.Count > 0);
+                IncludeInternal: skillFilters.Length > 0);
 
             skills = await interaction
                 .StatusAsync(
@@ -66,7 +67,7 @@ internal sealed class AddCommandExecutor(
                     () =>
                         provider
                             .FetchSkillsAsync(parsed, providerOptions, cancellationToken)
-                            .ContinueWith(t => (IReadOnlyList<RemoteSkill>)t.Result, cancellationToken))
+                            .ContinueWith(t => t.Result.ToImmutableArray(), cancellationToken))
                 .ConfigureAwait(false);
         }
         catch (CliException ex)
@@ -89,7 +90,7 @@ internal sealed class AddCommandExecutor(
 
         try
         {
-            if (skills.Count == 0)
+            if (skills.Length == 0)
             {
                 if (parsed is ParsedSource.WellKnown)
                 {
@@ -104,12 +105,12 @@ internal sealed class AddCommandExecutor(
                 return new CommandResult.Failure(ExitCodeConstants.Failure);
             }
 
-            interaction.WriteLine($"Found {skills.Count} skill(s)");
+            interaction.WriteLine($"Found {skills.Length} skill(s)");
 
             if (options.List)
             {
                 var filtered =
-                    skillFilters.Count > 0 && !skillFilters.Contains("*", StringComparer.Ordinal)
+                    skillFilters.Length > 0 && !skillFilters.Contains("*", StringComparer.Ordinal)
                         ? skills
                             .Where(s =>
                                 skillFilters.Any(f =>
@@ -117,7 +118,7 @@ internal sealed class AddCommandExecutor(
                                     || string.Equals(f, s.Name, StringComparison.OrdinalIgnoreCase)
                                 )
                             )
-                            .ToList()
+                            .ToImmutableArray()
                         : skills;
                 ListSkills(filtered);
                 return new CommandResult.Success();
@@ -134,16 +135,16 @@ internal sealed class AddCommandExecutor(
 
     private async Task<CommandResult> RunInstallationAsync(
         ParsedSource parsed,
-        IReadOnlyList<RemoteSkill> skills,
-        IReadOnlyList<string> skillFilters,
+        ImmutableArray<RemoteSkill> skills,
+        ImmutableArray<string> skillFilters,
         AddCommandOptions options,
         CancellationToken cancellationToken)
     {
         var selectedSkills = await SelectSkillsAsync(skills, skillFilters, options, cancellationToken)
             .ConfigureAwait(false);
-        if (selectedSkills.Count == 0)
+        if (selectedSkills.Length == 0)
         {
-            if (skillFilters.Count > 0)
+            if (skillFilters.Length > 0)
             {
                 interaction.WriteError($"No matching skills found for: {string.Join(", ", skillFilters)}");
                 interaction.WriteLine("Available skills:");
@@ -222,17 +223,17 @@ internal sealed class AddCommandExecutor(
         var results = await InstallSkillsAsync(selectedSkills, targetAgents, installOptions, cancellationToken)
             .ConfigureAwait(false);
 
-        var successful = results.Where(r => r.Result.Success).ToList();
-        var failed = results.Where(r => !r.Result.Success).ToList();
+        var successful = results.Where(r => r.Result.Success).ToImmutableArray();
+        var failed = results.Where(r => !r.Result.Success).ToImmutableArray();
 
-        if (successful.Count > 0)
+        if (successful.Length > 0)
         {
             await UpdateLocksAsync(parsed, successful, installGlobally, cancellationToken).ConfigureAwait(false);
 
             RenderInstallationSummary(targetAgents, successful, existingSkills, installGlobally);
         }
 
-        if (failed.Count > 0)
+        if (failed.Length > 0)
         {
             var detail = string.Join(
                 Environment.NewLine,
@@ -246,17 +247,17 @@ internal sealed class AddCommandExecutor(
 
     private void RenderInstallationSummary(
         IReadOnlyList<string> targetAgents,
-        IReadOnlyList<InstallEntry> successful,
+        ImmutableArray<InstallEntry> successful,
         HashSet<string> existingSkills,
         bool installGlobally)
     {
-        var skillNames = successful.Select(r => r.SkillName).Distinct(StringComparer.Ordinal).ToList();
+        var skillNames = successful.Select(r => r.SkillName).Distinct(StringComparer.Ordinal).ToImmutableArray();
         var universals = targetAgents.Where(registry.IsUniversalAgent).ToList();
         var symlinked = targetAgents.Where(a => !registry.IsUniversalAgent(a)).ToList();
         var overwrites = skillNames.Where(existingSkills.Contains).ToList();
 
         var canonical =
-            skillNames.Count == 1
+            skillNames.Length == 1
                 ? installer.GetCanonicalPath(skillNames[0], installGlobally)
                 : installer.GetCanonicalSkillsDir(installGlobally);
 
@@ -303,7 +304,7 @@ internal sealed class AddCommandExecutor(
 
         interaction.Console.Write(
             new Panel(new Markup(installed.ToString()))
-                .Header($"[bold green]Installed {skillNames.Count} skill(s)[/]")
+                .Header($"[bold green]Installed {skillNames.Length} skill(s)[/]")
                 .BorderColor(Color.Green)
                 .Expand());
 
@@ -311,11 +312,11 @@ internal sealed class AddCommandExecutor(
         interaction.WriteWarning("Done!  Review skills before use; they run with full agent permissions.");
     }
 
-    private IReadOnlyList<OverwriteTarget> GetOverwriteTargets(
-        IReadOnlyList<RemoteSkill> selectedSkills,
+    private ImmutableArray<OverwriteTarget> GetOverwriteTargets(
+        ImmutableArray<RemoteSkill> selectedSkills,
         bool installGlobally)
     {
-        var overwrites = new List<OverwriteTarget>();
+        var overwrites = ImmutableArray.CreateBuilder<OverwriteTarget>();
         foreach (var skill in selectedSkills)
         {
             var canonicalPath = installer.GetCanonicalPath(skill.InstallName, installGlobally);
@@ -325,7 +326,7 @@ internal sealed class AddCommandExecutor(
             }
         }
 
-        return overwrites;
+        return overwrites.ToImmutable();
     }
 
     private static bool PathExists(string path)
@@ -370,21 +371,20 @@ internal sealed class AddCommandExecutor(
                 .Expand());
     }
 
-    private static IReadOnlyList<string> MergeSkillFilters(IReadOnlyList<string> existing, ParsedSource parsed)
+    private static ImmutableArray<string> MergeSkillFilters(IReadOnlyList<string> existing, ParsedSource parsed)
     {
         if (parsed is ParsedSource.GitHub github && !string.IsNullOrEmpty(github.SkillFilter))
         {
             if (!existing.Contains(github.SkillFilter, StringComparer.OrdinalIgnoreCase))
             {
-                var merged = new List<string>(existing) { github.SkillFilter };
-                return merged;
+                return [.. existing, github.SkillFilter];
             }
         }
 
-        return existing;
+        return [.. existing];
     }
 
-    private void ListSkills(IReadOnlyList<RemoteSkill> skills)
+    private void ListSkills(ImmutableArray<RemoteSkill> skills)
     {
         interaction.WriteLine();
         interaction.WriteMarkupLine("[bold]Available Skills[/]");
@@ -430,13 +430,13 @@ internal sealed class AddCommandExecutor(
         return string.Join(' ', parts.Select(p => char.ToUpperInvariant(p[0]) + p[1..]));
     }
 
-    private async Task<IReadOnlyList<RemoteSkill>> SelectSkillsAsync(
-        IReadOnlyList<RemoteSkill> skills,
-        IReadOnlyList<string> skillFilters,
+    private async Task<ImmutableArray<RemoteSkill>> SelectSkillsAsync(
+        ImmutableArray<RemoteSkill> skills,
+        ImmutableArray<string> skillFilters,
         AddCommandOptions options,
         CancellationToken cancellationToken)
     {
-        if (skillFilters.Count > 0)
+        if (skillFilters.Length > 0)
         {
             if (skillFilters.Contains("*", StringComparer.Ordinal))
             {
@@ -450,10 +450,10 @@ internal sealed class AddCommandExecutor(
                         || string.Equals(f, s.Name, StringComparison.OrdinalIgnoreCase)
                     )
                 )
-                .ToList();
+                .ToImmutableArray();
         }
 
-        if (skills.Count == 1 || options.Yes)
+        if (skills.Length == 1 || options.Yes)
         {
             return skills;
         }
@@ -461,10 +461,10 @@ internal sealed class AddCommandExecutor(
         if (consoleEnvironment.IsInputRedirected)
         {
             interaction.WriteWarning("Installation cancelled");
-            return Array.Empty<RemoteSkill>();
+            return ImmutableArray<RemoteSkill>.Empty;
         }
 
-        return await prompter.SelectSkillsAsync(skills, cancellationToken).ConfigureAwait(false);
+        return (await prompter.SelectSkillsAsync(skills, cancellationToken).ConfigureAwait(false)).ToImmutableArray();
     }
 
     private Task<bool> IsNonInteractiveAsync(AddCommandOptions options)
@@ -532,7 +532,7 @@ internal sealed class AddCommandExecutor(
         return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken).ConfigureAwait(false);
     }
 
-    private IReadOnlyList<string> EnsureUniversalAgents(IReadOnlyList<string> agents)
+    private ImmutableArray<string> EnsureUniversalAgents(IReadOnlyList<string> agents)
     {
         var universal = registry.GetUniversalAgents();
         var result = new List<string>(agents);
@@ -544,7 +544,7 @@ internal sealed class AddCommandExecutor(
             }
         }
 
-        return result;
+        return [.. result];
     }
 
     private static void CleanupStagingPaths(IEnumerable<RemoteSkill> skills)
@@ -566,13 +566,13 @@ internal sealed class AddCommandExecutor(
         }
     }
 
-    private async Task<List<InstallEntry>> InstallSkillsAsync(
-        IReadOnlyList<RemoteSkill> selectedSkills,
+    private async Task<ImmutableArray<InstallEntry>> InstallSkillsAsync(
+        ImmutableArray<RemoteSkill> selectedSkills,
         IReadOnlyList<string> targetAgents,
         InstallOptions installOptions,
         CancellationToken cancellationToken)
     {
-        var results = new List<InstallEntry>();
+        var results = ImmutableArray.CreateBuilder<InstallEntry>();
         await interaction
             .StatusAsync("Installing skills...", async () => { foreach (var skill in selectedSkills)
                 {
@@ -586,12 +586,12 @@ internal sealed class AddCommandExecutor(
                 } })
             .ConfigureAwait(false);
 
-        return results;
+        return results.ToImmutable();
     }
 
     private async Task UpdateLocksAsync(
         ParsedSource parsed,
-        IReadOnlyList<InstallEntry> successful,
+        ImmutableArray<InstallEntry> successful,
         bool installGlobally,
         CancellationToken cancellationToken)
     {
