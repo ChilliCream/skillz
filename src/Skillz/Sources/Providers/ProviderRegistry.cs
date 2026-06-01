@@ -1,14 +1,6 @@
 using System.Collections.Immutable;
-using Skillz.Skills;
 
 namespace Skillz.Sources.Providers;
-
-internal interface IProviderRegistry
-{
-    IProvider Resolve(ParsedSource source);
-
-    ImmutableArray<IProvider> Providers { get; }
-}
 
 internal sealed class ProviderRegistry : IProviderRegistry
 {
