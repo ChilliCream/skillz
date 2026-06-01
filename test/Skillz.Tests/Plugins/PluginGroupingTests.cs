@@ -32,6 +32,7 @@ public class PluginGroupingTests : IDisposable
     [Fact]
     public async Task MapsSkillPathsToPluginNames()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -51,8 +52,10 @@ public class PluginGroupingTests : IDisposable
             }
             """);
 
+        // Act
         var groupings = await _grouping.GetPluginGroupingsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var xlsxPath = Path.GetFullPath(Path.Combine(_testDir, "skills", "xlsx"));
         var docxPath = Path.GetFullPath(Path.Combine(_testDir, "skills", "docx"));
         var artPath = Path.GetFullPath(Path.Combine(_testDir, "skills", "art"));
@@ -65,6 +68,7 @@ public class PluginGroupingTests : IDisposable
     [Fact]
     public async Task HandlesNestedPluginSources()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -79,8 +83,10 @@ public class PluginGroupingTests : IDisposable
             }
             """);
 
+        // Act
         var groupings = await _grouping.GetPluginGroupingsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var expected = Path.GetFullPath(Path.Combine(_testDir, "plugins", "my-plugin", "skills", "deep"));
         Assert.Equal("nested-plugin", groupings[expected]);
     }
@@ -88,6 +94,7 @@ public class PluginGroupingTests : IDisposable
     [Fact]
     public async Task MapsSkillsFromPluginJson()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/plugin.json",
             """
@@ -97,8 +104,10 @@ public class PluginGroupingTests : IDisposable
             }
             """);
 
+        // Act
         var groupings = await _grouping.GetPluginGroupingsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var onePath = Path.GetFullPath(Path.Combine(_testDir, "skills", "one"));
         var twoPath = Path.GetFullPath(Path.Combine(_testDir, "skills", "two"));
 
@@ -109,6 +118,7 @@ public class PluginGroupingTests : IDisposable
     [Fact]
     public async Task SkipsPluginsWithoutName()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -119,14 +129,17 @@ public class PluginGroupingTests : IDisposable
             }
             """);
 
+        // Act
         var groupings = await _grouping.GetPluginGroupingsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Empty(groupings);
     }
 
     [Fact]
     public async Task SkipsTraversalAttempts()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -141,8 +154,10 @@ public class PluginGroupingTests : IDisposable
             }
             """);
 
+        // Act
         var groupings = await _grouping.GetPluginGroupingsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Empty(groupings);
     }
 }

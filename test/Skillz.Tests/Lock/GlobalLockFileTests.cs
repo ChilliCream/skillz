@@ -37,10 +37,13 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public async Task ReadAsync_Returns_Empty_When_File_Does_Not_Exist()
     {
+        // Arrange
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
 
+        // Act
         var result = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(GlobalLockFile.CurrentVersion, result.Version);
         Assert.Empty(result.Skills);
     }
@@ -48,8 +51,10 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public async Task AddEntryAsync_Stores_Skill_With_InstalledAt_And_UpdatedAt()
     {
+        // Arrange
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
 
+        // Act
         await lockFile.AddEntryAsync(
             "my-skill",
             new SkillLockEntry
@@ -61,6 +66,7 @@ public class GlobalLockFileTests : IDisposable
             },
             TestContext.Current.CancellationToken);
 
+        // Assert
         var entry = await lockFile.GetEntryAsync("my-skill", TestContext.Current.CancellationToken);
         Assert.NotNull(entry);
         Assert.Equal("org/repo", entry!.Source);
@@ -71,12 +77,14 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public async Task AddEntryAsync_Preserves_InstalledAt_On_Update()
     {
+        // Arrange
         var firstTime = new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         var secondTime = new DateTime(2025, 2, 1, 0, 0, 0, DateTimeKind.Utc);
         var current = firstTime;
 
         var lockFile = new GlobalLockFile(_xdgPaths, () => current);
 
+        // Act
         await lockFile.AddEntryAsync(
             "my-skill",
             new SkillLockEntry
@@ -100,6 +108,7 @@ public class GlobalLockFileTests : IDisposable
             },
             TestContext.Current.CancellationToken);
 
+        // Assert
         var entry = await lockFile.GetEntryAsync("my-skill", TestContext.Current.CancellationToken);
         Assert.NotNull(entry);
         Assert.Equal(firstTime.ToString("o"), entry!.InstalledAt);
@@ -110,6 +119,7 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public async Task RemoveEntryAsync_Removes_Existing_Skill()
     {
+        // Arrange
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
         await lockFile.AddEntryAsync(
             "my-skill",
@@ -122,8 +132,10 @@ public class GlobalLockFileTests : IDisposable
             },
             TestContext.Current.CancellationToken);
 
+        // Act
         var removed = await lockFile.RemoveEntryAsync("my-skill", TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(removed);
         var entry = await lockFile.GetEntryAsync("my-skill", TestContext.Current.CancellationToken);
         Assert.Null(entry);
@@ -132,16 +144,20 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public async Task RemoveEntryAsync_Returns_False_For_Missing_Skill()
     {
+        // Arrange
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
 
+        // Act
         var removed = await lockFile.RemoveEntryAsync("nothing", TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.False(removed);
     }
 
     [Fact]
     public async Task ReadAsync_Wipes_On_Old_Version()
     {
+        // Arrange
         var lockPath = _xdgPaths.GetGlobalLockPath();
         Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
         await File.WriteAllTextAsync(
@@ -164,8 +180,11 @@ public class GlobalLockFileTests : IDisposable
             TestContext.Current.CancellationToken);
 
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
+
+        // Act
         var result = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(GlobalLockFile.CurrentVersion, result.Version);
         Assert.Empty(result.Skills);
     }
@@ -173,13 +192,17 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public async Task ReadAsync_Returns_Empty_On_Corrupted_Json()
     {
+        // Arrange
         var lockPath = _xdgPaths.GetGlobalLockPath();
         Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
         await File.WriteAllTextAsync(lockPath, "{ this is not json", TestContext.Current.CancellationToken);
 
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
+
+        // Act
         var result = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(GlobalLockFile.CurrentVersion, result.Version);
         Assert.Empty(result.Skills);
         // A plain read must not rewrite or wipe a corrupt file on disk.
@@ -189,12 +212,15 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public async Task AddEntryAsync_Refuses_Corrupted_Json_And_Preserves_File()
     {
+        // Arrange
         var lockPath = _xdgPaths.GetGlobalLockPath();
         Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
         const string corrupt = "{ this is not json";
         await File.WriteAllTextAsync(lockPath, corrupt, TestContext.Current.CancellationToken);
 
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
+
+        // Act & Assert
         var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
             "new-skill",
             new SkillLockEntry { Source = "org/repo", SourceType = "github", SourceUrl = "u", SkillFolderHash = "h" },
@@ -207,11 +233,14 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public async Task AddEntryAsync_Refuses_Zero_Byte_Lock_And_Preserves_File()
     {
+        // Arrange
         var lockPath = _xdgPaths.GetGlobalLockPath();
         Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
         await File.WriteAllBytesAsync(lockPath, [], TestContext.Current.CancellationToken);
 
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
+
+        // Act & Assert
         var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
             "new-skill",
             new SkillLockEntry { Source = "org/repo", SourceType = "github", SourceUrl = "u", SkillFolderHash = "h" },
@@ -224,6 +253,7 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public async Task AddEntryAsync_Rejects_Newer_Lock_Version_And_Preserves_File()
     {
+        // Arrange
         var lockPath = _xdgPaths.GetGlobalLockPath();
         Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
         var newer = $$"""
@@ -235,6 +265,8 @@ public class GlobalLockFileTests : IDisposable
         await File.WriteAllTextAsync(lockPath, newer, TestContext.Current.CancellationToken);
 
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
+
+        // Act & Assert
         var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
             "new-skill",
             new SkillLockEntry { Source = "org/repo", SourceType = "github", SourceUrl = "u", SkillFolderHash = "h" },
@@ -247,6 +279,7 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public async Task ReadWrite_Round_Trip_Preserves_Entries()
     {
+        // Arrange
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
         var input = new SkillLockFile
         {
@@ -267,9 +300,11 @@ public class GlobalLockFileTests : IDisposable
             }
         };
 
+        // Act
         await lockFile.WriteAsync(input, TestContext.Current.CancellationToken);
         var output = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(GlobalLockFile.CurrentVersion, output.Version);
         var entry = output.Skills["round-trip"];
         Assert.Equal("org/repo", entry.Source);
@@ -284,6 +319,7 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public async Task WriteAsync_Replaces_Existing_File_Without_Leaving_Temp_File()
     {
+        // Arrange
         var lockFile = new GlobalLockFile(_xdgPaths, () => FixedNow);
         await lockFile.AddEntryAsync(
             "old-skill",
@@ -305,8 +341,10 @@ public class GlobalLockFileTests : IDisposable
             }
         };
 
+        // Act
         await lockFile.WriteAsync(replacement, TestContext.Current.CancellationToken);
 
+        // Assert
         var output = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
         Assert.DoesNotContain("old-skill", output.Skills.Keys);
         Assert.Equal("new", output.Skills["new-skill"].SkillFolderHash);
@@ -316,28 +354,34 @@ public class GlobalLockFileTests : IDisposable
     [Fact]
     public void XdgPaths_Resolves_GlobalLockPath_From_XdgStateHome()
     {
+        // Arrange
         var stateDir = Path.Combine(_tempDir, "state");
 
+        // Act & Assert
         Assert.Equal(Path.Combine(stateDir, "skills", ".skill-lock.json"), _xdgPaths.GetGlobalLockPath());
     }
 
     [Fact]
     public void XdgPaths_Falls_Back_To_AgentsDir_When_No_XdgStateHome()
     {
+        // Arrange
         var home = Path.Combine(_tempDir, "home");
         Directory.CreateDirectory(home);
         var paths = new XdgPaths(home, _ => null);
 
+        // Act & Assert
         Assert.Equal(Path.Combine(home, ".agents", ".skill-lock.json"), paths.GetGlobalLockPath());
     }
 
     [Fact]
     public async Task AddEntryAsync_Creates_Directory_If_Missing()
     {
+        // Arrange
         var nestedHome = Path.Combine(_tempDir, "deeply", "nested", "home");
         var paths = new XdgPaths(nestedHome, _ => null);
         var lockFile = new GlobalLockFile(paths, () => FixedNow);
 
+        // Act
         await lockFile.AddEntryAsync(
             "first-skill",
             new SkillLockEntry
@@ -349,6 +393,7 @@ public class GlobalLockFileTests : IDisposable
             },
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(File.Exists(paths.GetGlobalLockPath()));
     }
 }

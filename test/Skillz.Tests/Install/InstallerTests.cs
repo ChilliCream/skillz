@@ -69,16 +69,19 @@ public class InstallerTests : IDisposable
     [Fact]
     public async Task SymlinkMode_CopiesSkillToCanonicalLocation()
     {
+        // Arrange
         var skillName = "my-skill";
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "claude-code",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
         var canonicalPath = Path.Combine(_projectDir, ".agents", "skills", skillName);
         Assert.Equal(canonicalPath, result.CanonicalPath);
@@ -88,18 +91,21 @@ public class InstallerTests : IDisposable
     [Fact]
     public async Task SymlinkMode_NonUniversalAgentWithExistingRoot_CreatesSymlink()
     {
+        // Arrange
         var skillName = "linked-skill";
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
 
         Directory.CreateDirectory(Path.Combine(_projectDir, ".claude"));
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "claude-code",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
         Assert.False(result.SymlinkFailed);
         Assert.False(result.Skipped);
@@ -118,16 +124,19 @@ public class InstallerTests : IDisposable
     [Fact]
     public async Task CopyMode_WritesDirectlyToAgentLocation_NoCanonical()
     {
+        // Arrange
         var skillName = "copy-skill";
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
         Assert.Equal(InstallMode.Copy, result.Mode);
         Assert.Null(result.CanonicalPath);
@@ -143,6 +152,7 @@ public class InstallerTests : IDisposable
     [Fact]
     public async Task CopyMode_ExcludesMetadataJsonAndGitDir_PreservesDotfiles()
     {
+        // Arrange
         var skillName = "copy-dotfile-skill";
         var sourceDir = CreateSkillSource(
             skillName,
@@ -154,12 +164,14 @@ public class InstallerTests : IDisposable
             });
         var skill = MakeSkill(skillName, sourceDir);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
 
         var installedDir = Path.Combine(_projectDir, ".agents", "skills", skillName);
@@ -181,6 +193,7 @@ public class InstallerTests : IDisposable
             return;
         }
 
+        // Arrange
         var skillName = "file-link-escape";
         var sourceDir = CreateSkillSource(skillName);
         var outsideFile = Path.Combine(_root, "outside-secret.txt");
@@ -188,12 +201,14 @@ public class InstallerTests : IDisposable
         File.CreateSymbolicLink(Path.Combine(sourceDir, "loot.txt"), outsideFile);
         var skill = MakeSkill(skillName, sourceDir);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.False(result.Success);
         Assert.Contains("outside source root", result.Error);
         Assert.False(File.Exists(Path.Combine(_projectDir, ".agents", "skills", skillName, "loot.txt")));
@@ -207,6 +222,7 @@ public class InstallerTests : IDisposable
             return;
         }
 
+        // Arrange
         var skillName = "dir-link-escape";
         var sourceDir = CreateSkillSource(skillName);
         var outsideDir = Path.Combine(_root, "outside-dir");
@@ -218,12 +234,14 @@ public class InstallerTests : IDisposable
         Directory.CreateSymbolicLink(Path.Combine(sourceDir, "loot"), outsideDir);
         var skill = MakeSkill(skillName, sourceDir);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.False(result.Success);
         Assert.Contains("outside source root", result.Error);
     }
@@ -236,17 +254,20 @@ public class InstallerTests : IDisposable
             return;
         }
 
+        // Arrange
         var skillName = "broken-link";
         var sourceDir = CreateSkillSource(skillName);
         File.CreateSymbolicLink(Path.Combine(sourceDir, "missing.txt"), Path.Combine(sourceDir, "nope.txt"));
         var skill = MakeSkill(skillName, sourceDir);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.False(result.Success);
         Assert.Contains("broken symlink", result.Error);
     }
@@ -259,6 +280,7 @@ public class InstallerTests : IDisposable
             return;
         }
 
+        // Arrange
         var skillName = "in-root-link";
         var sourceDir = CreateSkillSource(skillName);
         var target = Path.Combine(sourceDir, "content.txt");
@@ -266,12 +288,14 @@ public class InstallerTests : IDisposable
         File.CreateSymbolicLink(Path.Combine(sourceDir, "alias.txt"), target);
         var skill = MakeSkill(skillName, sourceDir);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
         var copied = Path.Combine(_projectDir, ".agents", "skills", skillName, "alias.txt");
         Assert.Equal("linked content", await File.ReadAllTextAsync(copied, TestContext.Current.CancellationToken));
@@ -286,6 +310,7 @@ public class InstallerTests : IDisposable
             return;
         }
 
+        // Arrange
         var skillName = "destination-link";
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
@@ -296,12 +321,14 @@ public class InstallerTests : IDisposable
         var installPath = Path.Combine(targetBase, skillName);
         Directory.CreateSymbolicLink(installPath, outsideDir);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
+        // Assert
         // The symlinked destination is replaced with a real directory; the
         // install must never write through the link into the outside target.
         Assert.True(result.Success);
@@ -314,16 +341,19 @@ public class InstallerTests : IDisposable
     [Fact]
     public async Task UniversalAgent_ProjectInstall_DoesNotCreateSymlink()
     {
+        // Arrange
         var skillName = "universal-only-skill";
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "github-copilot",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
         Assert.False(result.SymlinkFailed);
 
@@ -337,10 +367,12 @@ public class InstallerTests : IDisposable
     [Fact]
     public async Task NonUniversalAgent_ProjectInstall_AgentRootMissing_SkipsSymlink()
     {
+        // Arrange
         var skillName = "skipped-skill";
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
 
+        // Act
         // No .windsurf directory in project
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
@@ -348,6 +380,7 @@ public class InstallerTests : IDisposable
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
         Assert.True(result.Skipped);
 
@@ -366,6 +399,7 @@ public class InstallerTests : IDisposable
             return; // symlink creation on Windows requires admin
         }
 
+        // Arrange
         var skillName = "self-loop-skill";
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
@@ -380,12 +414,14 @@ public class InstallerTests : IDisposable
         var preInfo = new DirectoryInfo(canonicalDir);
         Assert.True((preInfo.Attributes & FileAttributes.ReparsePoint) != 0);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "amp",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
 
         var postInfo = new DirectoryInfo(canonicalDir);
@@ -402,6 +438,7 @@ public class InstallerTests : IDisposable
             return;
         }
 
+        // Arrange
         var skillName = "symlinked-dir-skill";
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
@@ -414,12 +451,14 @@ public class InstallerTests : IDisposable
         var claudeSkillsDir = Path.Combine(claudeDir, "skills");
         Directory.CreateSymbolicLink(claudeSkillsDir, canonicalBase);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "claude-code",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
         Assert.False(result.SymlinkFailed);
 
@@ -439,6 +478,7 @@ public class InstallerTests : IDisposable
     [Fact]
     public async Task Idempotent_ReinstallingSameSkill_Succeeds()
     {
+        // Arrange
         var skillName = "idempotent-skill";
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
@@ -453,12 +493,14 @@ public class InstallerTests : IDisposable
 
         Assert.True(first.Success);
 
+        // Act
         var second = await _installer.InstallSkillForAgentAsync(
             skill,
             "claude-code",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(second.Success);
         Assert.False(second.SymlinkFailed);
 
@@ -470,18 +512,21 @@ public class InstallerTests : IDisposable
     [Fact]
     public async Task PathTraversalAttempt_IsRejected_ViaSanitization()
     {
+        // Arrange
         // SanitizeName converts "../" into a hyphen so traversal cannot occur,
         // but we verify the install still lands inside the canonical base.
         var maliciousName = "../escaped";
         var sourceDir = CreateSkillSource("ok-name");
         var skill = MakeSkill(maliciousName, sourceDir);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
         var canonicalBase = Path.Combine(_projectDir, ".agents", "skills");
         Assert.StartsWith(canonicalBase, Path.GetFullPath(result.Path), StringComparison.Ordinal);
@@ -490,34 +535,47 @@ public class InstallerTests : IDisposable
     [Fact]
     public void GetCanonicalSkillsDir_Project_ReturnsAgentsSkillsRelativeToCwd()
     {
+        // Act
         var result = _installer.GetCanonicalSkillsDir(global: false, cwd: _projectDir);
+
+        // Assert
         Assert.Equal(Path.Combine(_projectDir, ".agents", "skills"), result);
     }
 
     [Fact]
     public void GetCanonicalSkillsDir_Global_ReturnsAgentsSkillsInHome()
     {
+        // Act
         var result = _installer.GetCanonicalSkillsDir(global: true);
+
+        // Assert
         Assert.Equal(Path.Combine(_home, ".agents", "skills"), result);
     }
 
     [Fact]
     public void GetAgentBaseDir_UniversalAgent_ReturnsCanonicalDir()
     {
+        // Act
         var result = _installer.GetAgentBaseDir("codex", global: false, cwd: _projectDir);
+
+        // Assert
         Assert.Equal(Path.Combine(_projectDir, ".agents", "skills"), result);
     }
 
     [Fact]
     public void GetAgentBaseDir_NonUniversalAgent_Project_ReturnsAgentSpecificDir()
     {
+        // Act
         var result = _installer.GetAgentBaseDir("claude-code", global: false, cwd: _projectDir);
+
+        // Assert
         Assert.Equal(Path.Combine(_projectDir, ".claude", "skills"), result);
     }
 
     [Fact]
     public async Task RemoteSkill_WritesSkillMdToCanonical()
     {
+        // Arrange
         var skillName = "remote-skill";
         var remote = new RemoteSkill(
             Name: skillName,
@@ -528,12 +586,14 @@ public class InstallerTests : IDisposable
             ProviderId: "test",
             SourceIdentifier: "test/repo");
 
+        // Act
         var result = await _installer.InstallRemoteSkillForAgentAsync(
             remote,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
         var installedSkillMd = Path.Combine(_projectDir, ".agents", "skills", skillName, "SKILL.md");
         Assert.True(File.Exists(installedSkillMd));
@@ -544,6 +604,7 @@ public class InstallerTests : IDisposable
     [Fact]
     public async Task GlobalInstall_AgentWithoutGlobalSupport_ReturnsError()
     {
+        // Arrange
         // The OpenClaw entry always has a global skills dir, so to test missing-support we
         // build a registry where no agent has GlobalSkillsDir for a synthetic check.
         // Instead, we use a known agent and verify behavior: all current agents define
@@ -552,12 +613,14 @@ public class InstallerTests : IDisposable
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
 
+        // Act
         var result = await _installer.InstallSkillForAgentAsync(
             skill,
             "github-copilot",
             new InstallOptions(Global: true, Cwd: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(result.Success);
         // For universal-global, path == canonical
         Assert.Equal(result.Path, result.CanonicalPath);

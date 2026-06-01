@@ -30,30 +30,39 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public void GetLockPath_Returns_SkillsLockJson_In_Given_Directory()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
 
+        // Act
         var path = lockFile.GetLockPath("/some/project");
 
+        // Assert
         Assert.Equal(Path.Combine("/some/project", "skills-lock.json"), path);
     }
 
     [Fact]
     public void GetLockPath_Uses_Cwd_When_No_Directory_Given()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
 
+        // Act
         var path = lockFile.GetLockPath();
 
+        // Assert
         Assert.Equal(Path.Combine(Directory.GetCurrentDirectory(), "skills-lock.json"), path);
     }
 
     [Fact]
     public async Task ReadAsync_Returns_Empty_Lock_When_File_Does_Not_Exist()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
 
+        // Act
         var result = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(ProjectLockFile.CurrentVersion, result.Version);
         Assert.Empty(result.Skills);
     }
@@ -61,6 +70,7 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task ReadAsync_Reads_A_Valid_Lock_File()
     {
+        // Arrange
         var content = """
             {
               "version": 1,
@@ -79,8 +89,11 @@ public class ProjectLockFileTests : IDisposable
             TestContext.Current.CancellationToken);
 
         var lockFile = new ProjectLockFile();
+
+        // Act
         var result = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(1, result.Version);
         Assert.Single(result.Skills);
         var entry = result.Skills["my-skill"];
@@ -92,6 +105,7 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task ReadAsync_Returns_Empty_For_Corrupted_Json()
     {
+        // Arrange
         var conflicted = """
             {
               "version": 1,
@@ -110,8 +124,11 @@ public class ProjectLockFileTests : IDisposable
             TestContext.Current.CancellationToken);
 
         var lockFile = new ProjectLockFile();
+
+        // Act
         var result = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(ProjectLockFile.CurrentVersion, result.Version);
         Assert.Empty(result.Skills);
         // A plain read must not rewrite or wipe a conflicted file on disk.
@@ -123,11 +140,14 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task AddEntryAsync_Refuses_Corrupted_Json_And_Preserves_File()
     {
+        // Arrange
         var lockPath = Path.Combine(_tempDir, "skills-lock.json");
         const string corrupt = "{ this is not json";
         await File.WriteAllTextAsync(lockPath, corrupt, TestContext.Current.CancellationToken);
 
         var lockFile = new ProjectLockFile();
+
+        // Act & Assert
         var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
             "new-skill",
             new LocalSkillLockEntry { Source = "org/repo", SourceType = "github", ComputedHash = "hash123" },
@@ -141,10 +161,13 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task AddEntryAsync_Refuses_Zero_Byte_Lock_And_Preserves_File()
     {
+        // Arrange
         var lockPath = Path.Combine(_tempDir, "skills-lock.json");
         await File.WriteAllBytesAsync(lockPath, [], TestContext.Current.CancellationToken);
 
         var lockFile = new ProjectLockFile();
+
+        // Act & Assert
         var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
             "new-skill",
             new LocalSkillLockEntry { Source = "org/repo", SourceType = "github", ComputedHash = "hash123" },
@@ -158,6 +181,7 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task AddEntryAsync_Rejects_Newer_Lock_Version_And_Preserves_File()
     {
+        // Arrange
         var lockPath = Path.Combine(_tempDir, "skills-lock.json");
         var newer = $$"""
             {
@@ -168,6 +192,8 @@ public class ProjectLockFileTests : IDisposable
         await File.WriteAllTextAsync(lockPath, newer, TestContext.Current.CancellationToken);
 
         var lockFile = new ProjectLockFile();
+
+        // Act & Assert
         var ex = await Assert.ThrowsAsync<CliException>(() => lockFile.AddEntryAsync(
             "new-skill",
             new LocalSkillLockEntry { Source = "org/repo", SourceType = "github", ComputedHash = "hash123" },
@@ -181,6 +207,7 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task ReadAsync_Returns_Empty_For_Old_Version()
     {
+        // Arrange
         var content = """
             {
               "version": 0,
@@ -199,8 +226,11 @@ public class ProjectLockFileTests : IDisposable
             TestContext.Current.CancellationToken);
 
         var lockFile = new ProjectLockFile();
+
+        // Act
         var result = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(ProjectLockFile.CurrentVersion, result.Version);
         Assert.Empty(result.Skills);
     }
@@ -208,6 +238,7 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task WriteAsync_Writes_Sorted_Keys_With_Trailing_Newline()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
         var file = new LocalSkillLockFile
         {
@@ -235,8 +266,10 @@ public class ProjectLockFileTests : IDisposable
             }
         };
 
+        // Act
         await lockFile.WriteAsync(file, _tempDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var raw = await File.ReadAllTextAsync(
             Path.Combine(_tempDir, "skills-lock.json"),
             TestContext.Current.CancellationToken);
@@ -252,6 +285,7 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task WriteAsync_Replaces_Existing_File_Without_Leaving_Temp_File()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
         await lockFile.AddEntryAsync(
             "old-skill",
@@ -273,8 +307,10 @@ public class ProjectLockFileTests : IDisposable
             }
         };
 
+        // Act
         await lockFile.WriteAsync(replacement, _tempDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var output = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
         Assert.DoesNotContain("old-skill", output.Skills.Keys);
         Assert.Equal("new", output.Skills["new-skill"].ComputedHash);
@@ -284,6 +320,7 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task ReadWrite_Round_Trip_Preserves_Entries()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
         var input = new LocalSkillLockFile
         {
@@ -301,9 +338,11 @@ public class ProjectLockFileTests : IDisposable
             }
         };
 
+        // Act
         await lockFile.WriteAsync(input, _tempDir, TestContext.Current.CancellationToken);
         var output = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(1, output.Version);
         var entry = output.Skills["round-trip"];
         Assert.Equal("org/repo", entry.Source);
@@ -316,8 +355,10 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task AddEntryAsync_Adds_New_Skill_To_Empty_Lock()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
 
+        // Act
         await lockFile.AddEntryAsync(
             "new-skill",
             new LocalSkillLockEntry
@@ -329,6 +370,7 @@ public class ProjectLockFileTests : IDisposable
             _tempDir,
             TestContext.Current.CancellationToken);
 
+        // Assert
         var result = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
         Assert.Single(result.Skills);
         Assert.Equal("hash123", result.Skills["new-skill"].ComputedHash);
@@ -337,8 +379,10 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task AddEntryAsync_Updates_Existing_Skill_Hash()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
 
+        // Act
         await lockFile.AddEntryAsync(
             "my-skill",
             new LocalSkillLockEntry
@@ -360,6 +404,7 @@ public class ProjectLockFileTests : IDisposable
             _tempDir,
             TestContext.Current.CancellationToken);
 
+        // Assert
         var result = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
         Assert.Equal("new-hash", result.Skills["my-skill"].ComputedHash);
     }
@@ -367,8 +412,10 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task AddEntryAsync_Preserves_Other_Skills()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
 
+        // Act
         await lockFile.AddEntryAsync(
             "skill-a",
             new LocalSkillLockEntry
@@ -390,6 +437,7 @@ public class ProjectLockFileTests : IDisposable
             _tempDir,
             TestContext.Current.CancellationToken);
 
+        // Assert
         var result = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
         Assert.Equal(2, result.Skills.Count);
         Assert.Equal("aaa", result.Skills["skill-a"].ComputedHash);
@@ -399,6 +447,7 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task RemoveEntryAsync_Removes_Existing_Skill()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
         await lockFile.AddEntryAsync(
             "my-skill",
@@ -411,8 +460,10 @@ public class ProjectLockFileTests : IDisposable
             _tempDir,
             TestContext.Current.CancellationToken);
 
+        // Act
         var removed = await lockFile.RemoveEntryAsync("my-skill", _tempDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(removed);
         var result = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
         Assert.Empty(result.Skills);
@@ -421,16 +472,20 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task RemoveEntryAsync_Returns_False_For_Non_Existent_Skill()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
 
+        // Act
         var removed = await lockFile.RemoveEntryAsync("no-such-skill", _tempDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.False(removed);
     }
 
     [Fact]
     public async Task HasSkillAsync_Returns_True_When_Skill_Exists()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
         await lockFile.AddEntryAsync(
             "found-skill",
@@ -443,9 +498,11 @@ public class ProjectLockFileTests : IDisposable
             _tempDir,
             TestContext.Current.CancellationToken);
 
+        // Act
         var hasFound = await lockFile.HasSkillAsync("found-skill", _tempDir, TestContext.Current.CancellationToken);
         var hasMissing = await lockFile.HasSkillAsync("missing-skill", _tempDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.True(hasFound);
         Assert.False(hasMissing);
     }
@@ -453,6 +510,7 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task ComputeSkillFolderHashAsync_Is_Deterministic_And_Sha256()
     {
+        // Arrange
         var skillDir = Path.Combine(_tempDir, "my-skill");
         Directory.CreateDirectory(skillDir);
         await File.WriteAllTextAsync(
@@ -461,9 +519,12 @@ public class ProjectLockFileTests : IDisposable
             TestContext.Current.CancellationToken);
 
         var lockFile = new ProjectLockFile();
+
+        // Act
         var hash1 = await lockFile.ComputeSkillFolderHashAsync(skillDir, TestContext.Current.CancellationToken);
         var hash2 = await lockFile.ComputeSkillFolderHashAsync(skillDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(hash1, hash2);
         Assert.Matches("^[a-f0-9]{64}$", hash1);
     }
@@ -471,23 +532,28 @@ public class ProjectLockFileTests : IDisposable
     [Fact]
     public async Task ComputeSkillFolderHashAsync_Changes_When_File_Content_Changes()
     {
+        // Arrange
         var skillDir = Path.Combine(_tempDir, "my-skill");
         Directory.CreateDirectory(skillDir);
         var skillFile = Path.Combine(skillDir, "SKILL.md");
         await File.WriteAllTextAsync(skillFile, "version 1", TestContext.Current.CancellationToken);
 
         var lockFile = new ProjectLockFile();
+
+        // Act
         var hash1 = await lockFile.ComputeSkillFolderHashAsync(skillDir, TestContext.Current.CancellationToken);
 
         await File.WriteAllTextAsync(skillFile, "version 2", TestContext.Current.CancellationToken);
         var hash2 = await lockFile.ComputeSkillFolderHashAsync(skillDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.NotEqual(hash1, hash2);
     }
 
     [Fact]
     public async Task ComputeSkillFolderHashAsync_Includes_Nested_Files()
     {
+        // Arrange
         var skillDir = Path.Combine(_tempDir, "my-skill");
         Directory.CreateDirectory(Path.Combine(skillDir, "sub"));
         await File.WriteAllTextAsync(Path.Combine(skillDir, "SKILL.md"), "root", TestContext.Current.CancellationToken);
@@ -495,17 +561,21 @@ public class ProjectLockFileTests : IDisposable
         await File.WriteAllTextAsync(nestedFile, "nested", TestContext.Current.CancellationToken);
 
         var lockFile = new ProjectLockFile();
+
+        // Act
         var hash1 = await lockFile.ComputeSkillFolderHashAsync(skillDir, TestContext.Current.CancellationToken);
 
         await File.WriteAllTextAsync(nestedFile, "changed", TestContext.Current.CancellationToken);
         var hash2 = await lockFile.ComputeSkillFolderHashAsync(skillDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.NotEqual(hash1, hash2);
     }
 
     [Fact]
     public async Task ComputeSkillFolderHashAsync_Ignores_Git_And_NodeModules()
     {
+        // Arrange
         var skillDir = Path.Combine(_tempDir, "my-skill");
         Directory.CreateDirectory(skillDir);
         await File.WriteAllTextAsync(
@@ -514,6 +584,8 @@ public class ProjectLockFileTests : IDisposable
             TestContext.Current.CancellationToken);
 
         var lockFile = new ProjectLockFile();
+
+        // Act
         var hash1 = await lockFile.ComputeSkillFolderHashAsync(skillDir, TestContext.Current.CancellationToken);
 
         Directory.CreateDirectory(Path.Combine(skillDir, ".git"));
@@ -529,13 +601,17 @@ public class ProjectLockFileTests : IDisposable
 
         var hash2 = await lockFile.ComputeSkillFolderHashAsync(skillDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(hash1, hash2);
     }
 
     [Fact]
     public async Task Lock_Output_Has_No_Timestamps_For_Merge_Friendliness()
     {
+        // Arrange
         var lockFile = new ProjectLockFile();
+
+        // Act
         await lockFile.AddEntryAsync(
             "skill-a",
             new LocalSkillLockEntry
@@ -547,6 +623,7 @@ public class ProjectLockFileTests : IDisposable
             _tempDir,
             TestContext.Current.CancellationToken);
 
+        // Assert
         var raw = await File.ReadAllTextAsync(
             Path.Combine(_tempDir, "skills-lock.json"),
             TestContext.Current.CancellationToken);

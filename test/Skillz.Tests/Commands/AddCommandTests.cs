@@ -76,32 +76,39 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_Without_Source_Returns_Failure()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var cmd = services.GetRequiredService<AddCommand>();
 
+        // Act
         var parseResult = cmd.Parse(Array.Empty<string>());
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.NotEqual(0, exitCode);
     }
 
     [Fact]
     public async Task Add_With_No_Skills_Discovered_Returns_Failure()
     {
+        // Arrange
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => Array.Empty<Skill>());
 
+        // Act
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.NotEqual(0, exitCode);
     }
 
     [Fact]
     public async Task Add_Yes_Mode_Installs_All_Discovered_Skills()
     {
+        // Arrange
         var installed = new List<(string Skill, string Agent)>();
 
         var services = BuildServices(
@@ -114,10 +121,12 @@ public class AddCommandTests : IDisposable
                     return new InstallResult(true, $"/installed/{skill.InstallName}");
                 });
 
+        // Act
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         Assert.Contains(installed, x => x.Skill == "alpha" && x.Agent == "claude-code");
         Assert.Contains(installed, x => x.Skill == "beta" && x.Agent == "claude-code");
@@ -126,6 +135,7 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_With_Skill_Filter_Installs_Only_Matching_Skills()
     {
+        // Arrange
         var installed = new List<string>();
 
         var services = BuildServices(
@@ -139,10 +149,12 @@ public class AddCommandTests : IDisposable
                     return new InstallResult(true, $"/installed/{skill.InstallName}");
                 });
 
+        // Act
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code", "--skill", "beta"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         Assert.Contains("beta", installed);
         Assert.DoesNotContain("alpha", installed);
@@ -152,6 +164,7 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_Project_Install_Updates_Project_Lock()
     {
+        // Arrange
         var lockEntries = new List<string>();
 
         var services = BuildServices(
@@ -161,10 +174,12 @@ public class AddCommandTests : IDisposable
                 i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, $"/installed/{skill.InstallName}"),
             configureProjectLock: l => l.OnAddEntry = (name, _, _) => lockEntries.Add(name));
 
+        // Act
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         Assert.Contains("alpha", lockEntries);
     }
@@ -172,6 +187,7 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_Global_Install_Updates_Global_Lock()
     {
+        // Arrange
         var lockEntries = new List<string>();
 
         var services = BuildServices(
@@ -181,10 +197,12 @@ public class AddCommandTests : IDisposable
                 i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, $"/installed/{skill.InstallName}"),
             configureGlobalLock: l => l.OnAddEntry = (name, _) => lockEntries.Add(name));
 
+        // Act
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["owner/repo", "--yes", "--agent", "claude-code", "--global"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         Assert.Contains("alpha", lockEntries);
     }
@@ -192,6 +210,7 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_With_List_Flag_Lists_Skills_Without_Installing()
     {
+        // Arrange
         var installed = new List<string>();
 
         var services = BuildServices(
@@ -204,10 +223,12 @@ public class AddCommandTests : IDisposable
                     return new InstallResult(true, $"/installed/{skill.InstallName}");
                 });
 
+        // Act
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--list"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         Assert.Empty(installed);
 
@@ -220,6 +241,7 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_Uses_Prompter_For_Skill_Selection_When_Interactive()
     {
+        // Arrange
         var installed = new List<string>();
 
         var services = BuildServices(
@@ -237,10 +259,12 @@ public class AddCommandTests : IDisposable
                     return new InstallResult(true, $"/installed/{skill.InstallName}");
                 });
 
+        // Act
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--agent", "claude-code"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         Assert.Contains("beta", installed);
         Assert.DoesNotContain("alpha", installed);
@@ -249,6 +273,7 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_Interactive_Confirmation_Includes_Existing_Canonical_Path()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".skillz", "skills", "alpha");
         Directory.CreateDirectory(canonical);
 
@@ -266,10 +291,12 @@ public class AddCommandTests : IDisposable
                 i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, canonical);
             });
 
+        // Act
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--agent", "claude-code"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         var prompter = services.GetRequiredService<TestAddCommandPrompter>();
         Assert.Equal(0, exitCode);
         Assert.Single(prompter.LastOverwriteTargets);
@@ -279,6 +306,7 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_Interactive_Cancel_With_Overwrite_Does_Not_Install()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".skillz", "skills", "alpha");
         Directory.CreateDirectory(canonical);
         var installed = false;
@@ -297,10 +325,12 @@ public class AddCommandTests : IDisposable
                 };
             });
 
+        // Act
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--agent", "claude-code"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(ExitCodeConstants.Cancelled, exitCode);
         Assert.False(installed);
     }
@@ -308,6 +338,7 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_Yes_Warns_About_Overwrite_Before_Installing()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".skillz", "skills", "alpha");
         Directory.CreateDirectory(canonical);
 
@@ -323,10 +354,12 @@ public class AddCommandTests : IDisposable
             return new InstallResult(true, canonical);
         };
 
+        // Act
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         var output = services.GetRequiredService<TestInteractionService>().Output.ToList();
         var warningIndex = output.FindIndex(line => line.Contains("Overwriting existing skill", StringComparison.Ordinal));
         var installIndex = output.FindIndex(line => line.Contains("INSTALL ACTION", StringComparison.Ordinal));
@@ -338,14 +371,17 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_With_Invalid_Agent_Returns_Failure()
     {
+        // Arrange
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") });
 
+        // Act
         var cmd = services.GetRequiredService<AddCommand>();
         var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "not-a-real-agent"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.NotEqual(0, exitCode);
     }
 }

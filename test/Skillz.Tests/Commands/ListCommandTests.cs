@@ -70,14 +70,17 @@ public class ListCommandTests : IDisposable
     [Fact]
     public async Task List_With_No_Installed_Skills_Reports_Empty()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
         ConfigureInstaller(installer);
 
+        // Act
         var cmd = services.GetRequiredService<ListCommand>();
         var parseResult = cmd.Parse(Array.Empty<string>());
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
         Assert.Contains(interaction.Output, o => o.Contains("No project skills", StringComparison.OrdinalIgnoreCase));
@@ -86,6 +89,7 @@ public class ListCommandTests : IDisposable
     [Fact]
     public async Task List_Reports_Installed_Skills_From_Canonical_Dir()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
@@ -95,10 +99,12 @@ public class ListCommandTests : IDisposable
         var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
         ConfigureInstaller(installer);
 
+        // Act
         var cmd = services.GetRequiredService<ListCommand>();
         var parseResult = cmd.Parse(Array.Empty<string>());
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
         var output = string.Join("\n", interaction.Output);
@@ -109,6 +115,7 @@ public class ListCommandTests : IDisposable
     [Fact]
     public async Task List_With_Json_Format_Writes_Json_To_Stdout()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
@@ -117,10 +124,12 @@ public class ListCommandTests : IDisposable
         var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
         ConfigureInstaller(installer);
 
+        // Act
         var cmd = services.GetRequiredService<ListCommand>();
         var parseResult = cmd.Parse(["--format", "json"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         var stdout = _capturedOut.ToString();
         Assert.Contains("\"name\"", stdout);

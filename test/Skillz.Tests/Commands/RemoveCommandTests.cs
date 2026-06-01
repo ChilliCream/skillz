@@ -60,14 +60,17 @@ public class RemoveCommandTests : IDisposable
     [Fact]
     public async Task Remove_With_No_Skills_Reports_Empty()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
         ConfigureInstaller(installer);
 
+        // Act
         var cmd = services.GetRequiredService<RemoveCommand>();
         var parseResult = cmd.Parse(["--yes"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
         Assert.Contains(interaction.Output, o => o.Contains("No skills", StringComparison.OrdinalIgnoreCase));
@@ -76,6 +79,7 @@ public class RemoveCommandTests : IDisposable
     [Fact]
     public async Task Remove_With_Named_Skill_Deletes_Directory_And_Updates_Lock()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
@@ -93,10 +97,12 @@ public class RemoveCommandTests : IDisposable
             return true;
         };
 
+        // Act
         var cmd = services.GetRequiredService<RemoveCommand>();
         var parseResult = cmd.Parse(["alpha", "--yes"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         Assert.False(Directory.Exists(Path.Combine(canonical, "alpha")));
         Assert.True(Directory.Exists(Path.Combine(canonical, "beta")));
@@ -106,6 +112,7 @@ public class RemoveCommandTests : IDisposable
     [Fact]
     public async Task Remove_With_All_Flag_Removes_Everything_Without_Prompts()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
@@ -115,10 +122,12 @@ public class RemoveCommandTests : IDisposable
         var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
         ConfigureInstaller(installer);
 
+        // Act
         var cmd = services.GetRequiredService<RemoveCommand>();
         var parseResult = cmd.Parse(["--all"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         Assert.False(Directory.Exists(Path.Combine(canonical, "alpha")));
         Assert.False(Directory.Exists(Path.Combine(canonical, "beta")));
@@ -127,6 +136,7 @@ public class RemoveCommandTests : IDisposable
     [Fact]
     public async Task Remove_Uses_Prompter_When_Interactive()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
@@ -143,10 +153,12 @@ public class RemoveCommandTests : IDisposable
         prompter.OnSelectSkills = installed => installed.Where(s => s == "beta").ToList();
         prompter.OnConfirmRemoval = _ => true;
 
+        // Act
         var cmd = services.GetRequiredService<RemoveCommand>();
         var parseResult = cmd.Parse(Array.Empty<string>());
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         Assert.True(Directory.Exists(Path.Combine(canonical, "alpha")));
         Assert.False(Directory.Exists(Path.Combine(canonical, "beta")));

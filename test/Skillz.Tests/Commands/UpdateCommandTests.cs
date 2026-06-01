@@ -40,16 +40,19 @@ public class UpdateCommandTests : IDisposable
     [Fact]
     public async Task Update_Global_Scope_With_No_Skills_Prints_Empty_Message()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
             new SkillLockFile { Version = 3, Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal) };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
+        // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
         var parseResult = cmd.Parse(["-g"]);
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exit);
         Assert.Contains(
             interaction.Output,
@@ -59,6 +62,7 @@ public class UpdateCommandTests : IDisposable
     [Fact]
     public async Task Update_Global_Reports_Up_To_Date_When_Hash_Matches()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
@@ -93,10 +97,12 @@ public class UpdateCommandTests : IDisposable
                 ]);
         var interaction = services.GetRequiredService<TestInteractionService>();
 
+        // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
         var parseResult = cmd.Parse(["-g"]);
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("up to date", StringComparison.Ordinal));
     }
@@ -104,6 +110,7 @@ public class UpdateCommandTests : IDisposable
     [Fact]
     public async Task Update_Global_Reports_Update_Available_When_Hash_Differs()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
@@ -138,10 +145,12 @@ public class UpdateCommandTests : IDisposable
                 ]);
         var interaction = services.GetRequiredService<TestInteractionService>();
 
+        // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
         var parseResult = cmd.Parse(["-g"]);
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("Found 1 global update", StringComparison.Ordinal));
         Assert.Contains(interaction.Output, line => line.Contains("Update available", StringComparison.Ordinal));
@@ -152,6 +161,7 @@ public class UpdateCommandTests : IDisposable
     [Fact]
     public async Task Update_Global_Skips_Skills_Without_Folder_Hash()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
@@ -172,10 +182,12 @@ public class UpdateCommandTests : IDisposable
             };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
+        // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
         var parseResult = cmd.Parse(["-g"]);
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exit);
         Assert.Contains(
             interaction.Output,
@@ -185,6 +197,7 @@ public class UpdateCommandTests : IDisposable
     [Fact]
     public async Task Update_Project_With_No_Skills_Prints_Empty_Message()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var projectLock = services.GetRequiredService<TestProjectLockFile>();
         projectLock.OnRead = _ => new LocalSkillLockFile
@@ -194,10 +207,12 @@ public class UpdateCommandTests : IDisposable
         };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
+        // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
         var parseResult = cmd.Parse(["-p"]);
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("No project skills", StringComparison.Ordinal));
     }
@@ -205,6 +220,7 @@ public class UpdateCommandTests : IDisposable
     [Fact]
     public async Task Update_Project_Reports_Update_For_Trackable_Skills()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var projectLock = services.GetRequiredService<TestProjectLockFile>();
         projectLock.OnRead = _ => new LocalSkillLockFile
@@ -224,10 +240,12 @@ public class UpdateCommandTests : IDisposable
         };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
+        // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
         var parseResult = cmd.Parse(["-p"]);
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("Update available", StringComparison.Ordinal));
     }
@@ -235,6 +253,7 @@ public class UpdateCommandTests : IDisposable
     [Fact]
     public async Task Update_Project_Skips_NodeModules_And_Local_Entries()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var projectLock = services.GetRequiredService<TestProjectLockFile>();
         projectLock.OnRead = _ => new LocalSkillLockFile
@@ -258,10 +277,12 @@ public class UpdateCommandTests : IDisposable
         };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
+        // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
         var parseResult = cmd.Parse(["-p"]);
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("No project skills", StringComparison.Ordinal));
     }
@@ -269,16 +290,19 @@ public class UpdateCommandTests : IDisposable
     [Fact]
     public async Task Update_With_Yes_Flag_Auto_Detects_Scope()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
             new SkillLockFile { Version = 3, Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal) };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
+        // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
         var parseResult = cmd.Parse(["-y"]);
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("No global skills", StringComparison.Ordinal));
     }
@@ -286,6 +310,7 @@ public class UpdateCommandTests : IDisposable
     [Fact]
     public async Task Update_Both_Scope_Shows_Headers()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
@@ -298,10 +323,12 @@ public class UpdateCommandTests : IDisposable
         };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
+        // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
         var parseResult = cmd.Parse(["-g", "-p"]);
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("Global Skills", StringComparison.Ordinal));
         Assert.Contains(interaction.Output, line => line.Contains("Project Skills", StringComparison.Ordinal));
@@ -310,9 +337,11 @@ public class UpdateCommandTests : IDisposable
     [Fact]
     public void Update_Has_Expected_Aliases()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var cmd = services.GetRequiredService<UpdateCommand>();
 
+        // Assert
         Assert.Contains("upgrade", cmd.Aliases);
         Assert.Contains("check", cmd.Aliases);
     }

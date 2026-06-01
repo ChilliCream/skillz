@@ -32,6 +32,7 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task DiscoversSearchDirs_FromMarketplaceJson()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -46,8 +47,10 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var expected = Path.Combine(_testDir, "plugins", "test-plugin", "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));
     }
@@ -55,6 +58,7 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RespectsMetadataPluginRoot()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -70,8 +74,10 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var expected = Path.Combine(_testDir, "plugins", "my-plugin", "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));
     }
@@ -79,6 +85,7 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task DiscoversSearchDirs_FromPluginJson()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/plugin.json",
             """
@@ -88,8 +95,10 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var expected = Path.Combine(_testDir, "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));
     }
@@ -97,6 +106,7 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task SkipsRemoteSourceObjects()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -111,32 +121,40 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Empty(dirs);
     }
 
     [Fact]
     public async Task MissingManifest_ReturnsEmpty()
     {
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Empty(dirs);
     }
 
     [Fact]
     public async Task InvalidJson_ReturnsEmpty()
     {
+        // Arrange
         WriteManifest(".claude-plugin/marketplace.json", "not valid json");
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Empty(dirs);
     }
 
     [Fact]
     public async Task RejectsTraversalViaSource()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -147,14 +165,17 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.All(dirs, d => Assert.True(PathContainment.IsContainedIn(d, _testDir)));
     }
 
     [Fact]
     public async Task RejectsTraversalViaSkillPath()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -165,14 +186,17 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.All(dirs, d => Assert.True(PathContainment.IsContainedIn(d, _testDir)));
     }
 
     [Fact]
     public async Task RejectsAbsolutePathsInSkills()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/plugin.json",
             """
@@ -181,8 +205,10 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var conventional = Path.Combine(_testDir, "skills");
         Assert.Single(dirs);
         Assert.Equal(Path.GetFullPath(conventional), Path.GetFullPath(dirs[0]));
@@ -191,6 +217,7 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RejectsSourceWithoutDotSlashPrefix()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -202,8 +229,10 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var bareSkills = Path.Combine(_testDir, "bare-plugin", "skills");
         var validSkills = Path.Combine(_testDir, "valid-plugin", "skills");
 
@@ -214,6 +243,7 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RejectsPluginRootWithoutDotSlashPrefix()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -225,14 +255,17 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Empty(dirs);
     }
 
     [Fact]
     public async Task RejectsSkillPathWithoutDotSlashPrefix()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/plugin.json",
             """
@@ -241,8 +274,10 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var validParent = Path.Combine(_testDir, "valid-loc");
         var invalidParent = Path.Combine(_testDir, "invalid-loc");
 
@@ -253,6 +288,7 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task RootLevelPlugin_WithoutSource_AddsConventionalDir()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/marketplace.json",
             """
@@ -263,8 +299,10 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var expected = Path.Combine(_testDir, "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));
     }
@@ -272,6 +310,7 @@ public class PluginManifestTests : IDisposable
     [Fact]
     public async Task PluginJson_WithoutSkillsField_StillAddsConventionalDir()
     {
+        // Arrange
         WriteManifest(
             ".claude-plugin/plugin.json",
             """
@@ -280,8 +319,10 @@ public class PluginManifestTests : IDisposable
             }
             """);
 
+        // Act
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
+        // Assert
         var expected = Path.Combine(_testDir, "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));
     }

@@ -8,6 +8,7 @@ public class ProgramTests
     [Fact]
     public void StripBareTerminators_Removes_Terminator_Between_Options_And_Positionals()
     {
+        // Act & Assert
         Assert.Equal(
             ["add", "--agent", "codex", "owner/repo"],
             Program.StripBareTerminators(["add", "--agent", "codex", "--", "owner/repo"]));
@@ -16,6 +17,7 @@ public class ProgramTests
     [Fact]
     public void StripBareTerminators_Removes_Terminator_Before_OptionLike_Value()
     {
+        // Act & Assert
         Assert.Equal(
             ["add", "--upload-pack=sh"],
             Program.StripBareTerminators(["add", "--", "--upload-pack=sh"]));
@@ -24,6 +26,7 @@ public class ProgramTests
     [Fact]
     public void StripBareTerminators_Removes_Multiple_Terminators()
     {
+        // Act & Assert
         Assert.Equal(
             ["add", "owner/repo"],
             Program.StripBareTerminators(["--", "add", "--", "owner/repo", "--"]));

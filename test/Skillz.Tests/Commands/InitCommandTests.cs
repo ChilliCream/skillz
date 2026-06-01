@@ -38,12 +38,15 @@ public class InitCommandTests : IDisposable
     [Fact]
     public async Task Init_Without_Name_Creates_SkillMd_In_Cwd()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var cmd = services.GetRequiredService<InitCommand>();
 
+        // Act
         var parseResult = cmd.Parse(Array.Empty<string>());
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         Assert.True(File.Exists(Path.Combine(_workspace, "SKILL.md")));
         var content = await File.ReadAllTextAsync(
@@ -56,12 +59,15 @@ public class InitCommandTests : IDisposable
     [Fact]
     public async Task Init_With_Name_Creates_Subdirectory_With_SkillMd()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider();
         var cmd = services.GetRequiredService<InitCommand>();
 
+        // Act
         var parseResult = cmd.Parse(["my-skill"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         var expected = Path.Combine(_workspace, "my-skill", "SKILL.md");
         Assert.True(File.Exists(expected));
@@ -72,15 +78,18 @@ public class InitCommandTests : IDisposable
     [Fact]
     public async Task Init_When_SkillMd_Exists_Leaves_File_Unchanged()
     {
+        // Arrange
         var existing = Path.Combine(_workspace, "SKILL.md");
         await File.WriteAllTextAsync(existing, "existing content", TestContext.Current.CancellationToken);
 
         var services = CliTestHelper.CreateServiceProvider();
         var cmd = services.GetRequiredService<InitCommand>();
 
+        // Act
         var parseResult = cmd.Parse(Array.Empty<string>());
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.Equal(0, exitCode);
         var content = await File.ReadAllTextAsync(existing, TestContext.Current.CancellationToken);
         Assert.Equal("existing content", content);
