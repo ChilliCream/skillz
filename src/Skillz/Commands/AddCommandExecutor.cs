@@ -109,7 +109,7 @@ internal sealed class AddCommandExecutor(
             && detection.Name is { } name
             && detector.GetAgentType(name) is { } mapped)
         {
-            agents = EnsureUniversalAgents([mapped]);
+            agents = WithUniversalAgents([mapped]);
         }
 
         interaction.WriteMarkupLine(
@@ -218,6 +218,7 @@ internal sealed class AddCommandExecutor(
         {
             installMode = await prompter.SelectInstallModeAsync(cancellationToken);
         }
+        // else: non-interactive, multiple distinct skills dirs → keep the symlink default.
 
         var overwriteTargets = GetOverwriteTargets(selectedSkills, installGlobally);
 
@@ -254,31 +255,46 @@ internal sealed class AddCommandExecutor(
         if (successful.Length > 0)
         {
             await UpdateLocksAsync(parsed, successful, installGlobally, cancellationToken);
+        }
 
-            RenderInstallationSummary(targetAgents, successful, existingSkills, installGlobally);
+        RenderInstallationReport(targetAgents, successful, failed, existingSkills, installGlobally, installMode);
+
+        return failed.Length > 0
+            ? new CommandResult.Failure(ExitCodeConstants.Failure)
+            : new CommandResult.Success();
+    }
+
+    private void RenderInstallationReport(
+        ImmutableArray<string> targetAgents,
+        ImmutableArray<InstallEntry> successful,
+        ImmutableArray<InstallEntry> failed,
+        HashSet<string> existingSkills,
+        bool installGlobally,
+        InstallMode installMode)
+    {
+        if (successful.Length > 0)
+        {
+            RenderSuccessPanels(targetAgents, successful, existingSkills, installGlobally, installMode);
         }
 
         if (failed.Length > 0)
         {
-            var detail = failed
-                .Select(r => $"{r.SkillName} → {r.AgentType}: {r.Result.Error}")
-                .Join(Environment.NewLine);
-            throw new CliException(ExitCodeConstants.Failure, detail, title: "Installation failed");
+            RenderFailurePanel(failed);
         }
-
-        return new CommandResult.Success();
     }
 
-    private void RenderInstallationSummary(
+    private void RenderSuccessPanels(
         ImmutableArray<string> targetAgents,
         ImmutableArray<InstallEntry> successful,
         HashSet<string> existingSkills,
-        bool installGlobally)
+        bool installGlobally,
+        InstallMode installMode)
     {
         var skillNames = successful.Select(r => r.SkillName).Distinct(StringComparer.Ordinal).ToImmutableArray();
         var universals = targetAgents.Where(registry.IsUniversalAgent).ToList();
-        var symlinked = targetAgents.Where(a => !registry.IsUniversalAgent(a)).ToList();
+        var linked = targetAgents.Where(a => !registry.IsUniversalAgent(a)).ToList();
         var overwrites = skillNames.Where(existingSkills.Contains).ToList();
+        var linkedLabel = installMode == InstallMode.Copy ? "Copied:" : "Symlinked:";
 
         var canonical =
             skillNames.Length == 1
@@ -292,14 +308,14 @@ internal sealed class AddCommandExecutor(
             summary.AppendLine(
                 $"[bold]Universal:[/]  {Markup.Escape(universals.Select(GetAgentDisplay).Join(", "))}");
         }
-        if (symlinked.Count > 0)
+        if (linked.Count > 0)
         {
             summary.AppendLine(
-                $"[bold]Symlinked:[/]  {Markup.Escape(symlinked.Select(GetAgentDisplay).Join(", "))}");
+                $"[bold]{linkedLabel}[/]  {Markup.Escape(linked.Select(GetAgentDisplay).Join(", "))}");
         }
         if (overwrites.Count > 0)
         {
-            summary.Append($"[yellow]Overwrites:[/] {Markup.Escape(overwrites.Join(", "))}");
+            summary.AppendLine($"[yellow]Overwrites:[/] {Markup.Escape(overwrites.Join(", "))}");
         }
 
         interaction.WriteLine();
@@ -312,28 +328,41 @@ internal sealed class AddCommandExecutor(
         var installed = new StringBuilder();
         foreach (var skillName in skillNames)
         {
-            var paths = successful
+            var firstPath = successful
                 .Where(r => r.SkillName == skillName)
                 .Select(r => r.Result.Path)
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-            var firstPath = paths.FirstOrDefault() ?? string.Empty;
+                .FirstOrDefault(p => !string.IsNullOrEmpty(p)) ?? string.Empty;
             installed.AppendLine($"[green]✓[/] {Markup.Escape(skillName)}");
-            installed.Append($"  [dim]→ {Markup.Escape(firstPath)}[/]");
-            if (skillName != skillNames[^1])
-            {
-                installed.AppendLine();
-            }
+            installed.AppendLine($"  [dim]→ {Markup.Escape(firstPath)}[/]");
         }
 
         interaction.WriteRenderable(
-            new Panel(new Markup(installed.ToString()))
+            new Panel(new Markup(installed.ToString().TrimEnd()))
                 .Header($"[bold green]Installed {skillNames.Length} skill(s)[/]")
                 .BorderColor(Color.Green)
                 .Expand());
 
         interaction.WriteLine();
         interaction.WriteWarning("Done!  Review skills before use; they run with full agent permissions.");
+    }
+
+    private void RenderFailurePanel(ImmutableArray<InstallEntry> failed)
+    {
+        var details = new StringBuilder();
+        foreach (var entry in failed)
+        {
+            var error = string.IsNullOrEmpty(entry.Result.Error) ? "unknown error" : entry.Result.Error;
+            details.AppendLine(
+                $"[red]✗[/] {Markup.Escape(entry.SkillName)} → "
+                + $"{Markup.Escape(GetAgentDisplay(entry.AgentType))}: {Markup.Escape(error)}");
+        }
+
+        interaction.WriteLine();
+        interaction.WriteRenderable(
+            new Panel(new Markup(details.ToString().TrimEnd()))
+                .Header($"[bold red]Installation failed for {failed.Length} skill(s)[/]")
+                .BorderColor(Color.Red)
+                .Expand());
     }
 
     private ImmutableArray<OverwriteTarget> GetOverwriteTargets(
@@ -364,7 +393,11 @@ internal sealed class AddCommandExecutor(
         {
             return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
         }
-        catch
+        catch (Exception ex) when (
+            ex is IOException
+                or UnauthorizedAccessException
+                or ArgumentException
+                or NotSupportedException)
         {
             return false;
         }
@@ -379,15 +412,13 @@ internal sealed class AddCommandExecutor(
     private static ImmutableArray<string> MergeSkillFilters(ImmutableArray<string> existing, SkillSource parsed)
     {
         if (parsed is SkillSource.ISkillFilterable filterable
-            && !string.IsNullOrEmpty(filterable.SkillFilter))
+            && !string.IsNullOrEmpty(filterable.SkillFilter)
+            && !existing.Contains(filterable.SkillFilter, StringComparer.OrdinalIgnoreCase))
         {
-            if (!existing.Contains(filterable.SkillFilter, StringComparer.OrdinalIgnoreCase))
-            {
-                return [.. existing, filterable.SkillFilter];
-            }
+            return [.. existing, filterable.SkillFilter];
         }
 
-        return [.. existing];
+        return existing;
     }
 
     private void ListSkills(ImmutableArray<ResolvedSkill> skills)
@@ -409,7 +440,7 @@ internal sealed class AddCommandExecutor(
                 {
                     interaction.WriteLine();
                 }
-                interaction.WriteMarkupLine($"[bold]{Markup.Escape(TitleCase(pluginName))}[/]");
+                interaction.WriteMarkupLine($"[bold]{Markup.Escape(ToTitleCase(pluginName))}[/]");
             }
 
             foreach (var skill in group.OrderBy(s => s.InstallName, StringComparer.Ordinal))
@@ -425,7 +456,7 @@ internal sealed class AddCommandExecutor(
         interaction.WriteDim("Use --skill <name> to install specific skills");
     }
 
-    private static string TitleCase(string value)
+    private static string ToTitleCase(string value)
     {
         if (string.IsNullOrEmpty(value))
         {
@@ -482,8 +513,14 @@ internal sealed class AddCommandExecutor(
             var invalid = options.Agents.Where(a => !validAgents.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
-                interaction.WriteError($"Invalid agents: {invalid.Join(", ")}");
-                return ImmutableArray<string>.Empty;
+                // Sort the advisory list so the hint is deterministic and easy to scan; the
+                // registry's own order is hash-bucket order and not meaningful to the user.
+                var sortedValid = validAgents.OrderBy(a => a, StringComparer.Ordinal);
+                throw new CliException(
+                    ExitCodeConstants.Failure,
+                    $"Invalid agents: {invalid.Join(", ")}",
+                    title: "Invalid agents",
+                    hint: $"Valid agents: {sortedValid.Join(", ")}");
             }
 
             return options.Agents;
@@ -505,14 +542,14 @@ internal sealed class AddCommandExecutor(
         // One installed OR non-interactive → no prompt
         if (installed.Length == 1 || nonInteractive)
         {
-            return EnsureUniversalAgents(installed);
+            return WithUniversalAgents(installed);
         }
 
         // Multiple installed → prompt
         return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken);
     }
 
-    private ImmutableArray<string> EnsureUniversalAgents(IReadOnlyList<string> agents)
+    private ImmutableArray<string> WithUniversalAgents(IReadOnlyList<string> agents)
     {
         var universal = registry.UniversalAgents;
         var result = new List<string>(agents);
@@ -553,14 +590,34 @@ internal sealed class AddCommandExecutor(
         CancellationToken cancellationToken)
     {
         var results = ImmutableArray.CreateBuilder<InstallEntry>();
-        await interaction.StatusAsync("Installing skills...", async () => { foreach (var skill in selectedSkills)
+        await interaction.StatusAsync(
+            "Installing skills...",
+            async () =>
             {
-                foreach (var agentType in targetAgents)
+                foreach (var skill in selectedSkills)
                 {
-                    var result = await installer.InstallAsync(skill, agentType, installOptions, cancellationToken);
-                    results.Add(new InstallEntry(skill, agentType, result));
+                    foreach (var agentType in targetAgents)
+                    {
+                        InstallResult result;
+                        try
+                        {
+                            result = await installer.InstallAsync(skill, agentType, installOptions, cancellationToken);
+                        }
+                        catch (Exception ex) when (ex is not OperationCanceledException)
+                        {
+                            // A throwing installer must not unwind the whole command: record this
+                            // single skill/agent pair as a failure and keep installing the rest.
+                            result = new InstallResult(
+                                Success: false,
+                                Path: string.Empty,
+                                Mode: installOptions.Mode,
+                                Error: ex.Message);
+                        }
+
+                        results.Add(new InstallEntry(skill, agentType, result));
+                    }
                 }
-            } });
+            });
 
         return results.ToImmutable();
     }
@@ -588,6 +645,13 @@ internal sealed class AddCommandExecutor(
             var installPath = entry.Result.Path;
             if (installGlobally)
             {
+                // Global-lock entries are only recorded for owner/repo sources; URL-only
+                // installs are skipped here, so don't compute a hash we'd throw away.
+                if (string.IsNullOrEmpty(ownerRepo))
+                {
+                    continue;
+                }
+
                 var skillFolderHash = await ComputeHashSafeAsync(installPath, cancellationToken);
 
                 var lockEntry = new SkillLockEntry
@@ -601,13 +665,14 @@ internal sealed class AddCommandExecutor(
                     InstalledAt = now,
                     UpdatedAt = now
                 };
-                if (!string.IsNullOrEmpty(ownerRepo))
+                try
                 {
-                    try
-                    {
-                        await globalLock.AddEntryAsync(entry.Skill.InstallName, lockEntry, cancellationToken);
-                    }
-                    catch { }
+                    await globalLock.AddEntryAsync(entry.Skill.InstallName, lockEntry, cancellationToken);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    interaction.WriteWarning(
+                        $"Could not record lock entry for '{entry.Skill.InstallName}': {ex.Message}");
                 }
             }
             else
@@ -626,7 +691,11 @@ internal sealed class AddCommandExecutor(
                 {
                     await projectLock.AddEntryAsync(entry.Skill.InstallName, lockEntry, cwd: null, cancellationToken);
                 }
-                catch { }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    interaction.WriteWarning(
+                        $"Could not record lock entry for '{entry.Skill.InstallName}': {ex.Message}");
+                }
             }
         }
     }
@@ -659,7 +728,7 @@ internal sealed class AddCommandExecutor(
                 return await projectLock.ComputeSkillFolderHashAsync(path, cancellationToken);
             }
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Hash is advisory; on failure we fall back to an empty hash.
         }
