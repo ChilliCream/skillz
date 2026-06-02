@@ -3,11 +3,11 @@ using Xunit;
 
 namespace Skillz.Tests.Install;
 
-public class AgentEnvironmentDetectorTests
+public class AgentEnvironmentTests
 {
     private const string Home = "/home/test";
 
-    private static (AgentEnvironmentDetector detector, AgentRegistry registry) Create(
+    private static (AgentEnvironment detector, AgentRegistry registry) Create(
         Dictionary<string, string?>? env = null,
         HashSet<string>? existingDirs = null,
         string? cwd = null)
@@ -17,7 +17,7 @@ public class AgentEnvironmentDetectorTests
         var cwdValue = cwd ?? "/workspace";
 
         var registry = new AgentRegistry(Home, name => env.GetValueOrDefault(name), existingDirs.Contains);
-        var detector = new AgentEnvironmentDetector(
+        var detector = new AgentEnvironment(
             registry,
             Home,
             name => env.GetValueOrDefault(name),
@@ -27,44 +27,44 @@ public class AgentEnvironmentDetectorTests
     }
 
     [Fact]
-    public void GetAgentType_KnownName_ReturnsType()
+    public void FindAgentType_KnownName_ReturnsType()
     {
         // Arrange
         var (detector, _) = Create();
 
         // Act & Assert
-        Assert.Equal("cursor", detector.GetAgentType("cursor"));
-        Assert.Equal("cursor", detector.GetAgentType("cursor-cli"));
-        Assert.Equal("claude-code", detector.GetAgentType("claude"));
-        Assert.Equal("claude-code", detector.GetAgentType("cowork"));
-        Assert.Equal("universal", detector.GetAgentType("devin"));
-        Assert.Equal("replit", detector.GetAgentType("replit"));
-        Assert.Equal("gemini-cli", detector.GetAgentType("gemini"));
-        Assert.Equal("codex", detector.GetAgentType("codex"));
-        Assert.Equal("antigravity", detector.GetAgentType("antigravity"));
-        Assert.Equal("augment", detector.GetAgentType("augment-cli"));
-        Assert.Equal("opencode", detector.GetAgentType("opencode"));
-        Assert.Equal("github-copilot", detector.GetAgentType("github-copilot"));
+        Assert.Equal("cursor", detector.FindAgentType("cursor"));
+        Assert.Equal("cursor", detector.FindAgentType("cursor-cli"));
+        Assert.Equal("claude-code", detector.FindAgentType("claude"));
+        Assert.Equal("claude-code", detector.FindAgentType("cowork"));
+        Assert.Equal("universal", detector.FindAgentType("devin"));
+        Assert.Equal("replit", detector.FindAgentType("replit"));
+        Assert.Equal("gemini-cli", detector.FindAgentType("gemini"));
+        Assert.Equal("codex", detector.FindAgentType("codex"));
+        Assert.Equal("antigravity", detector.FindAgentType("antigravity"));
+        Assert.Equal("augment", detector.FindAgentType("augment-cli"));
+        Assert.Equal("opencode", detector.FindAgentType("opencode"));
+        Assert.Equal("github-copilot", detector.FindAgentType("github-copilot"));
     }
 
     [Fact]
-    public void GetAgentType_UnknownName_ReturnsNull()
+    public void FindAgentType_UnknownName_ReturnsNull()
     {
         // Arrange
         var (detector, _) = Create();
 
         // Act & Assert
-        Assert.Null(detector.GetAgentType("unknown-agent"));
+        Assert.Null(detector.FindAgentType("unknown-agent"));
     }
 
     [Fact]
-    public void DetectAgent_NoEnv_ReturnsNotAgent()
+    public void CurrentAgent_NoEnv_ReturnsNotAgent()
     {
         // Arrange
         var (detector, _) = Create();
 
         // Act
-        var result = detector.DetectAgent;
+        var result = detector.CurrentAgent;
 
         // Assert
         Assert.False(result.IsAgent);
@@ -72,14 +72,14 @@ public class AgentEnvironmentDetectorTests
     }
 
     [Fact]
-    public void DetectAgent_CursorEnv_ReturnsCursor()
+    public void CurrentAgent_CursorEnv_ReturnsCursor()
     {
         // Arrange
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CURSOR_TRACE_ID"] = "abc123" };
         var (detector, _) = Create(env);
 
         // Act
-        var result = detector.DetectAgent;
+        var result = detector.CurrentAgent;
 
         // Assert
         Assert.True(result.IsAgent);
@@ -87,14 +87,14 @@ public class AgentEnvironmentDetectorTests
     }
 
     [Fact]
-    public void DetectAgent_ClaudeCodeEnv_ReturnsClaude()
+    public void CurrentAgent_ClaudeCodeEnv_ReturnsClaude()
     {
         // Arrange
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CLAUDECODE"] = "1" };
         var (detector, _) = Create(env);
 
         // Act
-        var result = detector.DetectAgent;
+        var result = detector.CurrentAgent;
 
         // Assert
         Assert.True(result.IsAgent);
@@ -102,168 +102,168 @@ public class AgentEnvironmentDetectorTests
     }
 
     [Fact]
-    public void DetectAgent_CachesResult()
+    public void CurrentAgent_CachesResult()
     {
         // Arrange
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CURSOR_AGENT"] = "1" };
         var (detector, _) = Create(env);
 
         // Act
-        var first = detector.DetectAgent;
-        var second = detector.DetectAgent;
+        var first = detector.CurrentAgent;
+        var second = detector.CurrentAgent;
 
         // Assert
         Assert.Same(first, second);
     }
 
     [Fact]
-    public void DetectAgent_IsAgent_TrueWhenAgentDetected()
+    public void CurrentAgent_IsAgent_TrueWhenAgentDetected()
     {
         // Arrange
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["REPL_ID"] = "id" };
         var (detector, _) = Create(env);
 
         // Act & Assert
-        Assert.True(detector.DetectAgent.IsAgent);
+        Assert.True(detector.CurrentAgent.IsAgent);
     }
 
     [Fact]
-    public void DetectAgent_IsAgent_FalseWhenNoAgent()
+    public void CurrentAgent_IsAgent_FalseWhenNoAgent()
     {
         // Arrange
         var (detector, _) = Create();
 
         // Act & Assert
-        Assert.False(detector.DetectAgent.IsAgent);
+        Assert.False(detector.CurrentAgent.IsAgent);
     }
 
     [Fact]
-    public void DetectAgent_Name_ReturnsNullWhenNotInAgent()
+    public void CurrentAgent_Name_ReturnsNullWhenNotInAgent()
     {
         // Arrange
         var (detector, _) = Create();
 
         // Act & Assert
-        Assert.Null(detector.DetectAgent.Name);
+        Assert.Null(detector.CurrentAgent.Name);
     }
 
     [Fact]
-    public void DetectAgent_Name_ReturnsNameWhenInAgent()
+    public void CurrentAgent_Name_ReturnsNameWhenInAgent()
     {
         // Arrange
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["OPENCODE_CLIENT"] = "1" };
         var (detector, _) = Create(env);
 
         // Act & Assert
-        Assert.Equal("opencode", detector.DetectAgent.Name);
+        Assert.Equal("opencode", detector.CurrentAgent.Name);
     }
 
     [Fact]
-    public void DetectInstalledAgents_NoDirs_ReturnsEmpty()
+    public void InstalledAgents_NoDirs_ReturnsEmpty()
     {
         // Arrange
         var (detector, _) = Create();
 
         // Act
-        var installed = detector.DetectInstalledAgents();
+        var installed = detector.InstalledAgents;
 
         // Assert
         Assert.Empty(installed);
     }
 
     [Fact]
-    public void DetectInstalledAgents_DetectsClaudeCode()
+    public void InstalledAgents_DetectsClaudeCode()
     {
         // Arrange
         var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".claude") };
         var (detector, _) = Create(existingDirs: existing);
 
         // Act
-        var installed = detector.DetectInstalledAgents();
+        var installed = detector.InstalledAgents;
 
         // Assert
         Assert.Contains("claude-code", installed);
     }
 
     [Fact]
-    public void DetectInstalledAgents_DetectsCursor()
+    public void InstalledAgents_DetectsCursor()
     {
         // Arrange
         var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".cursor") };
         var (detector, _) = Create(existingDirs: existing);
 
         // Act
-        var installed = detector.DetectInstalledAgents();
+        var installed = detector.InstalledAgents;
 
         // Assert
         Assert.Contains("cursor", installed);
     }
 
     [Fact]
-    public void DetectInstalledAgents_OpenClaw_DetectsViaAnyLegacyDir()
+    public void InstalledAgents_OpenClaw_DetectsViaAnyLegacyDir()
     {
         // Arrange
         var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".clawdbot") };
         var (detector, _) = Create(existingDirs: existing);
 
         // Act
-        var installed = detector.DetectInstalledAgents();
+        var installed = detector.InstalledAgents;
 
         // Assert
         Assert.Contains("openclaw", installed);
     }
 
     [Fact]
-    public void DetectInstalledAgents_Replit_DetectsViaCwd()
+    public void InstalledAgents_Replit_DetectsViaCwd()
     {
         // Arrange
         var existing = new HashSet<string>(StringComparer.Ordinal) { "/my-project/.replit" };
         var (detector, _) = Create(existingDirs: existing, cwd: "/my-project");
 
         // Act
-        var installed = detector.DetectInstalledAgents();
+        var installed = detector.InstalledAgents;
 
         // Assert
         Assert.Contains("replit", installed);
     }
 
     [Fact]
-    public void DetectInstalledAgents_Codex_DetectsViaCodexHome()
+    public void InstalledAgents_Codex_DetectsViaCodexHome()
     {
         // Arrange
         var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".codex") };
         var (detector, _) = Create(existingDirs: existing);
 
         // Act
-        var installed = detector.DetectInstalledAgents();
+        var installed = detector.InstalledAgents;
 
         // Assert
         Assert.Contains("codex", installed);
     }
 
     [Fact]
-    public void DetectInstalledAgents_Codex_DetectsViaEtcCodex()
+    public void InstalledAgents_Codex_DetectsViaEtcCodex()
     {
         // Arrange
         var existing = new HashSet<string>(StringComparer.Ordinal) { "/etc/codex" };
         var (detector, _) = Create(existingDirs: existing);
 
         // Act
-        var installed = detector.DetectInstalledAgents();
+        var installed = detector.InstalledAgents;
 
         // Assert
         Assert.Contains("codex", installed);
     }
 
     [Fact]
-    public void DetectInstalledAgents_Universal_NeverDetected()
+    public void InstalledAgents_Universal_NeverDetected()
     {
         // Arrange
         var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine(Home, ".agents", "skills") };
         var (detector, _) = Create(existingDirs: existing);
 
         // Act
-        var installed = detector.DetectInstalledAgents();
+        var installed = detector.InstalledAgents;
 
         // Assert
         Assert.DoesNotContain("universal", installed);

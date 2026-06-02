@@ -6,7 +6,7 @@ namespace Skillz.Interaction;
 internal sealed class BannerService(
     IInteractionService interaction,
     CliExecutionContext context,
-    IAgentEnvironmentDetector detector)
+    AgentEnvironment agentEnvironment)
 {
     private static readonly string[] s_logoLines =
     {
@@ -113,6 +113,6 @@ internal sealed class BannerService(
             return true;
         }
 
-        return detector.DetectAgent.IsAgent;
+        return agentEnvironment.CurrentAgent.IsAgent;
     }
 }

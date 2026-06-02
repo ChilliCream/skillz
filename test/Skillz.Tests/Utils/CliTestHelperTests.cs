@@ -36,7 +36,7 @@ public class CliTestHelperTests
         Assert.IsType<TestGitClient>(provider.GetRequiredService<IGitClient>());
         Assert.IsType<TestBlobClient>(provider.GetRequiredService<IBlobClient>());
         Assert.IsType<TestGitHubTokenProvider>(provider.GetRequiredService<IGitHubTokenProvider>());
-        Assert.IsType<TestAgentEnvironmentDetector>(provider.GetRequiredService<IAgentEnvironmentDetector>());
+        Assert.IsType<AgentEnvironment>(provider.GetRequiredService<AgentEnvironment>());
         Assert.IsType<TestInstaller>(provider.GetRequiredService<ISkillInstaller>());
         Assert.IsType<TestSkillDiscovery>(provider.GetRequiredService<ISkillDiscovery>());
         Assert.IsType<TestSourceParser>(provider.GetRequiredService<ISourceParser>());

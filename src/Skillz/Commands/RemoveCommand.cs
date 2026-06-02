@@ -14,7 +14,7 @@ internal sealed class RemoveCommand(
     IRemoveCommandPrompter prompter,
     IProjectLockFile projectLock,
     IGlobalLockFile globalLock,
-    IAgentEnvironmentDetector detector,
+    AgentEnvironment agentEnvironment,
     ConsoleEnvironment consoleEnvironment) : BaseCommand("remove", "Remove installed skills")
 {
     private readonly Argument<string[]> _skillsArgument = new("skills")
@@ -87,7 +87,7 @@ internal sealed class RemoveCommand(
             yes
             || all
             || consoleEnvironment.IsInputRedirected
-            || detector.DetectAgent.IsAgent;
+            || agentEnvironment.CurrentAgent.IsAgent;
 
         ImmutableArray<string> selected;
         if (all)

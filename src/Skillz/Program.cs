@@ -56,7 +56,7 @@ internal static class Program
         builder.Services.AddSingleton<IBlobClient, BlobClient>();
 
         builder.Services.AddSingleton<AgentRegistry>();
-        builder.Services.AddSingleton<IAgentEnvironmentDetector, AgentEnvironmentDetector>();
+        builder.Services.AddSingleton<AgentEnvironment>();
         builder.Services.AddSingleton<XdgPaths>();
         builder.Services.AddSingleton<ISkillInstaller, SkillInstaller>();
 

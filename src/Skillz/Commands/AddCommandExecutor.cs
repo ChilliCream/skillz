@@ -17,7 +17,7 @@ internal sealed class AddCommandExecutor(
     ISkillInstaller installer,
     IInteractionService interaction,
     AgentRegistry registry,
-    IAgentEnvironmentDetector detector,
+    AgentEnvironment agentEnvironment,
     IProjectLockFile projectLock,
     IGlobalLockFile globalLock,
     IAddCommandPrompter prompter,
@@ -96,7 +96,7 @@ internal sealed class AddCommandExecutor(
     // (plus the universal agents) and skip every prompt, since an agent can't answer them.
     private AddCommandOptions ApplyAgentContext(AddCommandOptions options)
     {
-        var detection = detector.DetectAgent;
+        var detection = agentEnvironment.CurrentAgent;
 
         if (!detection.IsAgent)
         {
@@ -107,7 +107,7 @@ internal sealed class AddCommandExecutor(
 
         if (agents.Length == 0
             && detection.Name is { } name
-            && detector.GetAgentType(name) is { } mapped)
+            && agentEnvironment.FindAgentType(name) is { } mapped)
         {
             agents = WithUniversalAgents([mapped]);
         }
@@ -514,7 +514,7 @@ internal sealed class AddCommandExecutor(
             return options.Agents;
         }
 
-        var installed = detector.DetectInstalledAgents();
+        var installed = agentEnvironment.InstalledAgents;
 
         // Zero installed
         if (installed.Length == 0)

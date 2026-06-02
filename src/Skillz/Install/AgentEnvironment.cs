@@ -2,12 +2,12 @@ using System.Collections.Immutable;
 
 namespace Skillz.Install;
 
-internal sealed class AgentEnvironmentDetector(
+internal sealed class AgentEnvironment(
     AgentRegistry registry,
     string home,
     Func<string, string?> envReader,
     Func<string, bool> directoryExists,
-    Func<string> cwdProvider) : IAgentEnvironmentDetector
+    Func<string> cwdProvider)
 {
     private static readonly ImmutableDictionary<string, string> s_agentNameToType = new Dictionary<string, string>(
         StringComparer.Ordinal)
@@ -26,7 +26,7 @@ internal sealed class AgentEnvironmentDetector(
         ["github-copilot"] = "github-copilot"
     }.ToImmutableDictionary(StringComparer.Ordinal);
 
-    public AgentEnvironmentDetector(AgentRegistry registry)
+    public AgentEnvironment(AgentRegistry registry)
         : this(
             registry,
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
@@ -34,28 +34,36 @@ internal sealed class AgentEnvironmentDetector(
             Directory.Exists,
             Directory.GetCurrentDirectory) { }
 
-    public AgentDetectionResult DetectAgent =>
+    public AgentDetectionResult CurrentAgent =>
         field ??= DetectAgentNameFromEnvironment() is { } name
             ? new AgentDetectionResult(true, name)
             : new AgentDetectionResult(false, null);
 
-    public string? GetAgentType(string agentName)
+    public string? FindAgentType(string agentName)
     {
         return s_agentNameToType.GetValueOrDefault(agentName);
     }
 
-    public ImmutableArray<string> DetectInstalledAgents()
+    public ImmutableArray<string> InstalledAgents
     {
-        var installed = new List<string>();
-        foreach (var (type, _) in registry.All)
+        get
         {
-            if (IsInstalled(type))
+            if (field.IsDefault)
             {
-                installed.Add(type);
-            }
-        }
+                var installed = new List<string>();
+                foreach (var (type, _) in registry.All)
+                {
+                    if (IsInstalled(type))
+                    {
+                        installed.Add(type);
+                    }
+                }
 
-        return [.. installed];
+                field = [.. installed];
+            }
+
+            return field;
+        }
     }
 
     private bool IsInstalled(string agentType)
@@ -241,7 +249,7 @@ internal sealed class AgentEnvironmentDetector(
             }
         }
 
-        // Return raw value — GetAgentType will handle mapping or null
+        // Return raw value — FindAgentType will handle mapping or null
         return value;
     }
 
@@ -256,3 +264,5 @@ internal sealed class AgentEnvironmentDetector(
         return value.Trim();
     }
 }
+
+internal sealed record AgentDetectionResult(bool IsAgent, string? Name);

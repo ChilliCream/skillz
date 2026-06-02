@@ -55,7 +55,6 @@ public class AddCommandTests : IDisposable
         Action<TestSourceParser>? configureParser = null,
         Action<TestSkillDiscovery>? configureDiscovery = null,
         Action<TestAddCommandPrompter>? configurePrompter = null,
-        Action<TestAgentEnvironmentDetector>? configureDetector = null,
         Action<TestInstaller>? configureInstaller = null,
         Action<TestProjectLockFile>? configureProjectLock = null,
         Action<TestGlobalLockFile>? configureGlobalLock = null)
@@ -65,7 +64,6 @@ public class AddCommandTests : IDisposable
         configureParser?.Invoke(services.GetRequiredService<TestSourceParser>());
         configureDiscovery?.Invoke(services.GetRequiredService<TestSkillDiscovery>());
         configurePrompter?.Invoke(services.GetRequiredService<TestAddCommandPrompter>());
-        configureDetector?.Invoke(services.GetRequiredService<TestAgentEnvironmentDetector>());
         configureInstaller?.Invoke(services.GetRequiredService<TestInstaller>());
         configureProjectLock?.Invoke(services.GetRequiredService<TestProjectLockFile>());
         configureGlobalLock?.Invoke(services.GetRequiredService<TestGlobalLockFile>());

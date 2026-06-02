@@ -39,8 +39,11 @@ internal static class CliTestHelper
 
         services.AddSingleton<AgentRegistry>();
 
-        services.AddSingleton<TestAgentEnvironmentDetector>();
-        services.AddSingleton<IAgentEnvironmentDetector>(sp => sp.GetRequiredService<TestAgentEnvironmentDetector>());
+        const string home = "/home/test";
+        const string cwd = "/workspace";
+        services.AddSingleton(new AgentEnvironment(
+            new AgentRegistry(home, _ => null, _ => false),
+            home, _ => null, _ => false, () => cwd));
 
         services.AddSingleton<TestInstaller>();
         services.AddSingleton<ISkillInstaller>(sp => sp.GetRequiredService<TestInstaller>());
