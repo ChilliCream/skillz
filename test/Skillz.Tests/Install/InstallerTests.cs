@@ -20,8 +20,9 @@ public class InstallerTests : IDisposable
         Directory.CreateDirectory(_projectDir);
         Directory.CreateDirectory(_home);
 
-        var registry = new AgentRegistry(new FakeSystemEnvironment { HomeDirectory = _home });
-        _installer = new SkillInstaller(registry, _home);
+        var system = new FakeSystemEnvironment { HomeDirectory = _home, CurrentDirectory = _projectDir };
+        var registry = new AgentRegistry(system);
+        _installer = new SkillInstaller(registry, system);
     }
 
     public void Dispose()

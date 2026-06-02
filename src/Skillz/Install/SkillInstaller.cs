@@ -3,7 +3,7 @@ using Skillz.Skills;
 
 namespace Skillz.Install;
 
-internal sealed class SkillInstaller(AgentRegistry registry, string home) : ISkillInstaller
+internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment system) : ISkillInstaller
 {
     private static readonly HashSet<string> s_excludeFiles = new(StringComparer.Ordinal) { "metadata.json" };
 
@@ -15,12 +15,9 @@ internal sealed class SkillInstaller(AgentRegistry registry, string home) : ISki
         "__pypackages__"
     };
 
-    public SkillInstaller(AgentRegistry registry)
-        : this(registry, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)) { }
-
     public string GetCanonicalSkillsDir(bool global, string? cwd = null)
     {
-        var baseDir = global ? home : cwd ?? Directory.GetCurrentDirectory();
+        var baseDir = global ? system.HomeDirectory : cwd ?? system.CurrentDirectory;
         return Path.Combine(baseDir, KnownConfigNames.AgentsDir, KnownConfigNames.SkillsSubdir);
     }
 
@@ -32,7 +29,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, string home) : ISki
         }
 
         var config = registry.GetConfig(agentType);
-        var baseDir = global ? home : cwd ?? Directory.GetCurrentDirectory();
+        var baseDir = global ? system.HomeDirectory : cwd ?? system.CurrentDirectory;
 
         if (global)
         {
@@ -83,7 +80,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, string home) : ISki
     {
         var config = registry.GetConfig(agentType);
         var isGlobal = options.Global;
-        var cwd = options.Cwd ?? Directory.GetCurrentDirectory();
+        var cwd = options.Cwd ?? system.CurrentDirectory;
         var installMode = options.Mode;
 
         if (isGlobal && config.GlobalSkillsDir is null)
