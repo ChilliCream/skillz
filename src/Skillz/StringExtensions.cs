@@ -42,4 +42,20 @@ internal static class StringExtensions
     /// </summary>
     public static string Join(this IEnumerable<string> values, string separator)
         => string.Join(separator, values);
+
+    /// <summary>
+    /// Produces a title-cased copy of <paramref name="value"/>: splits on <c>-</c>, <c>_</c>, and
+    /// space, upper-cases the first character of each word, and rejoins with single spaces. Returns
+    /// the input unchanged when it is null or empty.
+    /// </summary>
+    public static string ToTitleCase(this string value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return value;
+        }
+
+        var parts = value.Split(['-', '_', ' '], StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', parts.Select(p => char.ToUpperInvariant(p[0]) + p[1..]));
+    }
 }

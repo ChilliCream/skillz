@@ -439,7 +439,7 @@ internal sealed class AddCommandExecutor(
                 {
                     interaction.WriteLine();
                 }
-                interaction.WriteMarkupLine($"[bold]{Markup.Escape(ToTitleCase(pluginName))}[/]");
+                interaction.WriteMarkupLine($"[bold]{Markup.Escape(pluginName.ToTitleCase())}[/]");
             }
 
             foreach (var skill in group.OrderBy(s => s.InstallName, StringComparer.Ordinal))
@@ -453,17 +453,6 @@ internal sealed class AddCommandExecutor(
 
         interaction.WriteLine();
         interaction.WriteDim("Use --skill <name> to install specific skills");
-    }
-
-    private static string ToTitleCase(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-        {
-            return value;
-        }
-
-        var parts = value.Split(['-', '_', ' '], StringSplitOptions.RemoveEmptyEntries);
-        return string.Join(' ', parts.Select(p => char.ToUpperInvariant(p[0]) + p[1..]));
     }
 
     private async Task<ImmutableArray<ResolvedSkill>> SelectSkillsAsync(
