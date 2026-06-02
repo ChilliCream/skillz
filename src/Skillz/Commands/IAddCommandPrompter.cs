@@ -6,8 +6,8 @@ namespace Skillz.Commands;
 
 internal interface IAddCommandPrompter
 {
-    Task<ImmutableArray<RemoteSkill>> SelectSkillsAsync(
-        ImmutableArray<RemoteSkill> skills,
+    Task<ImmutableArray<ResolvedSkill>> SelectSkillsAsync(
+        ImmutableArray<ResolvedSkill> skills,
         CancellationToken cancellationToken);
 
     Task<ImmutableArray<string>> SelectAgentsAsync(
@@ -20,7 +20,7 @@ internal interface IAddCommandPrompter
     Task<InstallMode> SelectInstallModeAsync(CancellationToken cancellationToken);
 
     Task<bool> ConfirmInstallationAsync(
-        ImmutableArray<RemoteSkill> skills,
+        ImmutableArray<ResolvedSkill> skills,
         ImmutableArray<string> agents,
         ImmutableArray<OverwriteTarget> overwrites,
         CancellationToken cancellationToken);

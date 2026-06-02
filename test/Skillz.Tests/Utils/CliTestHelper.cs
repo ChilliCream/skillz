@@ -3,7 +3,7 @@ using Skillz.Commands;
 using Skillz.Git;
 using Skillz.Install;
 using Skillz.Interaction;
-using Skillz.Lock;
+using Skillz.Locking;
 using Skillz.Net;
 using Skillz.Plugins;
 using Skillz.Skills;
@@ -37,13 +37,13 @@ internal static class CliTestHelper
         services.AddSingleton<TestGitHubTokenProvider>();
         services.AddSingleton<IGitHubTokenProvider>(sp => sp.GetRequiredService<TestGitHubTokenProvider>());
 
-        services.AddSingleton<IAgentRegistry, AgentRegistry>();
+        services.AddSingleton<AgentRegistry>();
 
         services.AddSingleton<TestAgentEnvironmentDetector>();
         services.AddSingleton<IAgentEnvironmentDetector>(sp => sp.GetRequiredService<TestAgentEnvironmentDetector>());
 
         services.AddSingleton<TestInstaller>();
-        services.AddSingleton<IInstaller>(sp => sp.GetRequiredService<TestInstaller>());
+        services.AddSingleton<ISkillInstaller>(sp => sp.GetRequiredService<TestInstaller>());
 
         services.AddSingleton<TestSkillDiscovery>();
         services.AddSingleton<ISkillDiscovery>(sp => sp.GetRequiredService<TestSkillDiscovery>());
@@ -78,7 +78,7 @@ internal static class CliTestHelper
             sp.GetRequiredService<IGitClient>(),
             sp.GetRequiredService<ISkillDiscovery>()));
         services.AddSingleton<IProvider>(sp => new LocalProvider(sp.GetRequiredService<ISkillDiscovery>()));
-        services.AddSingleton<IProviderRegistry, ProviderRegistry>();
+        services.AddSingleton<ProviderRegistry>();
 
         services.AddTransient<AddCommandExecutor>();
         services.AddTransient<AddCommand>();

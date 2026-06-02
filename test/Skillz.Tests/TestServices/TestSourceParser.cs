@@ -4,9 +4,9 @@ namespace Skillz.Tests.TestServices;
 
 internal sealed class TestSourceParser : ISourceParser
 {
-    public Func<string, ParsedSource>? OnParse { get; set; }
+    public Func<string, SkillSource>? OnParse { get; set; }
 
-    public ParsedSource Parse(string input)
+    public SkillSource Parse(string input)
     {
         if (OnParse is not null)
         {

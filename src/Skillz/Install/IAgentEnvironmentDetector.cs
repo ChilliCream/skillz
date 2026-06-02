@@ -4,15 +4,11 @@ namespace Skillz.Install;
 
 internal interface IAgentEnvironmentDetector
 {
-    Task<AgentDetectionResult> DetectAgentAsync(CancellationToken cancellationToken);
-
-    Task<bool> IsRunningInAgentAsync(CancellationToken cancellationToken);
-
-    Task<string?> GetAgentNameAsync(CancellationToken cancellationToken);
+    AgentDetectionResult DetectAgent { get; }
 
     string? GetAgentType(string agentName);
 
-    Task<ImmutableArray<string>> DetectInstalledAgentsAsync(CancellationToken cancellationToken);
+    ImmutableArray<string> DetectInstalledAgents();
 }
 
 internal sealed record AgentDetectionResult(bool IsAgent, string? Name);

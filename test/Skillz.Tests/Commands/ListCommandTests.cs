@@ -72,7 +72,7 @@ public class ListCommandTests : IDisposable
     {
         // Arrange
         var services = CliTestHelper.CreateServiceProvider();
-        var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
+        var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
         // Act
@@ -96,7 +96,7 @@ public class ListCommandTests : IDisposable
         CreateSkill(canonical, "beta");
 
         var services = CliTestHelper.CreateServiceProvider();
-        var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
+        var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
         // Act
@@ -107,7 +107,7 @@ public class ListCommandTests : IDisposable
         // Assert
         Assert.Equal(0, exitCode);
         var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
-        var output = string.Join("\n", interaction.Output);
+        var output = interaction.OutputText;
         Assert.Contains("alpha", output);
         Assert.Contains("beta", output);
     }
@@ -121,7 +121,7 @@ public class ListCommandTests : IDisposable
         CreateSkill(canonical, "alpha");
 
         var services = CliTestHelper.CreateServiceProvider();
-        var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
+        var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
         // Act

@@ -11,7 +11,7 @@ internal sealed class StubHttpMessageHandler : HttpMessageHandler
     private readonly Dictionary<string, Func<HttpRequestMessage, HttpResponseMessage>> _routes = new(
         StringComparer.Ordinal);
 
-    public List<HttpRequestMessage> Requests { get; } = new();
+    public List<HttpRequestMessage> Requests { get; } = [];
 
     public int CallCount => Requests.Count;
 

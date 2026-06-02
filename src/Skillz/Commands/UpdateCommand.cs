@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 using System.CommandLine;
 using Skillz.Install;
 using Skillz.Interaction;
-using Skillz.Lock;
+using Skillz.Locking;
 using Skillz.Net;
 using Skillz.Skills;
 using Spectre.Console;

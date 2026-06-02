@@ -9,8 +9,8 @@ using Spectre.Console;
 namespace Skillz.Commands;
 
 internal sealed class ListCommand(
-    IInstaller installer,
-    IAgentRegistry registry,
+    ISkillInstaller installer,
+    AgentRegistry registry,
     IInteractionService interaction,
     CliExecutionContext executionContext) : BaseCommand("list", "List installed skills")
 {
@@ -57,7 +57,7 @@ internal sealed class ListCommand(
 
         if (agents.Length > 0)
         {
-            var valid = registry.ListAgentTypes();
+            var valid = registry.AgentTypes;
             var invalid = agents.Where(a => !valid.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
@@ -67,9 +67,15 @@ internal sealed class ListCommand(
         }
 
         var cwd = Directory.GetCurrentDirectory();
-        ImmutableArray<string> agentFilter = agents.Length > 0 ? [.. agents] : registry.ListAgentTypes();
+        ImmutableArray<string> agentFilter = agents.Length > 0 ? [.. agents] : registry.AgentTypes;
 
-        var skills = await CollectInstalledSkillsAsync(installer, registry, agentFilter, global, cwd, cancellationToken);
+        var skills = await CollectInstalledSkillsAsync(
+            installer,
+            registry,
+            agentFilter,
+            global,
+            cwd,
+            cancellationToken);
 
         if (jsonOutput)
         {
@@ -101,43 +107,45 @@ internal sealed class ListCommand(
         interaction.WriteMarkupLine($"[bold]{scopeLabel} Skills[/]");
         interaction.WriteLine();
 
+        var grid = new Grid();
+        grid.AddColumn(new GridColumn().PadRight(2));
+        grid.AddColumn(new GridColumn().PadRight(2));
+        grid.AddColumn(new GridColumn().PadRight(0));
+        grid.AddRow("[grey66]Skill[/]", "[grey66]Path[/]", "[grey66]Agents[/]");
+
         foreach (var skill in skills)
         {
             var agentNames = skill
                 .Agents.Select(a => registry.TryGetConfig(a, out var c) && c is not null ? c.DisplayName : a)
                 .ToList();
-            string agentDisplay;
+
+            string agentCell;
             if (agentNames.Count == 0)
             {
-                agentDisplay = "not linked";
-            }
-            else if (agentNames.Count > 5)
-            {
-                agentDisplay = string.Join(", ", agentNames.Take(5)) + $" +{agentNames.Count - 5} more";
+                agentCell = "[yellow]not linked[/]";
             }
             else
             {
-                agentDisplay = string.Join(", ", agentNames);
+                var display = agentNames.Count > 5
+                    ? string.Join(", ", agentNames.Take(5)) + $" +{agentNames.Count - 5} more"
+                    : string.Join(", ", agentNames);
+                agentCell = $"[dim]{Markup.Escape(display)}[/]";
             }
 
-            interaction.WriteMarkupLine(
-                $"[cyan]{Markup.Escape(skill.Name)}[/] [dim]{Markup.Escape(ShortenPath(skill.CanonicalPath))}[/]");
-            if (agentNames.Count == 0)
-            {
-                interaction.WriteMarkupLine("  Agents: [yellow]not linked[/]");
-            }
-            else
-            {
-                interaction.WriteDim($"  Agents: {agentDisplay}");
-            }
+            grid.AddRow(
+                $"[cyan]{Markup.Escape(skill.Name)}[/]",
+                $"[dim]{Markup.Escape(ShortenPath(skill.CanonicalPath))}[/]",
+                agentCell);
         }
+
+        interaction.WriteRenderable(grid);
 
         return new CommandResult.Success();
     }
 
     private static async Task<ImmutableArray<InstalledSkill>> CollectInstalledSkillsAsync(
-        IInstaller installer,
-        IAgentRegistry registry,
+        ISkillInstaller installer,
+        AgentRegistry registry,
         ImmutableArray<string> agentFilter,
         bool global,
         string cwd,

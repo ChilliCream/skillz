@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Skillz.Commands;
-using Skillz.Lock;
+using Skillz.Locking;
 using Skillz.Net;
 using Skillz.Tests.TestServices;
 using Skillz.Tests.Utils;

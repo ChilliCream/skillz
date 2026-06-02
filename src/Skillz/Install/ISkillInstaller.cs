@@ -2,16 +2,10 @@ using Skillz.Skills;
 
 namespace Skillz.Install;
 
-internal interface IInstaller
+internal interface ISkillInstaller
 {
-    Task<InstallResult> InstallSkillForAgentAsync(
-        Skill skill,
-        string agentType,
-        InstallOptions options,
-        CancellationToken cancellationToken);
-
-    Task<InstallResult> InstallRemoteSkillForAgentAsync(
-        RemoteSkill skill,
+    Task<InstallResult> InstallAsync(
+        ResolvedSkill skill,
         string agentType,
         InstallOptions options,
         CancellationToken cancellationToken);

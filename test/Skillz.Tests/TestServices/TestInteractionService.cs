@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text;
 using Skillz.Interaction;
 using Spectre.Console;
+using Spectre.Console.Rendering;
 
 namespace Skillz.Tests.TestServices;
 
@@ -23,13 +24,9 @@ internal sealed class TestInteractionService : IInteractionService
             });
     }
 
-    public IAnsiConsole Console => _console;
-
     public IReadOnlyList<string> Output => _output;
 
     public string OutputText => _writer.ToString();
-
-    public Func<string, string?, string>? OnPrompt { get; set; }
 
     public Func<string, bool, bool>? OnConfirm { get; set; }
 
@@ -43,16 +40,15 @@ internal sealed class TestInteractionService : IInteractionService
         _console.WriteLine(text);
     }
 
-    public void WriteMarkup(string markup)
-    {
-        _output.Add(markup);
-        _console.Markup(markup);
-    }
-
     public void WriteMarkupLine(string markup)
     {
         _output.Add(markup);
         _console.MarkupLine(markup);
+    }
+
+    public void WriteRenderable(IRenderable renderable)
+    {
+        _console.Write(renderable);
     }
 
     public void WriteError(string message)
@@ -114,15 +110,6 @@ internal sealed class TestInteractionService : IInteractionService
     {
         _output.Add($"STATUS: {status}");
         return action();
-    }
-
-    public Task<string> PromptAsync(
-        string message,
-        string? defaultValue,
-        CancellationToken cancellationToken)
-    {
-        var result = OnPrompt is not null ? OnPrompt(message, defaultValue) : defaultValue ?? string.Empty;
-        return Task.FromResult(result);
     }
 
     public Task<bool> ConfirmAsync(

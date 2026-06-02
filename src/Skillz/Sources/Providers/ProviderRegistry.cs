@@ -2,14 +2,23 @@ using System.Collections.Immutable;
 
 namespace Skillz.Sources.Providers;
 
-internal sealed class ProviderRegistry : IProviderRegistry
+/// <summary>
+/// Maintains the ordered set of <see cref="IProvider"/> instances and resolves the correct one
+/// for a given <see cref="SkillSource"/>.
+/// </summary>
+internal sealed class ProviderRegistry
 {
-    private readonly ImmutableArray<IProvider> _providers;
-
+    /// <summary>
+    /// Initializes a new <see cref="ProviderRegistry"/> with the supplied providers.
+    /// </summary>
+    /// <param name="providers">
+    /// The providers to register. Each provider must have a unique <see cref="IProvider.Id"/>.
+    /// </param>
+    /// <exception cref="InvalidOperationException">
+    /// Two or more providers share the same <see cref="IProvider.Id"/>.
+    /// </exception>
     public ProviderRegistry(IEnumerable<IProvider> providers)
     {
-        ArgumentNullException.ThrowIfNull(providers);
-
         var list = providers.ToImmutableArray();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         foreach (var provider in list)
@@ -20,16 +29,29 @@ internal sealed class ProviderRegistry : IProviderRegistry
             }
         }
 
-        _providers = list;
+        Providers = list;
     }
 
-    public ImmutableArray<IProvider> Providers => _providers;
+    /// <summary>
+    /// Gets all registered providers in registration order.
+    /// </summary>
+    public ImmutableArray<IProvider> Providers { get; }
 
-    public IProvider Resolve(ParsedSource source)
+    /// <summary>
+    /// Returns the first provider that can handle <paramref name="source"/>.
+    /// </summary>
+    /// <param name="source">
+    /// The skill source to resolve a provider for.
+    /// </param>
+    /// <returns>
+    /// The matching <see cref="IProvider"/>.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// No registered provider can handle <paramref name="source"/>.
+    /// </exception>
+    public IProvider Resolve(SkillSource source)
     {
-        ArgumentNullException.ThrowIfNull(source);
-
-        foreach (var provider in _providers)
+        foreach (var provider in Providers)
         {
             if (provider.CanHandle(source))
             {
@@ -37,6 +59,6 @@ internal sealed class ProviderRegistry : IProviderRegistry
             }
         }
 
-        throw new InvalidOperationException($"No provider can handle ParsedSource of type {source.GetType().Name}.");
+        throw new InvalidOperationException($"No provider can handle SkillSource of type {source.GetType().Name}.");
     }
 }

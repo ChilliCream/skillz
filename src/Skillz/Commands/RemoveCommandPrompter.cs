@@ -3,15 +3,8 @@ using Skillz.Interaction;
 
 namespace Skillz.Commands;
 
-internal sealed class RemoveCommandPrompter : IRemoveCommandPrompter
+internal sealed class RemoveCommandPrompter(IInteractionService interaction) : IRemoveCommandPrompter
 {
-    private readonly IInteractionService _interaction;
-
-    public RemoveCommandPrompter(IInteractionService interaction)
-    {
-        _interaction = interaction;
-    }
-
     public async Task<ImmutableArray<string>> SelectSkillsAsync(
         ImmutableArray<string> installed,
         CancellationToken cancellationToken)
@@ -22,7 +15,7 @@ internal sealed class RemoveCommandPrompter : IRemoveCommandPrompter
         }
 
         var choices = installed.Select(s => (s, s));
-        return await _interaction
+        return await interaction
             .MultiSelectAsync("Select skills to remove", choices, cancellationToken);
     }
 
@@ -30,6 +23,6 @@ internal sealed class RemoveCommandPrompter : IRemoveCommandPrompter
     {
         var skillNames = string.Join(", ", skills);
         var message = $"Are you sure you want to remove {skills.Length} skill(s) [{skillNames}]?";
-        return _interaction.ConfirmAsync(message, defaultValue: false, cancellationToken);
+        return interaction.ConfirmAsync(message, defaultValue: false, cancellationToken);
     }
 }

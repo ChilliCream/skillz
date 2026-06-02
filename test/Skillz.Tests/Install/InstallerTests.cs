@@ -9,7 +9,7 @@ public class InstallerTests : IDisposable
     private readonly string _root;
     private readonly string _projectDir;
     private readonly string _home;
-    private readonly Installer _installer;
+    private readonly SkillInstaller _installer;
 
     public InstallerTests()
     {
@@ -20,7 +20,7 @@ public class InstallerTests : IDisposable
         Directory.CreateDirectory(_home);
 
         var registry = new AgentRegistry(_home, _ => null, Directory.Exists);
-        _installer = new Installer(registry, _home);
+        _installer = new SkillInstaller(registry, _home);
     }
 
     public void Dispose()
@@ -61,9 +61,18 @@ public class InstallerTests : IDisposable
         return sourceDir;
     }
 
-    private Skill MakeSkill(string name, string path)
+    private ResolvedSkill MakeSkill(string name, string path)
     {
-        return new Skill(name, "test", path);
+        var installName = string.IsNullOrEmpty(name) ? Path.GetFileName(path) : name;
+        return new ResolvedSkill(
+            Name: name,
+            Description: "test",
+            Content: string.Empty,
+            InstallName: installName,
+            SourceUrl: string.Empty,
+            ProviderId: "test",
+            SourceIdentifier: "test/repo",
+            SourcePath: path);
     }
 
     [Fact]
@@ -75,7 +84,7 @@ public class InstallerTests : IDisposable
         var skill = MakeSkill(skillName, sourceDir);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "claude-code",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
@@ -99,7 +108,7 @@ public class InstallerTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_projectDir, ".claude"));
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "claude-code",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
@@ -130,7 +139,7 @@ public class InstallerTests : IDisposable
         var skill = MakeSkill(skillName, sourceDir);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
@@ -165,7 +174,7 @@ public class InstallerTests : IDisposable
         var skill = MakeSkill(skillName, sourceDir);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
@@ -202,7 +211,7 @@ public class InstallerTests : IDisposable
         var skill = MakeSkill(skillName, sourceDir);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
@@ -235,7 +244,7 @@ public class InstallerTests : IDisposable
         var skill = MakeSkill(skillName, sourceDir);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
@@ -261,7 +270,7 @@ public class InstallerTests : IDisposable
         var skill = MakeSkill(skillName, sourceDir);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
@@ -289,7 +298,7 @@ public class InstallerTests : IDisposable
         var skill = MakeSkill(skillName, sourceDir);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
@@ -322,7 +331,7 @@ public class InstallerTests : IDisposable
         Directory.CreateSymbolicLink(installPath, outsideDir);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
@@ -347,7 +356,7 @@ public class InstallerTests : IDisposable
         var skill = MakeSkill(skillName, sourceDir);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "github-copilot",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
@@ -374,7 +383,7 @@ public class InstallerTests : IDisposable
 
         // Act
         // No .windsurf directory in project
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "windsurf",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
@@ -415,7 +424,7 @@ public class InstallerTests : IDisposable
         Assert.True((preInfo.Attributes & FileAttributes.ReparsePoint) != 0);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "amp",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
@@ -452,7 +461,7 @@ public class InstallerTests : IDisposable
         Directory.CreateSymbolicLink(claudeSkillsDir, canonicalBase);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "claude-code",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
@@ -485,7 +494,7 @@ public class InstallerTests : IDisposable
 
         Directory.CreateDirectory(Path.Combine(_projectDir, ".claude"));
 
-        var first = await _installer.InstallSkillForAgentAsync(
+        var first = await _installer.InstallAsync(
             skill,
             "claude-code",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
@@ -494,7 +503,7 @@ public class InstallerTests : IDisposable
         Assert.True(first.Success);
 
         // Act
-        var second = await _installer.InstallSkillForAgentAsync(
+        var second = await _installer.InstallAsync(
             skill,
             "claude-code",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
@@ -520,7 +529,7 @@ public class InstallerTests : IDisposable
         var skill = MakeSkill(maliciousName, sourceDir);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
@@ -577,7 +586,7 @@ public class InstallerTests : IDisposable
     {
         // Arrange
         var skillName = "remote-skill";
-        var remote = new RemoteSkill(
+        var remote = new ResolvedSkill(
             Name: skillName,
             Description: "remote test",
             Content: "---\nname: remote-skill\ndescription: remote test\n---\nhello\n",
@@ -587,7 +596,7 @@ public class InstallerTests : IDisposable
             SourceIdentifier: "test/repo");
 
         // Act
-        var result = await _installer.InstallRemoteSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             remote,
             "codex",
             new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
@@ -614,7 +623,7 @@ public class InstallerTests : IDisposable
         var skill = MakeSkill(skillName, sourceDir);
 
         // Act
-        var result = await _installer.InstallSkillForAgentAsync(
+        var result = await _installer.InstallAsync(
             skill,
             "github-copilot",
             new InstallOptions(Global: true, Cwd: _projectDir, Mode: InstallMode.Symlink),

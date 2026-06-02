@@ -1,17 +1,15 @@
 using System.Collections.Immutable;
-using Spectre.Console;
+using Spectre.Console.Rendering;
 
 namespace Skillz.Interaction;
 
 internal interface IInteractionService
 {
-    IAnsiConsole Console { get; }
-
     void WriteLine(string text = "");
 
-    void WriteMarkup(string markup);
-
     void WriteMarkupLine(string markup);
+
+    void WriteRenderable(IRenderable renderable);
 
     void WriteError(string message);
 
@@ -26,11 +24,6 @@ internal interface IInteractionService
     Task<T> StatusAsync<T>(string status, Func<Task<T>> action);
 
     Task StatusAsync(string status, Func<Task> action);
-
-    Task<string> PromptAsync(
-        string message,
-        string? defaultValue,
-        CancellationToken cancellationToken);
 
     Task<bool> ConfirmAsync(string message, bool defaultValue, CancellationToken cancellationToken);
 

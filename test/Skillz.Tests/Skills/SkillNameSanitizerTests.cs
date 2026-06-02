@@ -3,7 +3,7 @@ using Xunit;
 
 namespace Skillz.Tests.Skills;
 
-public class NameSanitizerTests
+public class SkillNameSanitizerTests
 {
     [Theory]
     [InlineData("MySkill", "myskill")]
@@ -11,7 +11,7 @@ public class NameSanitizerTests
     public void Converts_To_Lowercase(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Theory]
@@ -20,14 +20,14 @@ public class NameSanitizerTests
     public void Replaces_Spaces_With_Hyphens(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Fact]
     public void Replaces_Multiple_Spaces_With_Single_Hyphen()
     {
         // Act & Assert
-        Assert.Equal("my-skill", NameSanitizer.SanitizeName("my   skill"));
+        Assert.Equal("my-skill", SkillNameSanitizer.SanitizeName("my   skill"));
     }
 
     [Theory]
@@ -37,7 +37,7 @@ public class NameSanitizerTests
     public void Preserves_Dots_And_Underscores(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Theory]
@@ -46,7 +46,7 @@ public class NameSanitizerTests
     public void Preserves_Numbers(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Theory]
@@ -57,7 +57,7 @@ public class NameSanitizerTests
     public void Replaces_Special_Characters_With_Hyphens(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Theory]
@@ -66,7 +66,7 @@ public class NameSanitizerTests
     public void Collapses_Multiple_Special_Chars_Into_Single_Hyphen(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Theory]
@@ -75,14 +75,14 @@ public class NameSanitizerTests
     public void Prevents_Path_Traversal_With_DotDot(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Fact]
     public void Prevents_Path_Traversal_With_Backslashes()
     {
         // Act & Assert
-        Assert.Equal("secret", NameSanitizer.SanitizeName("..\\..\\secret"));
+        Assert.Equal("secret", SkillNameSanitizer.SanitizeName("..\\..\\secret"));
     }
 
     [Theory]
@@ -91,7 +91,7 @@ public class NameSanitizerTests
     public void Handles_Absolute_Paths(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Theory]
@@ -101,7 +101,7 @@ public class NameSanitizerTests
     public void Removes_Leading_Dots(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Theory]
@@ -110,7 +110,7 @@ public class NameSanitizerTests
     public void Removes_Trailing_Dots(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Theory]
@@ -119,7 +119,7 @@ public class NameSanitizerTests
     public void Removes_Leading_Hyphens(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Theory]
@@ -128,7 +128,7 @@ public class NameSanitizerTests
     public void Removes_Trailing_Hyphens(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Theory]
@@ -137,14 +137,14 @@ public class NameSanitizerTests
     public void Removes_Mixed_Leading_Dots_And_Hyphens(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Fact]
     public void Returns_UnnamedSkill_For_Empty_String()
     {
         // Act & Assert
-        Assert.Equal("unnamed-skill", NameSanitizer.SanitizeName(""));
+        Assert.Equal("unnamed-skill", SkillNameSanitizer.SanitizeName(""));
     }
 
     [Theory]
@@ -154,7 +154,7 @@ public class NameSanitizerTests
     public void Returns_UnnamedSkill_When_Only_Special_Chars(string input)
     {
         // Act & Assert
-        Assert.Equal("unnamed-skill", NameSanitizer.SanitizeName(input));
+        Assert.Equal("unnamed-skill", SkillNameSanitizer.SanitizeName(input));
     }
 
     [Fact]
@@ -164,7 +164,7 @@ public class NameSanitizerTests
         var longName = new string('a', 300);
 
         // Act
-        var result = NameSanitizer.SanitizeName(longName);
+        var result = SkillNameSanitizer.SanitizeName(longName);
 
         // Assert
         Assert.Equal(255, result.Length);
@@ -177,7 +177,7 @@ public class NameSanitizerTests
     public void Handles_Unicode_Characters(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Theory]
@@ -186,14 +186,14 @@ public class NameSanitizerTests
     public void Handles_GitHub_Repo_Style_Names(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 
     [Fact]
     public void Handles_Urls()
     {
         // Act & Assert
-        Assert.Equal("https-example.com", NameSanitizer.SanitizeName("https://example.com"));
+        Assert.Equal("https-example.com", SkillNameSanitizer.SanitizeName("https://example.com"));
     }
 
     [Theory]
@@ -202,6 +202,6 @@ public class NameSanitizerTests
     public void Handles_Mintlify_Style_Names(string input, string expected)
     {
         // Act & Assert
-        Assert.Equal(expected, NameSanitizer.SanitizeName(input));
+        Assert.Equal(expected, SkillNameSanitizer.SanitizeName(input));
     }
 }

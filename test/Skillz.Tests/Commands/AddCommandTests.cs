@@ -3,7 +3,7 @@ using Skillz;
 using Skillz.Commands;
 using Skillz.Install;
 using Skillz.Interaction;
-using Skillz.Lock;
+using Skillz.Locking;
 using Skillz.Skills;
 using Skillz.Sources;
 using Skillz.Tests.TestServices;
@@ -93,7 +93,7 @@ public class AddCommandTests : IDisposable
     {
         // Arrange
         var services = BuildServices(
-            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => Array.Empty<Skill>());
 
         // Act
@@ -112,7 +112,7 @@ public class AddCommandTests : IDisposable
         var installed = new List<(string Skill, string Agent)>();
 
         var services = BuildServices(
-            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha"), CreateSkill("beta") },
             configureInstaller: i =>
                 i.OnInstallRemoteSkill = (skill, agent, _) =>
@@ -139,7 +139,7 @@ public class AddCommandTests : IDisposable
         var installed = new List<string>();
 
         var services = BuildServices(
-            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d =>
                 d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha"), CreateSkill("beta"), CreateSkill("gamma") },
             configureInstaller: i =>
@@ -168,7 +168,7 @@ public class AddCommandTests : IDisposable
         var lockEntries = new List<string>();
 
         var services = BuildServices(
-            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
             configureInstaller: i =>
                 i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, $"/installed/{skill.InstallName}"),
@@ -191,7 +191,7 @@ public class AddCommandTests : IDisposable
         var lockEntries = new List<string>();
 
         var services = BuildServices(
-            configureParser: p => p.OnParse = _ => new ParsedSource.GitHub("https://github.com/owner/repo.git"),
+            configureParser: p => p.OnParse = _ => new SkillSource.GitHub("https://github.com/owner/repo.git"),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
             configureInstaller: i =>
                 i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, $"/installed/{skill.InstallName}"),
@@ -214,7 +214,7 @@ public class AddCommandTests : IDisposable
         var installed = new List<string>();
 
         var services = BuildServices(
-            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha"), CreateSkill("beta") },
             configureInstaller: i =>
                 i.OnInstallRemoteSkill = (skill, _, _) =>
@@ -245,7 +245,7 @@ public class AddCommandTests : IDisposable
         var installed = new List<string>();
 
         var services = BuildServices(
-            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha"), CreateSkill("beta") },
             configurePrompter: p =>
             {
@@ -278,7 +278,7 @@ public class AddCommandTests : IDisposable
         Directory.CreateDirectory(canonical);
 
         var services = BuildServices(
-            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
             configurePrompter: p =>
             {
@@ -312,7 +312,7 @@ public class AddCommandTests : IDisposable
         var installed = false;
 
         var services = BuildServices(
-            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
             configurePrompter: p => p.OnConfirmInstallation = (_, _, _) => false,
             configureInstaller: i =>
@@ -343,7 +343,7 @@ public class AddCommandTests : IDisposable
         Directory.CreateDirectory(canonical);
 
         var services = BuildServices(
-            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") });
         var interaction = services.GetRequiredService<TestInteractionService>();
         var installer = services.GetRequiredService<TestInstaller>();
@@ -373,7 +373,7 @@ public class AddCommandTests : IDisposable
     {
         // Arrange
         var services = BuildServices(
-            configureParser: p => p.OnParse = _ => new ParsedSource.Local(_workspace, _workspace),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") });
 
         // Act

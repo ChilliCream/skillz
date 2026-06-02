@@ -29,9 +29,9 @@ public class WellKnownProviderTests
         var provider = new WellKnownProvider(new FakeHttpClientFactory(new StubHttpMessageHandler()));
 
         // Act & Assert
-        Assert.True(provider.CanHandle(new ParsedSource.WellKnown("https://example.com")));
-        Assert.False(provider.CanHandle(new ParsedSource.GitHub("https://github.com/foo/bar.git")));
-        Assert.False(provider.CanHandle(new ParsedSource.Local("/tmp/x", "/tmp/x")));
+        Assert.True(provider.CanHandle(new SkillSource.WellKnown("https://example.com")));
+        Assert.False(provider.CanHandle(new SkillSource.GitHub("https://github.com/foo/bar.git")));
+        Assert.False(provider.CanHandle(new SkillSource.Local("/tmp/x", "/tmp/x")));
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public class WellKnownProviderTests
 
         // Act
         var skills = await provider.FetchSkillsAsync(
-            new ParsedSource.WellKnown("https://example.com"),
+            new SkillSource.WellKnown("https://example.com"),
             options: null,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -119,7 +119,7 @@ public class WellKnownProviderTests
 
         // Act
         var skills = await provider.FetchSkillsAsync(
-            new ParsedSource.WellKnown("https://code.claude.com/docs"),
+            new SkillSource.WellKnown("https://code.claude.com/docs"),
             options: null,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -159,7 +159,7 @@ public class WellKnownProviderTests
 
         // Act
         var skills = await provider.FetchSkillsAsync(
-            new ParsedSource.WellKnown("https://example.com"),
+            new SkillSource.WellKnown("https://example.com"),
             options: null,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -198,7 +198,7 @@ public class WellKnownProviderTests
 
         // Act
         var skills = await provider.FetchSkillsAsync(
-            new ParsedSource.WellKnown("https://example.com"),
+            new SkillSource.WellKnown("https://example.com"),
             options: null,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -224,7 +224,7 @@ public class WellKnownProviderTests
 
         // Act
         var skills = await provider.FetchSkillsAsync(
-            new ParsedSource.WellKnown("https://example.com"),
+            new SkillSource.WellKnown("https://example.com"),
             options: null,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -243,7 +243,7 @@ public class WellKnownProviderTests
 
         // Act
         var skills = await provider.FetchSkillsAsync(
-            new ParsedSource.WellKnown("https://example.com"),
+            new SkillSource.WellKnown("https://example.com"),
             options: null,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -262,7 +262,7 @@ public class WellKnownProviderTests
 
         // Act
         var skills = await provider.FetchSkillsAsync(
-            new ParsedSource.WellKnown("https://example.com"),
+            new SkillSource.WellKnown("https://example.com"),
             options: null,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -293,7 +293,7 @@ public class WellKnownProviderTests
 
         // Act
         var skills = await provider.FetchSkillsAsync(
-            new ParsedSource.WellKnown("https://example.com"),
+            new SkillSource.WellKnown("https://example.com"),
             options: null,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -324,7 +324,7 @@ public class WellKnownProviderTests
 
         // Act
         var skills = await provider.FetchSkillsAsync(
-            new ParsedSource.WellKnown("https://example.com"),
+            new SkillSource.WellKnown("https://example.com"),
             options: null,
             cancellationToken: TestContext.Current.CancellationToken);
 
@@ -341,7 +341,7 @@ public class WellKnownProviderTests
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
             provider.FetchSkillsAsync(
-                new ParsedSource.GitHub("https://github.com/foo/bar.git"),
+                new SkillSource.GitHub("https://github.com/foo/bar.git"),
                 options: null,
                 cancellationToken: TestContext.Current.CancellationToken)
         );

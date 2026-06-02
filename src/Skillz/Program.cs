@@ -4,7 +4,7 @@ using Skillz.Commands;
 using Skillz.Git;
 using Skillz.Install;
 using Skillz.Interaction;
-using Skillz.Lock;
+using Skillz.Locking;
 using Skillz.Net;
 using Skillz.Plugins;
 using Skillz.Skills;
@@ -18,8 +18,8 @@ internal static class Program
 {
     public static async Task<int> Main(string[] args)
     {
-        // Strip bare `--` tokens — skillz has no pass-through commands and System.CommandLine
-        // treats the terminator inconsistently with TS, which simply ignores it.
+        // Strip bare `--` tokens — skillz has no pass-through commands, so the argument
+        // terminator is meaningless here and would only confuse System.CommandLine's parsing.
         args = StripBareTerminators(args);
 
         using var cts = new CancellationTokenSource();
@@ -31,10 +31,13 @@ internal static class Program
         };
         Console.CancelKeyPress += cancelKeyHandler;
 
-        EventHandler unloadHandler = (_, _) => { if (!cts.IsCancellationRequested)
+        EventHandler unloadHandler = (_, _) =>
         {
-            cts.Cancel();
-        } };
+            if (!cts.IsCancellationRequested)
+            {
+                cts.Cancel();
+            }
+        };
         AppDomain.CurrentDomain.ProcessExit += unloadHandler;
 
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings { Args = args });
@@ -52,10 +55,10 @@ internal static class Program
         builder.Services.AddSingleton<IGitHubTokenProvider, GitHubTokenProvider>();
         builder.Services.AddSingleton<IBlobClient, BlobClient>();
 
-        builder.Services.AddSingleton<IAgentRegistry, AgentRegistry>();
+        builder.Services.AddSingleton<AgentRegistry>();
         builder.Services.AddSingleton<IAgentEnvironmentDetector, AgentEnvironmentDetector>();
-        builder.Services.AddSingleton<IXdgPaths, XdgPaths>();
-        builder.Services.AddSingleton<IInstaller, Installer>();
+        builder.Services.AddSingleton<XdgPaths>();
+        builder.Services.AddSingleton<ISkillInstaller, SkillInstaller>();
 
         builder.Services.AddSingleton<IPluginManifest, PluginManifest>();
         builder.Services.AddSingleton<IPluginGrouping, PluginGrouping>();
@@ -68,7 +71,7 @@ internal static class Program
         builder.Services.AddSingleton<IProvider, GitProvider>();
         builder.Services.AddSingleton<IProvider, LocalProvider>();
         builder.Services.AddSingleton<IProvider, WellKnownProvider>();
-        builder.Services.AddSingleton<IProviderRegistry, ProviderRegistry>();
+        builder.Services.AddSingleton<ProviderRegistry>();
 
         builder.Services.AddSingleton<IProjectLockFile, ProjectLockFile>();
         builder.Services.AddSingleton<IGlobalLockFile, GlobalLockFile>();
@@ -94,7 +97,7 @@ internal static class Program
             if (args.Length == 0)
             {
                 var banner = host.Services.GetRequiredService<BannerService>();
-                await banner.ShowBannerAsync(cts.Token);
+                banner.ShowBanner();
                 return ExitCodeConstants.Success;
             }
 
@@ -102,7 +105,7 @@ internal static class Program
             if (args.Length == 1 && args[0] is "--help" or "-h" or "-?")
             {
                 var banner = host.Services.GetRequiredService<BannerService>();
-                await banner.ShowLogoAsync(cts.Token);
+                banner.ShowLogo();
                 banner.ShowCuratedHelp();
                 return ExitCodeConstants.Success;
             }
@@ -113,7 +116,7 @@ internal static class Program
             if (commandName is "add" or "init")
             {
                 var banner = host.Services.GetRequiredService<BannerService>();
-                await banner.ShowLogoAsync(cts.Token);
+                banner.ShowLogo();
             }
 
             return await parseResult.InvokeAsync(cancellationToken: cts.Token);

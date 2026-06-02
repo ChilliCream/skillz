@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Skillz.Commands;
 using Skillz.Install;
 using Skillz.Interaction;
-using Skillz.Lock;
+using Skillz.Locking;
 using Skillz.Tests.TestServices;
 using Skillz.Tests.Utils;
 using Xunit;
@@ -62,7 +62,7 @@ public class RemoveCommandTests : IDisposable
     {
         // Arrange
         var services = CliTestHelper.CreateServiceProvider();
-        var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
+        var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
         // Act
@@ -86,7 +86,7 @@ public class RemoveCommandTests : IDisposable
         CreateSkill(canonical, "beta");
 
         var services = CliTestHelper.CreateServiceProvider();
-        var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
+        var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
         var projectLock = (TestProjectLockFile)services.GetRequiredService<IProjectLockFile>();
@@ -119,7 +119,7 @@ public class RemoveCommandTests : IDisposable
         CreateSkill(canonical, "beta");
 
         var services = CliTestHelper.CreateServiceProvider();
-        var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
+        var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
         // Act
@@ -146,7 +146,7 @@ public class RemoveCommandTests : IDisposable
             s.AddSingleton<ConsoleEnvironment>(new TestConsoleEnvironment { InputRedirected = false })
         );
 
-        var installer = (TestInstaller)services.GetRequiredService<IInstaller>();
+        var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
         var prompter = services.GetRequiredService<TestRemoveCommandPrompter>();

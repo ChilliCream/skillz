@@ -4,27 +4,18 @@ using Skillz.Skills;
 
 namespace Skillz.Sources.Providers;
 
-internal sealed class GitProvider : IProvider
+internal sealed class GitProvider(IGitClient gitClient, ISkillDiscovery skillDiscovery) : IProvider
 {
-    private readonly IGitClient _gitClient;
-    private readonly ISkillDiscovery _skillDiscovery;
-
-    public GitProvider(IGitClient gitClient, ISkillDiscovery skillDiscovery)
-    {
-        _gitClient = gitClient;
-        _skillDiscovery = skillDiscovery;
-    }
-
     public string Id => "git";
 
-    public bool CanHandle(ParsedSource source) => source is ParsedSource.Git;
+    public bool CanHandle(SkillSource source) => source is SkillSource.Git;
 
-    public async Task<ImmutableArray<RemoteSkill>> FetchSkillsAsync(
-        ParsedSource source,
+    public async Task<ImmutableArray<ResolvedSkill>> FetchSkillsAsync(
+        SkillSource source,
         ProviderOptions? options,
         CancellationToken cancellationToken)
     {
-        if (source is not ParsedSource.Git git)
+        if (source is not SkillSource.Git git)
         {
             throw new ArgumentException($"GitProvider cannot handle {source.GetType().Name}.", nameof(source));
         }
@@ -32,16 +23,15 @@ internal sealed class GitProvider : IProvider
         var tempDir = Path.Combine(Path.GetTempPath(), "skillz-" + Guid.NewGuid().ToString("N"));
         try
         {
-            await _gitClient.CloneAsync(git.Url, tempDir, git.Ref, cancellationToken);
+            await gitClient.CloneAsync(git.Url, tempDir, git.Ref, cancellationToken);
 
             var discoveryOpts = new SkillDiscoveryOptions(
-                IncludeInternal: options?.IncludeInternal ?? false,
-                FullDepth: options?.FullDepth ?? false);
+                options?.IncludeInternal ?? false,
+                options?.FullDepth ?? false);
 
-            var skills = await _skillDiscovery
-                .DiscoverAsync(tempDir, subpath: null, discoveryOpts, cancellationToken);
+            var skills = await skillDiscovery.DiscoverAsync(tempDir, subpath: null, discoveryOpts, cancellationToken);
 
-            return ProviderConversions.ToRemoteSkills(skills, Id, git.Url, tempDir, cleanupPath: tempDir);
+            return skills.ToRemoteSkills(Id, git.Url, tempDir, cleanupPath: tempDir);
         }
         catch
         {

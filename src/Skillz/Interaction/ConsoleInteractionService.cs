@@ -2,33 +2,27 @@ using System.Collections.Immutable;
 using System.Runtime.ExceptionServices;
 using System.Text;
 using Spectre.Console;
+using Spectre.Console.Rendering;
 
 namespace Skillz.Interaction;
 
-internal sealed class ConsoleInteractionService : IInteractionService
+internal sealed class ConsoleInteractionService(IAnsiConsole? console = null) : IInteractionService
 {
-    private readonly IAnsiConsole _console;
-
-    public ConsoleInteractionService(IAnsiConsole? console = null)
-    {
-        _console = console ?? AnsiConsole.Console;
-    }
-
-    public IAnsiConsole Console => _console;
+    private readonly IAnsiConsole _console = console ?? AnsiConsole.Console;
 
     public void WriteLine(string text = "")
     {
         _console.WriteLine(text);
     }
 
-    public void WriteMarkup(string markup)
-    {
-        _console.Markup(markup);
-    }
-
     public void WriteMarkupLine(string markup)
     {
         _console.MarkupLine(markup);
+    }
+
+    public void WriteRenderable(IRenderable renderable)
+    {
+        _console.Write(renderable);
     }
 
     public void WriteError(string message)
@@ -97,25 +91,7 @@ internal sealed class ConsoleInteractionService : IInteractionService
         }
     }
 
-    public Task<string> PromptAsync(
-        string message,
-        string? defaultValue,
-        CancellationToken cancellationToken)
-    {
-        var prompt = new TextPrompt<string>(Markup.Escape(message)) { AllowEmpty = true };
-
-        if (defaultValue is not null)
-        {
-            prompt.DefaultValue(defaultValue);
-        }
-
-        return _console.PromptAsync(prompt, cancellationToken);
-    }
-
-    public Task<bool> ConfirmAsync(
-        string message,
-        bool defaultValue,
-        CancellationToken cancellationToken)
+    public Task<bool> ConfirmAsync(string message, bool defaultValue, CancellationToken cancellationToken)
     {
         var prompt = new ConfirmationPrompt(Markup.Escape(message)) { DefaultValue = defaultValue };
 

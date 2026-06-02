@@ -3,11 +3,9 @@ using Skillz.Skills;
 
 namespace Skillz.Tests.TestServices;
 
-internal sealed class TestInstaller : IInstaller
+internal sealed class TestInstaller : ISkillInstaller
 {
-    public Func<Skill, string, InstallOptions, InstallResult>? OnInstallSkill { get; set; }
-
-    public Func<RemoteSkill, string, InstallOptions, InstallResult>? OnInstallRemoteSkill { get; set; }
+    public Func<ResolvedSkill, string, InstallOptions, InstallResult>? OnInstallRemoteSkill { get; set; }
 
     public Func<bool, string?, string>? OnGetCanonicalSkillsDir { get; set; }
 
@@ -17,20 +15,8 @@ internal sealed class TestInstaller : IInstaller
 
     public Func<string, string, bool, string?, string>? OnGetInstallPath { get; set; }
 
-    public Task<InstallResult> InstallSkillForAgentAsync(
-        Skill skill,
-        string agentType,
-        InstallOptions options,
-        CancellationToken cancellationToken)
-    {
-        var result = OnInstallSkill is not null
-            ? OnInstallSkill(skill, agentType, options)
-            : new InstallResult(true, skill.Path);
-        return Task.FromResult(result);
-    }
-
-    public Task<InstallResult> InstallRemoteSkillForAgentAsync(
-        RemoteSkill skill,
+    public Task<InstallResult> InstallAsync(
+        ResolvedSkill skill,
         string agentType,
         InstallOptions options,
         CancellationToken cancellationToken)

@@ -5,8 +5,8 @@ namespace Skillz.Sources.Providers;
 
 internal static class ProviderConversions
 {
-    public static ImmutableArray<RemoteSkill> ToRemoteSkills(
-        ImmutableArray<Skill> skills,
+    public static ImmutableArray<ResolvedSkill> ToRemoteSkills(
+        this ImmutableArray<Skill> skills,
         string providerId,
         string sourceIdentifier,
         string? cloneRoot = null,
@@ -17,7 +17,7 @@ internal static class ProviderConversions
             return [];
         }
 
-        var result = ImmutableArray.CreateBuilder<RemoteSkill>(skills.Length);
+        var result = ImmutableArray.CreateBuilder<ResolvedSkill>(skills.Length);
         foreach (var skill in skills)
         {
             var content = skill.RawContent ?? string.Empty;
@@ -29,7 +29,7 @@ internal static class ProviderConversions
             }
 
             result.Add(
-                new RemoteSkill(
+                new ResolvedSkill(
                     Name: skill.Name,
                     Description: skill.Description,
                     Content: content,

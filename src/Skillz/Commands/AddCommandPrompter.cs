@@ -1,26 +1,18 @@
 using System.Collections.Immutable;
 using Skillz.Install;
 using Skillz.Interaction;
-using Skillz.Lock;
+using Skillz.Locking;
 using Skillz.Skills;
 
 namespace Skillz.Commands;
 
-internal sealed class AddCommandPrompter : IAddCommandPrompter
+internal sealed class AddCommandPrompter(
+    IInteractionService interaction,
+    AgentRegistry registry,
+    IGlobalLockFile globalLock) : IAddCommandPrompter
 {
-    private readonly IInteractionService _interaction;
-    private readonly IAgentRegistry _registry;
-    private readonly IGlobalLockFile _globalLock;
-
-    public AddCommandPrompter(IInteractionService interaction, IAgentRegistry registry, IGlobalLockFile globalLock)
-    {
-        _interaction = interaction;
-        _registry = registry;
-        _globalLock = globalLock;
-    }
-
-    public async Task<ImmutableArray<RemoteSkill>> SelectSkillsAsync(
-        ImmutableArray<RemoteSkill> skills,
+    public async Task<ImmutableArray<ResolvedSkill>> SelectSkillsAsync(
+        ImmutableArray<ResolvedSkill> skills,
         CancellationToken cancellationToken)
     {
         if (skills.Length == 0)
@@ -33,7 +25,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             return skills;
         }
 
-        // Sort by PluginName (nulls last) then InstallName — matches TS add.ts:1181-1188
+        // Sort by PluginName (nulls last) then InstallName
         var sorted = skills
             .OrderBy(s => s.PluginName is null ? 1 : 0)
             .ThenBy(s => s.PluginName, StringComparer.Ordinal)
@@ -46,7 +38,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             return ($"{s.InstallName} - {hint}", s);
         });
 
-        return await _interaction.MultiSelectAsync("Select skills to install", choices, cancellationToken);
+        return await interaction.MultiSelectAsync("Select skills to install", choices, cancellationToken);
     }
 
     public async Task<ImmutableArray<string>> SelectAgentsAsync(
@@ -63,7 +55,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
         IReadOnlyList<string>? defaults = null;
         try
         {
-            var lastUsed = await _globalLock.GetLastSelectedAgentsAsync(cancellationToken);
+            var lastUsed = await globalLock.GetLastSelectedAgentsAsync(cancellationToken);
             if (lastUsed is { Length: > 0 } lastUsedAgents)
             {
                 defaults = lastUsedAgents.Where(a => available.Contains(a, StringComparer.Ordinal)).ToList();
@@ -83,11 +75,11 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
 
         var choices = available.Select(a =>
         {
-            var config = _registry.GetConfig(a);
+            var config = registry.GetConfig(a);
             return ($"{config.DisplayName} ({a})", a);
         });
 
-        var selected = await _interaction.MultiSelectAsync(
+        var selected = await interaction.MultiSelectAsync(
             "Which agents do you want to install to?",
             choices,
             cancellationToken);
@@ -97,7 +89,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
         {
             try
             {
-                await _globalLock.SaveLastSelectedAgentsAsync(selected, cancellationToken);
+                await globalLock.SaveLastSelectedAgentsAsync(selected, cancellationToken);
             }
             catch
             {
@@ -116,7 +108,7 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             ("Global (install in home directory)", true)
         };
 
-        return await _interaction.SelectAsync("Installation scope", choices, cancellationToken);
+        return await interaction.SelectAsync("Installation scope", choices, cancellationToken);
     }
 
     public async Task<InstallMode> SelectInstallModeAsync(CancellationToken cancellationToken)
@@ -127,11 +119,11 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             ("Copy to all agents", InstallMode.Copy)
         };
 
-        return await _interaction.SelectAsync("Installation method", choices, cancellationToken);
+        return await interaction.SelectAsync("Installation method", choices, cancellationToken);
     }
 
     public Task<bool> ConfirmInstallationAsync(
-        ImmutableArray<RemoteSkill> skills,
+        ImmutableArray<ResolvedSkill> skills,
         ImmutableArray<string> agents,
         ImmutableArray<OverwriteTarget> overwrites,
         CancellationToken cancellationToken)
@@ -147,6 +139,6 @@ internal sealed class AddCommandPrompter : IAddCommandPrompter
             message += $"{Environment.NewLine}Existing installs will be overwritten:{Environment.NewLine}{targets}";
         }
 
-        return _interaction.ConfirmAsync(message, defaultValue: true, cancellationToken);
+        return interaction.ConfirmAsync(message, defaultValue: true, cancellationToken);
     }
 }

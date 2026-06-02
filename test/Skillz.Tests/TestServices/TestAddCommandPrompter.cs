@@ -7,7 +7,7 @@ namespace Skillz.Tests.TestServices;
 
 internal sealed class TestAddCommandPrompter : IAddCommandPrompter
 {
-    public Func<IReadOnlyList<RemoteSkill>, IReadOnlyList<RemoteSkill>>? OnSelectSkills { get; set; }
+    public Func<IReadOnlyList<ResolvedSkill>, IReadOnlyList<ResolvedSkill>>? OnSelectSkills { get; set; }
 
     public Func<IReadOnlyList<string>, bool, IReadOnlyList<string>>? OnSelectAgents { get; set; }
 
@@ -15,17 +15,17 @@ internal sealed class TestAddCommandPrompter : IAddCommandPrompter
 
     public Func<InstallMode>? OnSelectInstallMode { get; set; }
 
-    public Func<IReadOnlyList<RemoteSkill>, IReadOnlyList<string>, IReadOnlyList<OverwriteTarget>, bool>?
+    public Func<IReadOnlyList<ResolvedSkill>, IReadOnlyList<string>, IReadOnlyList<OverwriteTarget>, bool>?
         OnConfirmInstallation { get; set; }
 
     public ImmutableArray<OverwriteTarget> LastOverwriteTargets { get; private set; } = [];
 
-    public Task<ImmutableArray<RemoteSkill>> SelectSkillsAsync(
-        ImmutableArray<RemoteSkill> skills,
+    public Task<ImmutableArray<ResolvedSkill>> SelectSkillsAsync(
+        ImmutableArray<ResolvedSkill> skills,
         CancellationToken cancellationToken)
     {
         var result = OnSelectSkills is not null ? OnSelectSkills(skills) : skills;
-        return Task.FromResult<ImmutableArray<RemoteSkill>>([.. result]);
+        return Task.FromResult<ImmutableArray<ResolvedSkill>>([.. result]);
     }
 
     public Task<ImmutableArray<string>> SelectAgentsAsync(
@@ -50,7 +50,7 @@ internal sealed class TestAddCommandPrompter : IAddCommandPrompter
     }
 
     public Task<bool> ConfirmInstallationAsync(
-        ImmutableArray<RemoteSkill> skills,
+        ImmutableArray<ResolvedSkill> skills,
         ImmutableArray<string> agents,
         ImmutableArray<OverwriteTarget> overwrites,
         CancellationToken cancellationToken)

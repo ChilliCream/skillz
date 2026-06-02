@@ -2,14 +2,14 @@ using System.Collections.Immutable;
 using System.CommandLine;
 using Skillz.Install;
 using Skillz.Interaction;
-using Skillz.Lock;
+using Skillz.Locking;
 using Skillz.Skills;
 
 namespace Skillz.Commands;
 
 internal sealed class RemoveCommand(
-    IInstaller installer,
-    IAgentRegistry registry,
+    ISkillInstaller installer,
+    AgentRegistry registry,
     IInteractionService interaction,
     IRemoveCommandPrompter prompter,
     IProjectLockFile projectLock,
@@ -65,7 +65,7 @@ internal sealed class RemoveCommand(
 
         if (agents.Length > 0)
         {
-            var valid = registry.ListAgentTypes();
+            var valid = registry.AgentTypes;
             var invalid = agents.Where(a => !valid.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
@@ -87,7 +87,7 @@ internal sealed class RemoveCommand(
             yes
             || all
             || consoleEnvironment.IsInputRedirected
-            || (await detector.DetectAgentAsync(cancellationToken)).IsAgent;
+            || detector.DetectAgent.IsAgent;
 
         ImmutableArray<string> selected;
         if (all)
@@ -121,7 +121,7 @@ internal sealed class RemoveCommand(
             }
         }
 
-        var targetAgents = agents.Length > 0 ? (IReadOnlyList<string>)agents : registry.ListAgentTypes();
+        var targetAgents = agents.Length > 0 ? (IReadOnlyList<string>)agents : registry.AgentTypes;
 
         if (!nonInteractive)
         {
@@ -196,8 +196,8 @@ internal sealed class RemoveCommand(
     }
 
     private static async Task<ImmutableArray<string>> ScanInstalledSkillsAsync(
-        IInstaller installer,
-        IAgentRegistry registry,
+        ISkillInstaller installer,
+        AgentRegistry registry,
         bool global,
         string cwd,
         CancellationToken cancellationToken)
@@ -205,11 +205,12 @@ internal sealed class RemoveCommand(
         cancellationToken.ThrowIfCancellationRequested();
 
         var skills = new HashSet<string>(StringComparer.Ordinal);
-        var directoriesToScan = new HashSet<string>(GetPathComparer());
+        var directoriesToScan = new HashSet<string>(GetPathComparer())
+        {
+            installer.GetCanonicalSkillsDir(global, cwd)
+        };
 
-        directoriesToScan.Add(installer.GetCanonicalSkillsDir(global, cwd));
-
-        foreach (var agentType in registry.ListAgentTypes())
+        foreach (var agentType in registry.AgentTypes)
         {
             var config = registry.GetConfig(agentType);
             if (global && config.GlobalSkillsDir is null)
@@ -238,15 +239,15 @@ internal sealed class RemoveCommand(
     }
 
     private static bool IsCanonicalStillUsed(
-        IInstaller installer,
-        IAgentRegistry registry,
+        ISkillInstaller installer,
+        AgentRegistry registry,
         string skillName,
         bool global,
         string cwd,
         IReadOnlyList<string> removedAgents)
     {
         var removedSet = new HashSet<string>(removedAgents, StringComparer.Ordinal);
-        foreach (var agentType in registry.ListAgentTypes())
+        foreach (var agentType in registry.AgentTypes)
         {
             if (removedSet.Contains(agentType))
             {

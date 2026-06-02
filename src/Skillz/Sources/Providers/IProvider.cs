@@ -7,10 +7,10 @@ internal interface IProvider
 {
     string Id { get; }
 
-    bool CanHandle(ParsedSource source);
+    bool CanHandle(SkillSource source);
 
-    Task<ImmutableArray<RemoteSkill>> FetchSkillsAsync(
-        ParsedSource source,
+    Task<ImmutableArray<ResolvedSkill>> FetchSkillsAsync(
+        SkillSource source,
         ProviderOptions? options,
         CancellationToken cancellationToken);
 }

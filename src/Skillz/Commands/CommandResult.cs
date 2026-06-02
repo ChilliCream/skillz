@@ -4,21 +4,25 @@ internal abstract record CommandResult
 {
     private CommandResult() { }
 
-    public int ExitCode
-        => this switch
-        {
-            Success => ExitCodeConstants.Success,
-            Failure f => f.Code,
-            Cancelled => ExitCodeConstants.Cancelled,
-            DisplayHelp => ExitCodeConstants.Success,
-            _ => ExitCodeConstants.Failure
-        };
+    public abstract int ExitCode { get; }
 
-    public sealed record Success : CommandResult;
+    public sealed record Success : CommandResult
+    {
+        public override int ExitCode => ExitCodeConstants.Success;
+    }
 
-    public sealed record Failure(int Code, string? Message = null) : CommandResult;
+    public sealed record Failure(int Code, string? Message = null) : CommandResult
+    {
+        public override int ExitCode => Code;
+    }
 
-    public sealed record Cancelled : CommandResult;
+    public sealed record Cancelled : CommandResult
+    {
+        public override int ExitCode => ExitCodeConstants.Cancelled;
+    }
 
-    public sealed record DisplayHelp : CommandResult;
+    public sealed record DisplayHelp : CommandResult
+    {
+        public override int ExitCode => ExitCodeConstants.Success;
+    }
 }

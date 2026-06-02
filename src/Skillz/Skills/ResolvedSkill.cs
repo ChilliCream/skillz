@@ -1,6 +1,6 @@
 namespace Skillz.Skills;
 
-internal record RemoteSkill(
+internal record ResolvedSkill(
     string Name,
     string Description,
     string Content,

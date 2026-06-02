@@ -2,7 +2,7 @@ using System.Collections.Immutable;
 
 namespace Skillz.Install;
 
-internal sealed class AgentRegistry : IAgentRegistry
+internal sealed class AgentRegistry(string home, Func<string, string?> envReader, Func<string, bool> directoryExists)
 {
     public const string UniversalSkillsDir = ".agents/skills";
 
@@ -12,28 +12,50 @@ internal sealed class AgentRegistry : IAgentRegistry
             Environment.GetEnvironmentVariable,
             Directory.Exists) { }
 
-    public AgentRegistry(string home, Func<string, string?> envReader, Func<string, bool> directoryExists)
+    public ImmutableDictionary<string, AgentConfig> All => field ??= BuildAgents(home, envReader, directoryExists);
+
+    public ImmutableArray<string> AgentTypes
     {
-        var all = BuildAgents(home, envReader, directoryExists);
+        get
+        {
+            if (field.IsDefault)
+            {
+                field = All.Keys.ToImmutableArray();
+            }
 
-        All = all;
-        AgentTypes = all.Keys.ToImmutableArray();
-        UniversalAgents = all.Where(kv => kv.Value.SkillsDir == UniversalSkillsDir && kv.Value.ShowInUniversalList)
-            .Select(kv => kv.Key)
-            .ToImmutableArray();
-
-        NonUniversalAgents = all.Where(kv => kv.Value.SkillsDir != UniversalSkillsDir)
-            .Select(kv => kv.Key)
-            .ToImmutableArray();
+            return field;
+        }
     }
 
-    public ImmutableDictionary<string, AgentConfig> All { get; }
+    public ImmutableArray<string> UniversalAgents
+    {
+        get
+        {
+            if (field.IsDefault)
+            {
+                field = All.Where(kv => kv.Value.SkillsDir == UniversalSkillsDir && kv.Value.ShowInUniversalList)
+                    .Select(kv => kv.Key)
+                    .ToImmutableArray();
+            }
 
-    public ImmutableArray<string> AgentTypes { get; }
+            return field;
+        }
+    }
 
-    public ImmutableArray<string> UniversalAgents { get; }
+    public ImmutableArray<string> NonUniversalAgents
+    {
+        get
+        {
+            if (field.IsDefault)
+            {
+                field = All.Where(kv => kv.Value.SkillsDir != UniversalSkillsDir)
+                    .Select(kv => kv.Key)
+                    .ToImmutableArray();
+            }
 
-    public ImmutableArray<string> NonUniversalAgents { get; }
+            return field;
+        }
+    }
 
     public AgentConfig GetConfig(string agentType)
     {

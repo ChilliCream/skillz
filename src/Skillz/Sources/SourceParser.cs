@@ -5,7 +5,7 @@ namespace Skillz.Sources;
 
 internal interface ISourceParser
 {
-    ParsedSource Parse(string input);
+    SkillSource Parse(string input);
 }
 
 internal sealed partial class SourceParser : ISourceParser
@@ -58,17 +58,17 @@ internal sealed partial class SourceParser : ISourceParser
     [GeneratedRegex(@"\.git$")]
     private static partial Regex TrailingGitRegex();
 
-    public ParsedSource Parse(string input)
+    public SkillSource Parse(string input)
     {
         return ParseInternal(input);
     }
 
-    public static ParsedSource ParseInternal(string input)
+    public static SkillSource ParseInternal(string input)
     {
         if (IsLocalPath(input))
         {
             var resolvedPath = Path.GetFullPath(input);
-            return new ParsedSource.Local(resolvedPath, resolvedPath);
+            return new SkillSource.Local(resolvedPath, resolvedPath);
         }
 
         var fragment = ParseFragmentRef(input);
@@ -100,7 +100,7 @@ internal sealed partial class SourceParser : ISourceParser
             var repo = githubTreeWithPathMatch.Groups[2].Value;
             var refValue = githubTreeWithPathMatch.Groups[3].Value;
             var subpath = githubTreeWithPathMatch.Groups[4].Value;
-            return new ParsedSource.GitHub(
+            return new SkillSource.GitHub(
                 Url: $"https://github.com/{owner}/{repo}.git",
                 Ref: !string.IsNullOrEmpty(refValue) ? refValue : fragmentRef,
                 Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.SanitizeSubpath(subpath) : subpath);
@@ -112,7 +112,7 @@ internal sealed partial class SourceParser : ISourceParser
             var owner = githubTreeMatch.Groups[1].Value;
             var repo = githubTreeMatch.Groups[2].Value;
             var refValue = githubTreeMatch.Groups[3].Value;
-            return new ParsedSource.GitHub(
+            return new SkillSource.GitHub(
                 Url: $"https://github.com/{owner}/{repo}.git",
                 Ref: !string.IsNullOrEmpty(refValue) ? refValue : fragmentRef);
         }
@@ -123,7 +123,7 @@ internal sealed partial class SourceParser : ISourceParser
             var owner = githubRepoMatch.Groups[1].Value;
             var repo = githubRepoMatch.Groups[2].Value;
             var cleanRepo = TrailingGitRegex().Replace(repo, string.Empty);
-            return new ParsedSource.GitHub(Url: $"https://github.com/{owner}/{cleanRepo}.git", Ref: fragmentRef);
+            return new SkillSource.GitHub(Url: $"https://github.com/{owner}/{cleanRepo}.git", Ref: fragmentRef);
         }
 
         var gitlabTreeWithPathMatch = GitLabTreeWithPathRegex().Match(input);
@@ -136,7 +136,7 @@ internal sealed partial class SourceParser : ISourceParser
             var subpath = gitlabTreeWithPathMatch.Groups[5].Value;
             if (hostname != "github.com" && !string.IsNullOrEmpty(repoPath))
             {
-                return new ParsedSource.GitLab(
+                return new SkillSource.GitLab(
                     Url: $"{protocol}://{hostname}/{TrailingGitRegex().Replace(repoPath, string.Empty)}.git",
                     Ref: !string.IsNullOrEmpty(refValue) ? refValue : fragmentRef,
                     Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.SanitizeSubpath(subpath) : subpath);
@@ -152,7 +152,7 @@ internal sealed partial class SourceParser : ISourceParser
             var refValue = gitlabTreeMatch.Groups[4].Value;
             if (hostname != "github.com" && !string.IsNullOrEmpty(repoPath))
             {
-                return new ParsedSource.GitLab(
+                return new SkillSource.GitLab(
                     Url: $"{protocol}://{hostname}/{TrailingGitRegex().Replace(repoPath, string.Empty)}.git",
                     Ref: !string.IsNullOrEmpty(refValue) ? refValue : fragmentRef);
             }
@@ -164,7 +164,7 @@ internal sealed partial class SourceParser : ISourceParser
             var repoPath = gitlabRepoMatch.Groups[1].Value;
             if (repoPath.Contains('/', StringComparison.Ordinal))
             {
-                return new ParsedSource.GitLab(Url: $"https://gitlab.com/{repoPath}.git", Ref: fragmentRef);
+                return new SkillSource.GitLab(Url: $"https://gitlab.com/{repoPath}.git", Ref: fragmentRef);
             }
         }
 
@@ -177,7 +177,7 @@ internal sealed partial class SourceParser : ISourceParser
             var owner = atSkillMatch.Groups[1].Value;
             var repo = atSkillMatch.Groups[2].Value;
             var skillFilter = atSkillMatch.Groups[3].Value;
-            return new ParsedSource.GitHub(
+            return new SkillSource.GitHub(
                 Url: $"https://github.com/{owner}/{repo}.git",
                 Ref: fragmentRef,
                 SkillFilter: !string.IsNullOrEmpty(fragmentSkillFilter) ? fragmentSkillFilter : skillFilter);
@@ -192,7 +192,7 @@ internal sealed partial class SourceParser : ISourceParser
             var owner = shorthandMatch.Groups[1].Value;
             var repo = shorthandMatch.Groups[2].Value;
             var subpath = shorthandMatch.Groups[3].Success ? shorthandMatch.Groups[3].Value : null;
-            return new ParsedSource.GitHub(
+            return new SkillSource.GitHub(
                 Url: $"https://github.com/{owner}/{repo}.git",
                 Ref: fragmentRef,
                 Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.SanitizeSubpath(subpath) : null,
@@ -201,10 +201,10 @@ internal sealed partial class SourceParser : ISourceParser
 
         if (IsWellKnownUrl(input))
         {
-            return new ParsedSource.WellKnown(input);
+            return new SkillSource.WellKnown(input);
         }
 
-        return new ParsedSource.Git(input, fragmentRef);
+        return new SkillSource.Git(input, fragmentRef);
     }
 
     private static bool IsLocalPath(string input)

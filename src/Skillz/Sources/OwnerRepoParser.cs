@@ -13,22 +13,14 @@ internal static partial class OwnerRepoParser
     [GeneratedRegex(@"^([^/]+)/([^/]+)$")]
     private static partial Regex OwnerRepoRegex();
 
-    public static string? GetOwnerRepo(ParsedSource parsed)
+    public static string? GetOwnerRepo(SkillSource parsed)
     {
-        if (parsed is ParsedSource.Local)
+        if (parsed is SkillSource.Local)
         {
             return null;
         }
 
-        var url = parsed switch
-        {
-            ParsedSource.GitHub g => g.Url,
-            ParsedSource.GitLab g => g.Url,
-            ParsedSource.Git g => g.Url,
-            ParsedSource.WellKnown w => w.Url,
-            _ => null
-        };
-
+        var url = parsed.Url;
         if (url is null)
         {
             return null;

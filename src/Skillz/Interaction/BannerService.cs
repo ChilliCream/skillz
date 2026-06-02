@@ -1,4 +1,5 @@
 using Skillz.Install;
+using Spectre.Console;
 
 namespace Skillz.Interaction;
 
@@ -19,9 +20,9 @@ internal sealed class BannerService(
 
     private static readonly string[] s_grays = { "grey78", "grey74", "grey69", "grey62", "grey58", "grey50" };
 
-    public async Task ShowLogoAsync(CancellationToken cancellationToken)
+    public void ShowLogo()
     {
-        if (await ShouldSkipAsync(cancellationToken))
+        if (ShouldSkip())
         {
             return;
         }
@@ -29,33 +30,29 @@ internal sealed class BannerService(
         interaction.WriteLine();
         for (var i = 0; i < s_logoLines.Length; i++)
         {
-            var line = s_logoLines[i];
-            var gray = s_grays[i];
-            interaction.WriteMarkupLine($"[{gray}]{line}[/]");
+            interaction.WriteMarkupLine($"[{s_grays[i]}]{s_logoLines[i]}[/]");
         }
     }
 
-    public async Task ShowBannerAsync(CancellationToken cancellationToken)
+    public void ShowBanner()
     {
-        if (await ShouldSkipAsync(cancellationToken))
+        if (ShouldSkip())
         {
             return;
         }
 
-        await ShowLogoAsync(cancellationToken);
+        ShowLogo();
         interaction.WriteLine();
         interaction.WriteDim("The open agent skills ecosystem");
         interaction.WriteLine();
-        interaction.WriteMarkupLine(
-            "  [dim]$[/] [grey78]skillz add[/] [dim]<package>[/]        [dim]Add a new skill[/]");
-        interaction.WriteMarkupLine(
-            "  [dim]$[/] [grey78]skillz remove[/]               [dim]Remove installed skills[/]");
-        interaction.WriteMarkupLine("  [dim]$[/] [grey78]skillz list[/]                 [dim]List installed skills[/]");
-        interaction.WriteLine();
-        interaction.WriteMarkupLine(
-            "  [dim]$[/] [grey78]skillz update[/]               [dim]Update installed skills[/]");
-        interaction.WriteMarkupLine(
-            "  [dim]$[/] [grey78]skillz init[/] [dim][[name]][/]          [dim]Create a new skill[/]");
+
+        WriteCommandTable(
+            ("[dim]$[/] [grey78]skillz add[/] [dim]<package>[/]", "Add a new skill"),
+            ("[dim]$[/] [grey78]skillz remove[/]", "Remove installed skills"),
+            ("[dim]$[/] [grey78]skillz list[/]", "List installed skills"),
+            ("[dim]$[/] [grey78]skillz update[/]", "Update installed skills"),
+            ("[dim]$[/] [grey78]skillz init[/] [dim][[name]][/]", "Create a new skill"));
+
         interaction.WriteLine();
     }
 
@@ -65,46 +62,57 @@ internal sealed class BannerService(
         interaction.WriteMarkupLine("[bold]Usage:[/] [grey78]skillz[/] [dim]<command>[/] [dim][[options]][/]");
         interaction.WriteLine();
 
-        interaction.WriteMarkupLine("[bold]Manage Skills[/]");
-        interaction.WriteMarkupLine("  [grey78]add[/] [dim]<source>[/]              Add a skill from a source");
-        interaction.WriteMarkupLine("  [grey78]remove[/] [dim][[names…]][/]         Remove installed skills");
-        interaction.WriteMarkupLine("  [grey78]list[/]                     List installed skills");
+        interaction.WriteMarkupLine("[bold]Commands[/]");
+        WriteCommandTable(
+            ("[grey78]add[/] [dim]<source>[/]", "Add a skill from a source"),
+            ("[grey78]remove[/] [dim][[names…]][/]", "Remove installed skills"),
+            ("[grey78]list[/]", "List installed skills"),
+            ("[grey78]update[/] [dim][[names…]][/]", "Check for and apply updates"),
+            ("[grey78]init[/] [dim][[name]][/]", "Scaffold a new SKILL.md"));
         interaction.WriteLine();
 
-        interaction.WriteMarkupLine("[bold]Updates[/]");
-        interaction.WriteMarkupLine("  [grey78]update[/] [dim][[names…]][/]         Check for and apply updates");
-        interaction.WriteLine();
-
-        interaction.WriteMarkupLine("[bold]Init[/]");
-        interaction.WriteMarkupLine("  [grey78]init[/] [dim][[name]][/]             Scaffold a new SKILL.md");
-        interaction.WriteLine();
-
-        interaction.WriteMarkupLine("[bold]Common Options[/]");
-        interaction.WriteMarkupLine("  [grey78]-g, --global[/]             Operate on global scope");
-        interaction.WriteMarkupLine("  [grey78]-a, --agent <list>[/]       Target specific agent(s)");
-        interaction.WriteMarkupLine("  [grey78]-y, --yes[/]                Skip prompts (non-interactive)");
-        interaction.WriteMarkupLine("  [grey78]-h, --help[/]               Show help for a command");
+        interaction.WriteMarkupLine("[bold]Options[/]");
+        WriteCommandTable(
+            ("[grey78]-g, --global[/]", "Operate on global scope"),
+            ("[grey78]-a, --agent <list>[/]", "Target specific agent(s)"),
+            ("[grey78]-y, --yes[/]", "Skip prompts (non-interactive)"),
+            ("[grey78]-h, --help[/]", "Show help for a command"));
         interaction.WriteLine();
 
         interaction.WriteMarkupLine("[bold]Examples[/]");
-        interaction.WriteMarkupLine("  [dim]$[/] [grey78]skillz add[/] [dim]vercel-labs/agent-skills[/]");
-        interaction.WriteMarkupLine("  [dim]$[/] [grey78]skillz add[/] [dim]owner/repo@skill-name -y[/]");
-        interaction.WriteMarkupLine("  [dim]$[/] [grey78]skillz list[/] [dim]-g --json[/]");
-        interaction.WriteMarkupLine("  [dim]$[/] [grey78]skillz update -y[/]");
-        interaction.WriteMarkupLine("  [dim]$[/] [grey78]skillz init[/] [dim]my-skill[/]");
+        WriteCommandTable(
+            ("[dim]$[/] [grey78]skillz add[/] [dim]vercel-labs/agent-skills[/]", ""),
+            ("[dim]$[/] [grey78]skillz add[/] [dim]owner/repo@skill-name -y[/]", ""),
+            ("[dim]$[/] [grey78]skillz list[/] [dim]-g --json[/]", ""),
+            ("[dim]$[/] [grey78]skillz update -y[/]", ""),
+            ("[dim]$[/] [grey78]skillz init[/] [dim]my-skill[/]", ""));
         interaction.WriteLine();
 
         interaction.WriteDim("Use 'skillz <command> --help' for detailed command-specific help.");
         interaction.WriteLine();
     }
 
-    private async Task<bool> ShouldSkipAsync(CancellationToken cancellationToken)
+    private void WriteCommandTable(params (string Command, string Description)[] rows)
+    {
+        var grid = new Grid();
+        grid.AddColumn(new GridColumn().PadLeft(2).PadRight(4));
+        grid.AddColumn(new GridColumn().PadRight(0));
+
+        foreach (var (command, description) in rows)
+        {
+            grid.AddRow(command, description.Length == 0 ? string.Empty : $"[dim]{description}[/]");
+        }
+
+        interaction.WriteRenderable(grid);
+    }
+
+    private bool ShouldSkip()
     {
         if (context.IsJsonOutput)
         {
             return true;
         }
 
-        return await detector.IsRunningInAgentAsync(cancellationToken);
+        return detector.DetectAgent.IsAgent;
     }
 }

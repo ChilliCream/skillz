@@ -8,7 +8,7 @@ using Skillz.Skills;
 
 namespace Skillz.Sources.Providers;
 
-internal sealed partial class WellKnownProvider : IProvider
+internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFactory) : IProvider
 {
     internal const string HttpClientName = "Skillz.WellKnown";
     internal const string DiscoverySchemaV2 = "https://schemas.agentskills.io/discovery/0.2.0/schema.json";
@@ -22,23 +22,16 @@ internal sealed partial class WellKnownProvider : IProvider
     [GeneratedRegex(@"^[a-z0-9-]+$")]
     private static partial Regex SkillNameRegex();
 
-    private readonly IHttpClientFactory _httpClientFactory;
-
-    public WellKnownProvider(IHttpClientFactory httpClientFactory)
-    {
-        _httpClientFactory = httpClientFactory;
-    }
-
     public string Id => "well-known";
 
-    public bool CanHandle(ParsedSource source) => source is ParsedSource.WellKnown;
+    public bool CanHandle(SkillSource source) => source is SkillSource.WellKnown;
 
-    public async Task<ImmutableArray<RemoteSkill>> FetchSkillsAsync(
-        ParsedSource source,
+    public async Task<ImmutableArray<ResolvedSkill>> FetchSkillsAsync(
+        SkillSource source,
         ProviderOptions? options,
         CancellationToken cancellationToken)
     {
-        if (source is not ParsedSource.WellKnown wellKnown)
+        if (source is not SkillSource.WellKnown wellKnown)
         {
             throw new ArgumentException($"WellKnownProvider cannot handle {source.GetType().Name}.", nameof(source));
         }
@@ -47,7 +40,7 @@ internal sealed partial class WellKnownProvider : IProvider
 
         foreach (var candidate in candidates)
         {
-            var skills = ImmutableArray.CreateBuilder<RemoteSkill>();
+            var skills = ImmutableArray.CreateBuilder<ResolvedSkill>();
             foreach (var entry in candidate.Entries)
             {
                 var skill = await FetchSkillByEntryAsync(entry, cancellationToken);
@@ -101,7 +94,7 @@ internal sealed partial class WellKnownProvider : IProvider
         }
 
         var candidates = new List<IndexCandidate>();
-        var client = _httpClientFactory.CreateClient(HttpClientName);
+        var client = httpClientFactory.CreateClient(HttpClientName);
 
         foreach (var (indexUrl, resolvedBase, wellKnownPath) in urlsToTry)
         {
@@ -229,9 +222,9 @@ internal sealed partial class WellKnownProvider : IProvider
         return $"{parsed.Scheme}://{parsed.Authority}{trimmed}";
     }
 
-    private async Task<RemoteSkill?> FetchSkillByEntryAsync(NormalizedEntry entry, CancellationToken cancellationToken)
+    private async Task<ResolvedSkill?> FetchSkillByEntryAsync(NormalizedEntry entry, CancellationToken cancellationToken)
     {
-        var client = _httpClientFactory.CreateClient(HttpClientName);
+        var client = httpClientFactory.CreateClient(HttpClientName);
 
         if (entry.Version == "0.1.0")
         {
@@ -246,7 +239,7 @@ internal sealed partial class WellKnownProvider : IProvider
         return null;
     }
 
-    private async Task<RemoteSkill?> FetchLegacySkillAsync(
+    private async Task<ResolvedSkill?> FetchLegacySkillAsync(
         HttpClient client,
         NormalizedEntry entry,
         CancellationToken cancellationToken)
@@ -329,7 +322,7 @@ internal sealed partial class WellKnownProvider : IProvider
                 }
             }
 
-            return new RemoteSkill(
+            return new ResolvedSkill(
                 Name: TerminalSanitizer.SanitizeMetadata(skillName),
                 Description: TerminalSanitizer.SanitizeMetadata(skillDesc),
                 Content: content,
@@ -357,7 +350,7 @@ internal sealed partial class WellKnownProvider : IProvider
         }
     }
 
-    private async Task<RemoteSkill?> FetchSkillMdArtifactAsync(
+    private async Task<ResolvedSkill?> FetchSkillMdArtifactAsync(
         HttpClient client,
         NormalizedEntry entry,
         CancellationToken cancellationToken)
@@ -386,7 +379,7 @@ internal sealed partial class WellKnownProvider : IProvider
                 return null;
             }
 
-            return new RemoteSkill(
+            return new ResolvedSkill(
                 Name: TerminalSanitizer.SanitizeMetadata(skillName),
                 Description: TerminalSanitizer.SanitizeMetadata(skillDesc),
                 Content: content,

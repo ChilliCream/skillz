@@ -3,7 +3,7 @@ using Skillz.Skills;
 
 namespace Skillz.Install;
 
-internal sealed class Installer : IInstaller
+internal sealed class SkillInstaller(AgentRegistry registry, string home) : ISkillInstaller
 {
     private static readonly HashSet<string> s_excludeFiles = new(StringComparer.Ordinal) { "metadata.json" };
 
@@ -15,33 +15,24 @@ internal sealed class Installer : IInstaller
         "__pypackages__"
     };
 
-    private readonly IAgentRegistry _registry;
-    private readonly string _home;
-
-    public Installer(IAgentRegistry registry)
+    public SkillInstaller(AgentRegistry registry)
         : this(registry, Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)) { }
-
-    public Installer(IAgentRegistry registry, string home)
-    {
-        _registry = registry;
-        _home = home;
-    }
 
     public string GetCanonicalSkillsDir(bool global, string? cwd = null)
     {
-        var baseDir = global ? _home : cwd ?? Directory.GetCurrentDirectory();
+        var baseDir = global ? home : cwd ?? Directory.GetCurrentDirectory();
         return Path.Combine(baseDir, KnownConfigNames.AgentsDir, KnownConfigNames.SkillsSubdir);
     }
 
     public string GetAgentBaseDir(string agentType, bool global, string? cwd = null)
     {
-        if (_registry.IsUniversalAgent(agentType))
+        if (registry.IsUniversalAgent(agentType))
         {
             return GetCanonicalSkillsDir(global, cwd);
         }
 
-        var config = _registry.GetConfig(agentType);
-        var baseDir = global ? _home : cwd ?? Directory.GetCurrentDirectory();
+        var config = registry.GetConfig(agentType);
+        var baseDir = global ? home : cwd ?? Directory.GetCurrentDirectory();
 
         if (global)
         {
@@ -58,7 +49,7 @@ internal sealed class Installer : IInstaller
 
     public string GetCanonicalPath(string skillName, bool global = false, string? cwd = null)
     {
-        var sanitized = NameSanitizer.SanitizeName(skillName);
+        var sanitized = SkillNameSanitizer.SanitizeName(skillName);
         var canonicalBase = GetCanonicalSkillsDir(global, cwd);
         var canonicalPath = Path.Combine(canonicalBase, sanitized);
 
@@ -72,7 +63,7 @@ internal sealed class Installer : IInstaller
 
     public string GetInstallPath(string skillName, string agentType, bool global = false, string? cwd = null)
     {
-        var sanitized = NameSanitizer.SanitizeName(skillName);
+        var sanitized = SkillNameSanitizer.SanitizeName(skillName);
         var targetBase = GetAgentBaseDir(agentType, global, cwd);
         var installPath = Path.Combine(targetBase, sanitized);
 
@@ -84,13 +75,13 @@ internal sealed class Installer : IInstaller
         return installPath;
     }
 
-    public async Task<InstallResult> InstallSkillForAgentAsync(
-        Skill skill,
+    public async Task<InstallResult> InstallAsync(
+        ResolvedSkill skill,
         string agentType,
         InstallOptions options,
         CancellationToken cancellationToken)
     {
-        var config = _registry.GetConfig(agentType);
+        var config = registry.GetConfig(agentType);
         var isGlobal = options.Global;
         var cwd = options.Cwd ?? Directory.GetCurrentDirectory();
         var installMode = options.Mode;
@@ -104,8 +95,7 @@ internal sealed class Installer : IInstaller
                 Error: $"{config.DisplayName} does not support global skill installation");
         }
 
-        var rawSkillName = string.IsNullOrEmpty(skill.Name) ? Path.GetFileName(skill.Path) : skill.Name;
-        var skillName = NameSanitizer.SanitizeName(rawSkillName);
+        var skillName = SkillNameSanitizer.SanitizeName(skill.InstallName);
 
         var canonicalBase = GetCanonicalSkillsDir(isGlobal, cwd);
         var canonicalDir = Path.Combine(canonicalBase, skillName);
@@ -136,20 +126,20 @@ internal sealed class Installer : IInstaller
             if (installMode == InstallMode.Copy)
             {
                 CleanAndCreateDirectory(agentDir, agentBase);
-                await CopyDirectoryAsync(skill.Path, agentDir, cancellationToken);
+                await MaterializeAsync(skill, agentDir, cancellationToken);
 
                 return new InstallResult(true, agentDir, Mode: InstallMode.Copy);
             }
 
             CleanAndCreateDirectory(canonicalDir, canonicalBase);
-            await CopyDirectoryAsync(skill.Path, canonicalDir, cancellationToken);
+            await MaterializeAsync(skill, canonicalDir, cancellationToken);
 
-            if (isGlobal && _registry.IsUniversalAgent(agentType))
+            if (isGlobal && registry.IsUniversalAgent(agentType))
             {
                 return new InstallResult(true, canonicalDir, canonicalDir, InstallMode.Symlink);
             }
 
-            if (!isGlobal && !_registry.IsUniversalAgent(agentType))
+            if (!isGlobal && !registry.IsUniversalAgent(agentType))
             {
                 var rootSegment = config.SkillsDir.Split('/', '\\')[0];
                 var agentRootDir = Path.Combine(cwd, rootSegment);
@@ -164,7 +154,7 @@ internal sealed class Installer : IInstaller
             if (!symlinkCreated)
             {
                 CleanAndCreateDirectory(agentDir, agentBase);
-                await CopyDirectoryAsync(skill.Path, agentDir, cancellationToken);
+                await MaterializeAsync(skill, agentDir, cancellationToken);
 
                 return new InstallResult(true, agentDir, canonicalDir, InstallMode.Symlink, SymlinkFailed: true);
             }
@@ -177,119 +167,16 @@ internal sealed class Installer : IInstaller
         }
     }
 
-    public async Task<InstallResult> InstallRemoteSkillForAgentAsync(
-        RemoteSkill skill,
-        string agentType,
-        InstallOptions options,
-        CancellationToken cancellationToken)
+    private async Task MaterializeAsync(ResolvedSkill skill, string destDir, CancellationToken ct)
     {
-        var config = _registry.GetConfig(agentType);
-        var isGlobal = options.Global;
-        var cwd = options.Cwd ?? Directory.GetCurrentDirectory();
-        var installMode = options.Mode;
-
-        if (isGlobal && config.GlobalSkillsDir is null)
+        if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
         {
-            return new InstallResult(
-                Success: false,
-                Path: string.Empty,
-                Mode: installMode,
-                Error: $"{config.DisplayName} does not support global skill installation");
+            await CopyDirectoryAsync(skill.SourcePath, destDir, ct);
         }
-
-        var skillName = NameSanitizer.SanitizeName(skill.InstallName);
-
-        var canonicalBase = GetCanonicalSkillsDir(isGlobal, cwd);
-        var canonicalDir = Path.Combine(canonicalBase, skillName);
-
-        var agentBase = GetAgentBaseDir(agentType, isGlobal, cwd);
-        var agentDir = Path.Combine(agentBase, skillName);
-
-        if (!PathContainment.IsContainedInRealPath(canonicalDir, canonicalBase))
+        else
         {
-            return new InstallResult(
-                false,
-                agentDir,
-                Mode: installMode,
-                Error: "Invalid skill name: potential path traversal detected");
-        }
-
-        if (!PathContainment.IsContainedInRealPath(agentDir, agentBase))
-        {
-            return new InstallResult(
-                false,
-                agentDir,
-                Mode: installMode,
-                Error: "Invalid skill name: potential path traversal detected");
-        }
-
-        try
-        {
-            if (installMode == InstallMode.Copy)
-            {
-                CleanAndCreateDirectory(agentDir, agentBase);
-                if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
-                {
-                    await CopyDirectoryAsync(skill.SourcePath, agentDir, cancellationToken);
-                }
-                else
-                {
-                    var agentSkillMd = Path.Combine(agentDir, KnownConfigNames.SkillFileName);
-                    await File.WriteAllTextAsync(agentSkillMd, skill.Content, cancellationToken);
-                }
-
-                return new InstallResult(true, agentDir, Mode: InstallMode.Copy);
-            }
-
-            CleanAndCreateDirectory(canonicalDir, canonicalBase);
-            if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
-            {
-                await CopyDirectoryAsync(skill.SourcePath, canonicalDir, cancellationToken);
-            }
-            else
-            {
-                var canonicalSkillMd = Path.Combine(canonicalDir, KnownConfigNames.SkillFileName);
-                await File.WriteAllTextAsync(canonicalSkillMd, skill.Content, cancellationToken);
-            }
-
-            if (isGlobal && _registry.IsUniversalAgent(agentType))
-            {
-                return new InstallResult(true, canonicalDir, canonicalDir, InstallMode.Symlink);
-            }
-
-            if (!isGlobal && !_registry.IsUniversalAgent(agentType))
-            {
-                var rootSegment = config.SkillsDir.Split('/', '\\')[0];
-                var agentRootDir = Path.Combine(cwd, rootSegment);
-                if (!Directory.Exists(agentRootDir))
-                {
-                    return new InstallResult(true, canonicalDir, canonicalDir, InstallMode.Symlink, Skipped: true);
-                }
-            }
-
-            var symlinkCreated = TryCreateSymlink(canonicalDir, agentDir);
-
-            if (!symlinkCreated)
-            {
-                CleanAndCreateDirectory(agentDir, agentBase);
-                if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
-                {
-                    await CopyDirectoryAsync(skill.SourcePath, agentDir, cancellationToken);
-                }
-                else
-                {
-                    var fallbackSkillMd = Path.Combine(agentDir, KnownConfigNames.SkillFileName);
-                    await File.WriteAllTextAsync(fallbackSkillMd, skill.Content, cancellationToken);
-                }
-
-                return new InstallResult(true, agentDir, canonicalDir, InstallMode.Symlink, SymlinkFailed: true);
-            }
-
-            return new InstallResult(true, agentDir, canonicalDir, InstallMode.Symlink);
-        }
-        catch (Exception ex)
-        {
-            return new InstallResult(false, agentDir, Mode: installMode, Error: ex.Message);
+            var skillMd = Path.Combine(destDir, KnownConfigNames.SkillFileName);
+            await File.WriteAllTextAsync(skillMd, skill.Content, ct);
         }
     }
 
@@ -329,7 +216,8 @@ internal sealed class Installer : IInstaller
 
     private static async Task CopyDirectoryAsync(string src, string dest, CancellationToken cancellationToken)
     {
-        var sourceRoot = RealPath.TryGetRealPath(src)
+        var sourceRoot =
+            RealPath.TryGetRealPath(src)
             ?? throw new InvalidOperationException($"Source path cannot be resolved: {src}");
 
         await CopyDirectoryAsync(src, dest, sourceRoot, cancellationToken);
@@ -510,7 +398,8 @@ internal sealed class Installer : IInstaller
                 Directory.CreateDirectory(linkDir);
             }
 
-            var realLinkDir = RealPath.ResolveWithNearestExistingParent(linkDir ?? string.Empty)
+            var realLinkDir =
+                RealPath.ResolveWithNearestExistingParent(linkDir ?? string.Empty)
                 ?? Path.GetFullPath(linkDir ?? string.Empty);
             var relativePath = Path.GetRelativePath(realLinkDir, target);
 

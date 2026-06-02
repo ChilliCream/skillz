@@ -4,27 +4,18 @@ using Skillz.Skills;
 
 namespace Skillz.Sources.Providers;
 
-internal sealed class GitHubProvider : IProvider
+internal sealed class GitHubProvider(IGitClient gitClient, ISkillDiscovery skillDiscovery) : IProvider
 {
-    private readonly IGitClient _gitClient;
-    private readonly ISkillDiscovery _skillDiscovery;
-
-    public GitHubProvider(IGitClient gitClient, ISkillDiscovery skillDiscovery)
-    {
-        _gitClient = gitClient;
-        _skillDiscovery = skillDiscovery;
-    }
-
     public string Id => "github";
 
-    public bool CanHandle(ParsedSource source) => source is ParsedSource.GitHub;
+    public bool CanHandle(SkillSource source) => source is SkillSource.GitHub;
 
-    public async Task<ImmutableArray<RemoteSkill>> FetchSkillsAsync(
-        ParsedSource source,
+    public async Task<ImmutableArray<ResolvedSkill>> FetchSkillsAsync(
+        SkillSource source,
         ProviderOptions? options,
         CancellationToken cancellationToken)
     {
-        if (source is not ParsedSource.GitHub github)
+        if (source is not SkillSource.GitHub github)
         {
             throw new ArgumentException($"GitHubProvider cannot handle {source.GetType().Name}.", nameof(source));
         }
@@ -32,17 +23,14 @@ internal sealed class GitHubProvider : IProvider
         var tempDir = Path.Combine(Path.GetTempPath(), "skillz-" + Guid.NewGuid().ToString("N"));
         try
         {
-            await _gitClient.CloneAsync(github.Url, tempDir, github.Ref, cancellationToken);
+            await gitClient.CloneAsync(github.Url, tempDir, github.Ref, cancellationToken);
 
             var includeInternal = !string.IsNullOrEmpty(github.SkillFilter) || (options?.IncludeInternal ?? false);
-            var discoveryOpts = new SkillDiscoveryOptions(
-                IncludeInternal: includeInternal,
-                FullDepth: options?.FullDepth ?? false);
+            var discoveryOpts = new SkillDiscoveryOptions(includeInternal, options?.FullDepth ?? false);
 
-            var skills = await _skillDiscovery
-                .DiscoverAsync(tempDir, github.Subpath, discoveryOpts, cancellationToken);
+            var skills = await skillDiscovery.DiscoverAsync(tempDir, github.Subpath, discoveryOpts, cancellationToken);
 
-            return ProviderConversions.ToRemoteSkills(skills, Id, github.Url, tempDir, cleanupPath: tempDir);
+            return skills.ToRemoteSkills(Id, github.Url, tempDir, cleanupPath: tempDir);
         }
         catch
         {

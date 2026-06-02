@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Skillz.Git;
 using Skillz.Install;
 using Skillz.Interaction;
-using Skillz.Lock;
+using Skillz.Locking;
 using Skillz.Net;
 using Skillz.Plugins;
 using Skillz.Skills;
@@ -37,7 +37,7 @@ public class CliTestHelperTests
         Assert.IsType<TestBlobClient>(provider.GetRequiredService<IBlobClient>());
         Assert.IsType<TestGitHubTokenProvider>(provider.GetRequiredService<IGitHubTokenProvider>());
         Assert.IsType<TestAgentEnvironmentDetector>(provider.GetRequiredService<IAgentEnvironmentDetector>());
-        Assert.IsType<TestInstaller>(provider.GetRequiredService<IInstaller>());
+        Assert.IsType<TestInstaller>(provider.GetRequiredService<ISkillInstaller>());
         Assert.IsType<TestSkillDiscovery>(provider.GetRequiredService<ISkillDiscovery>());
         Assert.IsType<TestSourceParser>(provider.GetRequiredService<ISourceParser>());
         Assert.IsType<TestPluginManifest>(provider.GetRequiredService<IPluginManifest>());
@@ -55,7 +55,7 @@ public class CliTestHelperTests
         // Assert
         Assert.NotNull(provider.GetRequiredService<ConsoleEnvironment>());
         Assert.NotNull(provider.GetRequiredService<CliExecutionContext>());
-        Assert.NotNull(provider.GetRequiredService<IAgentRegistry>());
+        Assert.NotNull(provider.GetRequiredService<AgentRegistry>());
     }
 
     [Fact]
@@ -104,22 +104,19 @@ public class CliTestHelperTests
     }
 
     [Fact]
-    public async Task TestInteractionService_Uses_Callbacks_For_Prompts()
+    public async Task TestInteractionService_Uses_Callback_For_Confirm()
     {
         // Arrange
         var ct = TestContext.Current.CancellationToken;
         var provider = CliTestHelper.CreateServiceProvider();
         var interaction = (TestInteractionService)provider.GetRequiredService<IInteractionService>();
 
-        interaction.OnPrompt = (_, _) => "typed value";
         interaction.OnConfirm = (_, _) => true;
 
         // Act
-        var prompt = await interaction.PromptAsync("name?", "default", ct);
         var confirm = await interaction.ConfirmAsync("ok?", defaultValue: false, ct);
 
         // Assert
-        Assert.Equal("typed value", prompt);
         Assert.True(confirm);
     }
 
@@ -132,11 +129,9 @@ public class CliTestHelperTests
         var interaction = (TestInteractionService)provider.GetRequiredService<IInteractionService>();
 
         // Act
-        var prompt = await interaction.PromptAsync("name?", "default", ct);
         var confirm = await interaction.ConfirmAsync("ok?", defaultValue: true, cancellationToken: ct);
 
         // Assert
-        Assert.Equal("default", prompt);
         Assert.True(confirm);
     }
 }

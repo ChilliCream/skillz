@@ -4,27 +4,18 @@ using Skillz.Skills;
 
 namespace Skillz.Sources.Providers;
 
-internal sealed class GitLabProvider : IProvider
+internal sealed class GitLabProvider(IGitClient gitClient, ISkillDiscovery skillDiscovery) : IProvider
 {
-    private readonly IGitClient _gitClient;
-    private readonly ISkillDiscovery _skillDiscovery;
-
-    public GitLabProvider(IGitClient gitClient, ISkillDiscovery skillDiscovery)
-    {
-        _gitClient = gitClient;
-        _skillDiscovery = skillDiscovery;
-    }
-
     public string Id => "gitlab";
 
-    public bool CanHandle(ParsedSource source) => source is ParsedSource.GitLab;
+    public bool CanHandle(SkillSource source) => source is SkillSource.GitLab;
 
-    public async Task<ImmutableArray<RemoteSkill>> FetchSkillsAsync(
-        ParsedSource source,
+    public async Task<ImmutableArray<ResolvedSkill>> FetchSkillsAsync(
+        SkillSource source,
         ProviderOptions? options,
         CancellationToken cancellationToken)
     {
-        if (source is not ParsedSource.GitLab gitlab)
+        if (source is not SkillSource.GitLab gitlab)
         {
             throw new ArgumentException($"GitLabProvider cannot handle {source.GetType().Name}.", nameof(source));
         }
@@ -32,17 +23,15 @@ internal sealed class GitLabProvider : IProvider
         var tempDir = Path.Combine(Path.GetTempPath(), "skillz-" + Guid.NewGuid().ToString("N"));
         try
         {
-            await _gitClient.CloneAsync(gitlab.Url, tempDir, gitlab.Ref, cancellationToken);
+            await gitClient.CloneAsync(gitlab.Url, tempDir, gitlab.Ref, cancellationToken);
 
-            var includeInternal = options?.IncludeInternal ?? false;
             var discoveryOpts = new SkillDiscoveryOptions(
-                IncludeInternal: includeInternal,
-                FullDepth: options?.FullDepth ?? false);
+                options?.IncludeInternal ?? false,
+                options?.FullDepth ?? false);
 
-            var skills = await _skillDiscovery
-                .DiscoverAsync(tempDir, gitlab.Subpath, discoveryOpts, cancellationToken);
+            var skills = await skillDiscovery.DiscoverAsync(tempDir, gitlab.Subpath, discoveryOpts, cancellationToken);
 
-            return ProviderConversions.ToRemoteSkills(skills, Id, gitlab.Url, tempDir, cleanupPath: tempDir);
+            return skills.ToRemoteSkills(Id, gitlab.Url, tempDir, cleanupPath: tempDir);
         }
         catch
         {
