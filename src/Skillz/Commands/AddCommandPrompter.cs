@@ -128,14 +128,14 @@ internal sealed class AddCommandPrompter(
         ImmutableArray<OverwriteTarget> overwrites,
         CancellationToken cancellationToken)
     {
-        var skillNames = string.Join(", ", skills.Select(s => s.InstallName));
-        var agentNames = string.Join(", ", agents);
+        var skillNames = skills.Select(s => s.InstallName).Join(", ");
+        var agentNames = agents.Join(", ");
         var message = $"Install {skills.Length} skill(s) [{skillNames}] to {agents.Length} agent(s) [{agentNames}]?";
         if (overwrites.Length > 0)
         {
-            var targets = string.Join(
-                Environment.NewLine,
-                overwrites.Select(o => $"  - {o.SkillName}: {o.DestinationPath}"));
+            var targets = overwrites
+                .Select(o => $"  - {o.SkillName}: {o.DestinationPath}")
+                .Join(Environment.NewLine);
             message += $"{Environment.NewLine}Existing installs will be overwritten:{Environment.NewLine}{targets}";
         }
 

@@ -51,7 +51,7 @@ internal sealed class ListCommand(
         var agents = parseResult.GetValue(_agentOption) ?? [];
         var format = parseResult.GetValue(_formatOption);
         var jsonFlag = parseResult.GetValue(_jsonOption);
-        var jsonOutput = jsonFlag || string.Equals(format, "json", StringComparison.OrdinalIgnoreCase);
+        var jsonOutput = jsonFlag || format.EqualsOrdinalIgnoreCase("json");
 
         executionContext.IsJsonOutput = jsonOutput;
 
@@ -61,7 +61,7 @@ internal sealed class ListCommand(
             var invalid = agents.Where(a => !valid.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
-                interaction.WriteError($"Invalid agents: {string.Join(", ", invalid)}");
+                interaction.WriteError($"Invalid agents: {invalid.Join(", ")}");
                 return new CommandResult.Failure(ExitCodeConstants.Failure);
             }
         }
@@ -127,8 +127,8 @@ internal sealed class ListCommand(
             else
             {
                 var display = agentNames.Count > 5
-                    ? string.Join(", ", agentNames.Take(5)) + $" +{agentNames.Count - 5} more"
-                    : string.Join(", ", agentNames);
+                    ? agentNames.Take(5).Join(", ") + $" +{agentNames.Count - 5} more"
+                    : agentNames.Join(", ");
                 agentCell = $"[dim]{Markup.Escape(display)}[/]";
             }
 
@@ -241,12 +241,12 @@ internal sealed class ListCommand(
     private static string ShortenPath(string path)
     {
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        if (!string.IsNullOrEmpty(home) && path.StartsWith(home, StringComparison.Ordinal))
+        if (!string.IsNullOrEmpty(home) && path.StartsWithOrdinal(home))
         {
             return "~" + path[home.Length..];
         }
         var cwd = Directory.GetCurrentDirectory();
-        if (!string.IsNullOrEmpty(cwd) && path.StartsWith(cwd, StringComparison.Ordinal))
+        if (!string.IsNullOrEmpty(cwd) && path.StartsWithOrdinal(cwd))
         {
             var relative = path[cwd.Length..];
             return "." + (relative.Length == 0 ? "" : relative);

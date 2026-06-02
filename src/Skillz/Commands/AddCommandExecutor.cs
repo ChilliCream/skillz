@@ -170,7 +170,7 @@ internal sealed class AddCommandExecutor(
         {
             if (skillFilters.Length > 0)
             {
-                interaction.WriteError($"No matching skills found for: {string.Join(", ", skillFilters)}");
+                interaction.WriteError($"No matching skills found for: {skillFilters.Join(", ")}");
                 interaction.WriteLine("Available skills:");
                 foreach (var s in skills)
                 {
@@ -260,9 +260,9 @@ internal sealed class AddCommandExecutor(
 
         if (failed.Length > 0)
         {
-            var detail = string.Join(
-                Environment.NewLine,
-                failed.Select(r => $"{r.SkillName} → {r.AgentType}: {r.Result.Error}"));
+            var detail = failed
+                .Select(r => $"{r.SkillName} → {r.AgentType}: {r.Result.Error}")
+                .Join(Environment.NewLine);
             throw new CliException(ExitCodeConstants.Failure, detail, title: "Installation failed");
         }
 
@@ -290,16 +290,16 @@ internal sealed class AddCommandExecutor(
         if (universals.Count > 0)
         {
             summary.AppendLine(
-                $"[bold]Universal:[/]  {Markup.Escape(string.Join(", ", universals.Select(GetAgentDisplay)))}");
+                $"[bold]Universal:[/]  {Markup.Escape(universals.Select(GetAgentDisplay).Join(", "))}");
         }
         if (symlinked.Count > 0)
         {
             summary.AppendLine(
-                $"[bold]Symlinked:[/]  {Markup.Escape(string.Join(", ", symlinked.Select(GetAgentDisplay)))}");
+                $"[bold]Symlinked:[/]  {Markup.Escape(symlinked.Select(GetAgentDisplay).Join(", "))}");
         }
         if (overwrites.Count > 0)
         {
-            summary.Append($"[yellow]Overwrites:[/] {Markup.Escape(string.Join(", ", overwrites))}");
+            summary.Append($"[yellow]Overwrites:[/] {Markup.Escape(overwrites.Join(", "))}");
         }
 
         interaction.WriteLine();
@@ -482,7 +482,7 @@ internal sealed class AddCommandExecutor(
             var invalid = options.Agents.Where(a => !validAgents.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
-                interaction.WriteError($"Invalid agents: {string.Join(", ", invalid)}");
+                interaction.WriteError($"Invalid agents: {invalid.Join(", ")}");
                 return ImmutableArray<string>.Empty;
             }
 
@@ -643,8 +643,8 @@ internal sealed class AddCommandExecutor(
         return skills
             .Where(s =>
                 filters.Any(f =>
-                    string.Equals(f, s.InstallName, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(f, s.Name, StringComparison.OrdinalIgnoreCase)
+                    f.EqualsOrdinalIgnoreCase(s.InstallName)
+                    || f.EqualsOrdinalIgnoreCase(s.Name)
                 )
             )
             .ToImmutableArray();

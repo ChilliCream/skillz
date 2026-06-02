@@ -85,7 +85,7 @@ public sealed class GitClient : IGitClient
 
             foreach (var line in result.StandardOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
-                if (!line.StartsWith("ref: refs/heads/", StringComparison.Ordinal))
+                if (!line.StartsWithOrdinal("ref: refs/heads/"))
                 {
                     continue;
                 }
@@ -125,10 +125,10 @@ public sealed class GitClient : IGitClient
         var redactedUrl = GitUrl.RedactUrlUserInfo(url);
         var redactedError = GitUrl.RedactUrlUserInfo(errorMessage);
         var isAuthError =
-            errorMessage.Contains("Authentication failed", StringComparison.Ordinal)
-            || errorMessage.Contains("could not read Username", StringComparison.Ordinal)
-            || errorMessage.Contains("Permission denied", StringComparison.Ordinal)
-            || errorMessage.Contains("Repository not found", StringComparison.Ordinal);
+            errorMessage.ContainsOrdinal("Authentication failed")
+            || errorMessage.ContainsOrdinal("could not read Username")
+            || errorMessage.ContainsOrdinal("Permission denied")
+            || errorMessage.ContainsOrdinal("Repository not found");
 
         if (isAuthError)
         {

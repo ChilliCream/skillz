@@ -69,7 +69,7 @@ internal sealed class RemoveCommand(
             var invalid = agents.Where(a => !valid.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
-                interaction.WriteError($"Invalid agents: {string.Join(", ", invalid)}");
+                interaction.WriteError($"Invalid agents: {invalid.Join(", ")}");
                 return new CommandResult.Failure(ExitCodeConstants.Failure);
             }
         }
@@ -97,12 +97,12 @@ internal sealed class RemoveCommand(
         else if (requestedSkills.Length > 0)
         {
             selected = installed
-                .Where(s => requestedSkills.Any(r => string.Equals(r, s, StringComparison.OrdinalIgnoreCase)))
+                .Where(s => requestedSkills.Any(r => r.EqualsOrdinalIgnoreCase(s)))
                 .ToImmutableArray();
 
             if (selected.Length == 0)
             {
-                interaction.WriteDim($"No matching skills found for: {string.Join(", ", requestedSkills)}");
+                interaction.WriteDim($"No matching skills found for: {requestedSkills.Join(", ")}");
                 return new CommandResult.Success();
             }
         }

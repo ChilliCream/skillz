@@ -308,6 +308,6 @@ file static class Extensions
             => skill.Metadata is { } metadata
             && metadata.TryGetValue("internal", out var flag)
             && flag is string value
-            && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+            && value.EqualsOrdinalIgnoreCase("true");
     }
 }

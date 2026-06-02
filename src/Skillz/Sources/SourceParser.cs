@@ -157,7 +157,7 @@ internal sealed partial class SourceParser : ISourceParser
         if (gitlabRepoMatch.Success)
         {
             var repoPath = gitlabRepoMatch.Groups[1].Value;
-            if (repoPath.Contains('/', StringComparison.Ordinal))
+            if (repoPath.ContainsOrdinal('/'))
             {
                 return new SkillSource.GitLab(Url: $"https://gitlab.com/{repoPath}.git", Ref: fragmentRef);
             }
@@ -165,7 +165,7 @@ internal sealed partial class SourceParser : ISourceParser
 
         var atSkillMatch = AtSkillRegex().Match(input);
         if (atSkillMatch.Success
-            && !input.Contains(':', StringComparison.Ordinal)
+            && !input.ContainsOrdinal(':')
             && !input.StartsWith('.')
             && !input.StartsWith('/'))
         {
@@ -180,7 +180,7 @@ internal sealed partial class SourceParser : ISourceParser
 
         var shorthandMatch = ShorthandRegex().Match(input);
         if (shorthandMatch.Success
-            && !input.Contains(':', StringComparison.Ordinal)
+            && !input.ContainsOrdinal(':')
             && !input.StartsWith('.')
             && !input.StartsWith('/'))
         {
@@ -209,8 +209,8 @@ internal sealed partial class SourceParser : ISourceParser
             return false;
         }
 
-        if (input.StartsWith("./", StringComparison.Ordinal)
-            || input.StartsWith("../", StringComparison.Ordinal)
+        if (input.StartsWithOrdinal("./")
+            || input.StartsWithOrdinal("../")
             || input == "."
             || input == "..")
         {
@@ -232,8 +232,8 @@ internal sealed partial class SourceParser : ISourceParser
 
     private static bool IsWellKnownUrl(string input)
     {
-        if (!input.StartsWith("http://", StringComparison.Ordinal)
-            && !input.StartsWith("https://", StringComparison.Ordinal))
+        if (!input.StartsWithOrdinal("http://")
+            && !input.StartsWithOrdinal("https://"))
         {
             return false;
         }
@@ -249,7 +249,7 @@ internal sealed partial class SourceParser : ISourceParser
             return false;
         }
 
-        if (input.EndsWith(".git", StringComparison.Ordinal))
+        if (input.EndsWithOrdinal(".git"))
         {
             return false;
         }
@@ -261,7 +261,7 @@ internal sealed partial class SourceParser : ISourceParser
 
     private static FragmentRefResult ParseFragmentRef(string input)
     {
-        var hashIndex = input.IndexOf('#', StringComparison.Ordinal);
+        var hashIndex = input.IndexOfOrdinal('#');
         if (hashIndex < 0)
         {
             return new FragmentRefResult(input, null, null);
@@ -275,7 +275,7 @@ internal sealed partial class SourceParser : ISourceParser
             return new FragmentRefResult(input, null, null);
         }
 
-        var atIndex = fragment.IndexOf('@', StringComparison.Ordinal);
+        var atIndex = fragment.IndexOfOrdinal('@');
         if (atIndex == -1)
         {
             return new FragmentRefResult(inputWithoutFragment, DecodeFragmentValue(fragment), null);
@@ -303,15 +303,15 @@ internal sealed partial class SourceParser : ISourceParser
 
     private static bool LooksLikeGitSource(string input)
     {
-        if (input.StartsWith("github:", StringComparison.Ordinal)
-            || input.StartsWith("gitlab:", StringComparison.Ordinal)
-            || input.StartsWith("git@", StringComparison.Ordinal))
+        if (input.StartsWithOrdinal("github:")
+            || input.StartsWithOrdinal("gitlab:")
+            || input.StartsWithOrdinal("git@"))
         {
             return true;
         }
 
-        if (input.StartsWith("http://", StringComparison.Ordinal)
-            || input.StartsWith("https://", StringComparison.Ordinal))
+        if (input.StartsWithOrdinal("http://")
+            || input.StartsWithOrdinal("https://"))
         {
             if (Uri.TryCreate(input, UriKind.Absolute, out var parsed))
             {
@@ -333,7 +333,7 @@ internal sealed partial class SourceParser : ISourceParser
             return true;
         }
 
-        return !input.Contains(':', StringComparison.Ordinal)
+        return !input.ContainsOrdinal(':')
             && !input.StartsWith('.')
             && !input.StartsWith('/')
             && OwnerRepoOrAtRegex().IsMatch(input);

@@ -31,11 +31,11 @@ internal static partial class OwnerRepoParser
         {
             var path = sshMatch.Groups[1].Value;
             path = TrailingGitRegex().Replace(path, string.Empty);
-            return path.Contains('/', StringComparison.Ordinal) ? path : null;
+            return path.ContainsOrdinal('/') ? path : null;
         }
 
-        if (!url.StartsWith("http://", StringComparison.Ordinal)
-            && !url.StartsWith("https://", StringComparison.Ordinal))
+        if (!url.StartsWithOrdinal("http://")
+            && !url.StartsWithOrdinal("https://"))
         {
             return null;
         }
@@ -52,7 +52,7 @@ internal static partial class OwnerRepoParser
         }
 
         pathname = TrailingGitRegex().Replace(pathname, string.Empty);
-        return pathname.Contains('/', StringComparison.Ordinal) ? pathname : null;
+        return pathname.ContainsOrdinal('/') ? pathname : null;
     }
 
     public static (string Owner, string Repo)? ParseOwnerRepo(string ownerRepo)

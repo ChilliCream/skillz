@@ -21,7 +21,7 @@ internal sealed class RemoveCommandPrompter(IInteractionService interaction) : I
 
     public Task<bool> ConfirmRemovalAsync(ImmutableArray<string> skills, CancellationToken cancellationToken)
     {
-        var skillNames = string.Join(", ", skills);
+        var skillNames = skills.Join(", ");
         var message = $"Are you sure you want to remove {skills.Length} skill(s) [{skillNames}]?";
         return interaction.ConfirmAsync(message, defaultValue: false, cancellationToken);
     }

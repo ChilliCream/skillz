@@ -67,7 +67,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
         }
 
         var host = parsed.Host;
-        return host.StartsWith("www.", StringComparison.Ordinal) ? host[4..] : host;
+        return host.StartsWithOrdinal("www.") ? host[4..] : host;
     }
 
     private async Task<List<IndexCandidate>> FetchIndexCandidatesAsync(
@@ -218,7 +218,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
         var parsed = new Uri(indexUrl);
         var marker = $"/{wellKnownPath}/{IndexFile}";
         var pathname = parsed.AbsolutePath;
-        var trimmed = pathname.EndsWith(marker, StringComparison.Ordinal) ? pathname[..^marker.Length] : pathname;
+        var trimmed = pathname.EndsWithOrdinal(marker) ? pathname[..^marker.Length] : pathname;
         return $"{parsed.Scheme}://{parsed.Authority}{trimmed}";
     }
 
@@ -277,7 +277,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
             {
                 foreach (var relativeFile in entry.Files)
                 {
-                    if (string.Equals(relativeFile, "SKILL.md", StringComparison.OrdinalIgnoreCase))
+                    if (relativeFile.EqualsOrdinalIgnoreCase("SKILL.md"))
                     {
                         continue;
                     }
@@ -422,7 +422,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
 
         if (name.StartsWith('-')
             || name.EndsWith('-')
-            || name.Contains("--", StringComparison.Ordinal))
+            || name.ContainsOrdinal("--"))
         {
             return false;
         }
@@ -439,7 +439,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
 
         if (filePath.StartsWith('/')
             || filePath.StartsWith('\\')
-            || filePath.Contains("..", StringComparison.Ordinal))
+            || filePath.ContainsOrdinal(".."))
         {
             return false;
         }
@@ -477,7 +477,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
             }
         }
 
-        var hasSkillMd = entry.Files.Any(f => string.Equals(f, "SKILL.md", StringComparison.OrdinalIgnoreCase));
+        var hasSkillMd = entry.Files.Any(f => f.EqualsOrdinalIgnoreCase("SKILL.md"));
         return hasSkillMd;
     }
 
