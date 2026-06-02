@@ -1,5 +1,6 @@
 using System.CommandLine;
 using Skillz.Interaction;
+using Spectre.Console;
 
 namespace Skillz.Commands;
 
@@ -49,18 +50,21 @@ internal sealed class InitCommand(IInteractionService interaction)
         var content = BuildSkillTemplate(skillName);
         await File.WriteAllTextAsync(skillFile, content, cancellationToken);
 
-        interaction.WriteSuccess($"Initialized skill: {skillName}");
-        interaction.WriteLine();
-        interaction.WriteDim("Created:");
-        interaction.WriteLine($"  {displayPath}");
-        interaction.WriteLine();
-        interaction.WriteDim("Next steps:");
-        interaction.WriteLine($"  1. Edit {displayPath} to define your skill instructions");
-        interaction.WriteLine("  2. Update the name and description in the frontmatter");
-        interaction.WriteLine();
-        interaction.WriteDim("Publishing:");
-        interaction.WriteLine("  GitHub: Push to a repo, then skillz add <owner>/<repo>");
-        interaction.WriteLine($"  URL:    Host the file, then skillz add https://example.com/{displayPath}");
+        interaction.WriteMarkupLine(
+            $"""
+            [green]Initialized skill: {Markup.Escape(skillName)}[/]
+
+            [dim]Created:[/]
+              {Markup.Escape(displayPath)}
+
+            [dim]Next steps:[/]
+              1. Edit {Markup.Escape(displayPath)} to define your skill instructions
+              2. Update the name and description in the frontmatter
+
+            [dim]Publishing:[/]
+              GitHub: Push to a repo, then skillz add <owner>/<repo>
+              URL:    Host the file, then skillz add https://example.com/{Markup.Escape(displayPath)}
+            """);
 
         return new CommandResult.Success();
     }

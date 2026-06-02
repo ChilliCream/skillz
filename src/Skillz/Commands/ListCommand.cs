@@ -51,23 +51,23 @@ internal sealed class ListCommand(
         var agents = parseResult.GetValue(_agentOption) ?? [];
         var format = parseResult.GetValue(_formatOption);
         var jsonFlag = parseResult.GetValue(_jsonOption);
-        var jsonOutput = jsonFlag || string.Equals(format, "json", StringComparison.OrdinalIgnoreCase);
+        var jsonOutput = jsonFlag || format.EqualsOrdinalIgnoreCase("json");
 
         executionContext.IsJsonOutput = jsonOutput;
 
         if (agents.Length > 0)
         {
-            var valid = registry.ListAgentTypes();
+            var valid = registry.AgentTypes;
             var invalid = agents.Where(a => !valid.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
-                interaction.WriteError($"Invalid agents: {string.Join(", ", invalid)}");
+                interaction.WriteError($"Invalid agents: {invalid.Join(", ")}");
                 return new CommandResult.Failure(ExitCodeConstants.Failure);
             }
         }
 
         var cwd = Directory.GetCurrentDirectory();
-        ImmutableArray<string> agentFilter = agents.Length > 0 ? [.. agents] : registry.ListAgentTypes();
+        ImmutableArray<string> agentFilter = agents.Length > 0 ? [.. agents] : registry.AgentTypes;
 
         var skills = await CollectInstalledSkillsAsync(installer, registry, agentFilter, global, cwd, cancellationToken);
 
@@ -113,11 +113,11 @@ internal sealed class ListCommand(
             }
             else if (agentNames.Count > 5)
             {
-                agentDisplay = string.Join(", ", agentNames.Take(5)) + $" +{agentNames.Count - 5} more";
+                agentDisplay = agentNames.Take(5).Join(", ") + $" +{agentNames.Count - 5} more";
             }
             else
             {
-                agentDisplay = string.Join(", ", agentNames);
+                agentDisplay = agentNames.Join(", ");
             }
 
             interaction.WriteMarkupLine(
@@ -233,12 +233,12 @@ internal sealed class ListCommand(
     private static string ShortenPath(string path)
     {
         var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-        if (!string.IsNullOrEmpty(home) && path.StartsWith(home, StringComparison.Ordinal))
+        if (!string.IsNullOrEmpty(home) && path.StartsWithOrdinal(home))
         {
             return "~" + path[home.Length..];
         }
         var cwd = Directory.GetCurrentDirectory();
-        if (!string.IsNullOrEmpty(cwd) && path.StartsWith(cwd, StringComparison.Ordinal))
+        if (!string.IsNullOrEmpty(cwd) && path.StartsWithOrdinal(cwd))
         {
             var relative = path[cwd.Length..];
             return "." + (relative.Length == 0 ? "" : relative);

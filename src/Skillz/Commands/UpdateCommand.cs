@@ -65,7 +65,7 @@ internal sealed class UpdateCommand(
 
         if (skillFilter is not null)
         {
-            interaction.WriteMarkupLine($"Checking {Markup.Escape(string.Join(", ", skillFilter))}...");
+            interaction.WriteMarkupLine($"Checking {Markup.Escape(skillFilter.Join(", "))}...");
         }
         else
         {
@@ -111,7 +111,7 @@ internal sealed class UpdateCommand(
 
         if (skillFilter is not null && totalFound == 0)
         {
-            interaction.WriteDim($"No installed skills found matching: {string.Join(", ", skillFilter)}");
+            interaction.WriteDim($"No installed skills found matching: {skillFilter.Join(", ")}");
         }
 
         interaction.WriteLine();
@@ -278,7 +278,7 @@ internal sealed class UpdateCommand(
                     entry.Ref,
                     cancellationToken);
             if (latestHash is not null
-                && !string.Equals(latestHash, entry.SkillFolderHash, StringComparison.Ordinal))
+                && !entry.SkillFolderHash.EqualsOrdinal(latestHash))
             {
                 updates.Add((skillName, entry));
             }
@@ -344,8 +344,8 @@ internal sealed class UpdateCommand(
                 continue;
             }
 
-            if (string.Equals(entry.SourceType, "node_modules", StringComparison.Ordinal)
-                || string.Equals(entry.SourceType, "local", StringComparison.Ordinal))
+            if (entry.SourceType.EqualsOrdinal("node_modules")
+                || entry.SourceType.EqualsOrdinal("local"))
             {
                 continue;
             }
@@ -397,7 +397,7 @@ internal sealed class UpdateCommand(
         string? @ref,
         CancellationToken cancellationToken)
     {
-        var slash = ownerRepo.IndexOf('/', StringComparison.Ordinal);
+        var slash = ownerRepo.IndexOfOrdinal('/');
         if (slash <= 0 || slash == ownerRepo.Length - 1)
         {
             return null;
@@ -423,8 +423,8 @@ internal sealed class UpdateCommand(
 
             foreach (var entry in tree.Tree)
             {
-                if (string.Equals(entry.Type, "tree", StringComparison.Ordinal)
-                    && string.Equals(entry.Path, folderPath, StringComparison.Ordinal))
+                if (entry.Type.EqualsOrdinal("tree")
+                    && entry.Path.EqualsOrdinal(folderPath))
                 {
                     return entry.Sha;
                 }
@@ -441,11 +441,11 @@ internal sealed class UpdateCommand(
     private static string DeriveSkillFolder(string skillPath)
     {
         var folder = skillPath.Replace('\\', '/');
-        if (folder.EndsWith("/SKILL.md", StringComparison.OrdinalIgnoreCase))
+        if (folder.EndsWithOrdinalIgnoreCase("/SKILL.md"))
         {
             folder = folder[..^9];
         }
-        else if (folder.EndsWith("SKILL.md", StringComparison.OrdinalIgnoreCase))
+        else if (folder.EndsWithOrdinalIgnoreCase("SKILL.md"))
         {
             folder = folder[..^8];
         }
@@ -467,7 +467,7 @@ internal sealed class UpdateCommand(
 
         foreach (var f in filter)
         {
-            if (string.Equals(name, f, StringComparison.OrdinalIgnoreCase))
+            if (name.EqualsOrdinalIgnoreCase(f))
             {
                 return true;
             }
@@ -477,17 +477,17 @@ internal sealed class UpdateCommand(
 
     private static string GetSkipReason(SkillLockEntry entry)
     {
-        if (string.Equals(entry.SourceType, "local", StringComparison.Ordinal))
+        if (entry.SourceType.EqualsOrdinal("local"))
         {
             return "Local path";
         }
 
-        if (string.Equals(entry.SourceType, "git", StringComparison.Ordinal))
+        if (entry.SourceType.EqualsOrdinal("git"))
         {
             return "Git URL";
         }
 
-        if (string.Equals(entry.SourceType, "well-known", StringComparison.Ordinal))
+        if (entry.SourceType.EqualsOrdinal("well-known"))
         {
             return "Well-known skill";
         }
@@ -544,9 +544,9 @@ internal sealed class UpdateCommand(
     private static string GetInstallSource(SkippedSkill skill)
     {
         var url = skill.SourceUrl;
-        if (string.Equals(skill.SourceType, "well-known", StringComparison.Ordinal))
+        if (skill.SourceType.EqualsOrdinal("well-known"))
         {
-            var idx = url.IndexOf("/.well-known/", StringComparison.Ordinal);
+            var idx = url.IndexOfOrdinal("/.well-known/");
             if (idx >= 0)
             {
                 url = url[..idx];

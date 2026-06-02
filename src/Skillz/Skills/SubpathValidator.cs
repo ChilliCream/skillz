@@ -23,7 +23,7 @@ internal static class SubpathValidator
     {
         var combined = Path.GetFullPath(Path.Combine(basePath, subpath));
         var normalizedBase = Path.GetFullPath(basePath);
-        return combined.StartsWith(normalizedBase + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+        return combined.StartsWithOrdinal(normalizedBase + Path.DirectorySeparatorChar)
             || combined == normalizedBase;
     }
 }

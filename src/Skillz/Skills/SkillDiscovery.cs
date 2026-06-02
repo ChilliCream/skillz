@@ -303,7 +303,7 @@ internal sealed class SkillDiscovery : ISkillDiscovery
             metadata is not null
             && metadata.TryGetValue("internal", out var internalFlag)
             && internalFlag is string s
-            && (string.Equals(s, "true", StringComparison.OrdinalIgnoreCase));
+            && s.EqualsOrdinalIgnoreCase("true");
 
         if (isInternal && !options.IncludeInternal && !ShouldInstallInternalSkills())
         {
@@ -323,6 +323,6 @@ internal sealed class SkillDiscovery : ISkillDiscovery
     internal static bool ShouldInstallInternalSkills()
     {
         var env = Environment.GetEnvironmentVariable("INSTALL_INTERNAL_SKILLS");
-        return env == "1" || string.Equals(env, "true", StringComparison.OrdinalIgnoreCase);
+        return env == "1" || env.EqualsOrdinalIgnoreCase("true");
     }
 }

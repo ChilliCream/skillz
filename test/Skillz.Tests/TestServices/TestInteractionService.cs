@@ -21,6 +21,10 @@ internal sealed class TestInteractionService : IInteractionService
                 Interactive = InteractionSupport.No,
                 Out = new AnsiConsoleOutput(_writer)
             });
+
+        // Pin the render width so panel/box geometry in snapshots is independent of the
+        // environment (Spectre otherwise honours a COLUMNS env var when no console is attached).
+        _console.Profile.Width = 80;
     }
 
     public IAnsiConsole Console => _console;

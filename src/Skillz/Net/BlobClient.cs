@@ -218,7 +218,7 @@ internal sealed class BlobClient : IBlobClient
 
         var prefix = path.EndsWith('/') ? path : path + "/";
         var filtered = tree
-            .Tree.Where(e => e.Path.StartsWith(prefix, StringComparison.Ordinal) || e.Path == path)
+            .Tree.Where(e => e.Path.StartsWithOrdinal(prefix) || e.Path == path)
             .ToImmutableArray();
 
         return new RepoTree(tree.Sha, tree.Branch, filtered);

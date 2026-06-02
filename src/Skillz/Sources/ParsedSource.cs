@@ -4,17 +4,59 @@ internal abstract record ParsedSource
 {
     private ParsedSource() { }
 
+    public abstract string Url { get; init; }
+
+    public abstract string? Ref { get; init; }
+
+    public abstract string SourceType { get; }
+
+    public string DisplayString
+    {
+        get
+        {
+            var url = Url;
+            if (!string.IsNullOrEmpty(Ref))
+            {
+                url += $" @ {Ref}";
+            }
+            if (this is GitHub { Subpath: { Length: > 0 } subpath })
+            {
+                url += $" ({subpath})";
+            }
+            return url;
+        }
+    }
+
     public sealed record GitHub(string Url, string? Ref = null, string? Subpath = null, string? SkillFilter = null)
         : ParsedSource
-        , ISkillFilterable;
+        , ISkillFilterable
+    {
+        public override string SourceType => "github";
+    }
 
-    public sealed record GitLab(string Url, string? Ref = null, string? Subpath = null) : ParsedSource;
+    public sealed record GitLab(string Url, string? Ref = null, string? Subpath = null) : ParsedSource
+    {
+        public override string SourceType => "gitlab";
+    }
 
-    public sealed record Git(string Url, string? Ref = null) : ParsedSource;
+    public sealed record Git(string Url, string? Ref = null) : ParsedSource
+    {
+        public override string SourceType => "git";
+    }
 
-    public sealed record Local(string Url, string LocalPath) : ParsedSource;
+    public sealed record Local(string Url, string LocalPath) : ParsedSource
+    {
+        public override string? Ref { get => null; init { } }
 
-    public sealed record WellKnown(string Url) : ParsedSource;
+        public override string SourceType => "local";
+    }
+
+    public sealed record WellKnown(string Url) : ParsedSource
+    {
+        public override string? Ref { get => null; init { } }
+
+        public override string SourceType => "well-known";
+    }
 
     public interface ISkillFilterable
     {

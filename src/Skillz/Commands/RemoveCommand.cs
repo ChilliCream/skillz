@@ -65,11 +65,11 @@ internal sealed class RemoveCommand(
 
         if (agents.Length > 0)
         {
-            var valid = registry.ListAgentTypes();
+            var valid = registry.AgentTypes;
             var invalid = agents.Where(a => !valid.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
-                interaction.WriteError($"Invalid agents: {string.Join(", ", invalid)}");
+                interaction.WriteError($"Invalid agents: {invalid.Join(", ")}");
                 return new CommandResult.Failure(ExitCodeConstants.Failure);
             }
         }
@@ -97,12 +97,12 @@ internal sealed class RemoveCommand(
         else if (requestedSkills.Length > 0)
         {
             selected = installed
-                .Where(s => requestedSkills.Any(r => string.Equals(r, s, StringComparison.OrdinalIgnoreCase)))
+                .Where(s => requestedSkills.Any(r => r.EqualsOrdinalIgnoreCase(s)))
                 .ToImmutableArray();
 
             if (selected.Length == 0)
             {
-                interaction.WriteDim($"No matching skills found for: {string.Join(", ", requestedSkills)}");
+                interaction.WriteDim($"No matching skills found for: {requestedSkills.Join(", ")}");
                 return new CommandResult.Success();
             }
         }
@@ -121,7 +121,7 @@ internal sealed class RemoveCommand(
             }
         }
 
-        var targetAgents = agents.Length > 0 ? (IReadOnlyList<string>)agents : registry.ListAgentTypes();
+        var targetAgents = agents.Length > 0 ? (IReadOnlyList<string>)agents : registry.AgentTypes;
 
         if (!nonInteractive)
         {
@@ -209,7 +209,7 @@ internal sealed class RemoveCommand(
 
         directoriesToScan.Add(installer.GetCanonicalSkillsDir(global, cwd));
 
-        foreach (var agentType in registry.ListAgentTypes())
+        foreach (var agentType in registry.AgentTypes)
         {
             var config = registry.GetConfig(agentType);
             if (global && config.GlobalSkillsDir is null)
@@ -246,7 +246,7 @@ internal sealed class RemoveCommand(
         IReadOnlyList<string> removedAgents)
     {
         var removedSet = new HashSet<string>(removedAgents, StringComparer.Ordinal);
-        foreach (var agentType in registry.ListAgentTypes())
+        foreach (var agentType in registry.AgentTypes)
         {
             if (removedSet.Contains(agentType))
             {

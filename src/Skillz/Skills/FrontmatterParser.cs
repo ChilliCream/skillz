@@ -1,6 +1,5 @@
-using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
-using YamlDotNet.Serialization;
+using YamlDotNet.RepresentationModel;
 
 namespace Skillz.Skills;
 
@@ -11,14 +10,6 @@ internal static partial class FrontmatterParser
     [GeneratedRegex(@"\A---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)\z")]
     private static partial Regex FrontmatterRegex();
 
-    [UnconditionalSuppressMessage(
-        "AOT",
-        "IL3050:RequiresDynamicCode",
-        Justification = "Deserializing into Dictionary<string, object> uses only built-in primitive types that YamlDotNet handles without dynamic code generation.")]
-    [UnconditionalSuppressMessage(
-        "Trimming",
-        "IL2026:RequiresUnreferencedCode",
-        Justification = "Dictionary<string, object> contains only primitive YAML scalar types; no user-defined types are reflected over.")]
     public static FrontmatterResult Parse(string raw)
     {
         var match = FrontmatterRegex().Match(raw);
@@ -30,9 +21,62 @@ internal static partial class FrontmatterParser
         var yaml = match.Groups[1].Value;
         var content = match.Groups[2].Value;
 
-        var deserializer = new DeserializerBuilder().Build();
-        var parsed = deserializer.Deserialize<Dictionary<string, object>?>(yaml);
+        return new FrontmatterResult(ParseMapping(yaml), content);
+    }
 
-        return new FrontmatterResult(parsed ?? new Dictionary<string, object>(), content);
+    private static Dictionary<string, object> ParseMapping(string yaml)
+    {
+        var stream = new YamlStream();
+        stream.Load(new StringReader(yaml));
+
+        if (stream.Documents.Count == 0
+            || stream.Documents[0].RootNode is not YamlMappingNode root)
+        {
+            return new Dictionary<string, object>();
+        }
+
+        var result = new Dictionary<string, object>();
+        foreach (var entry in root.Children)
+        {
+            if (entry.Key is YamlScalarNode { Value: { } key })
+            {
+                result[key] = ConvertNode(entry.Value);
+            }
+        }
+
+        return result;
+    }
+
+    private static object ConvertNode(YamlNode node)
+    {
+        switch (node)
+        {
+            case YamlMappingNode mapping:
+                var map = new Dictionary<object, object>();
+                foreach (var entry in mapping.Children)
+                {
+                    if (entry.Key is YamlScalarNode { Value: { } key })
+                    {
+                        map[key] = ConvertNode(entry.Value);
+                    }
+                }
+
+                return map;
+
+            case YamlSequenceNode sequence:
+                var list = new List<object>();
+                foreach (var item in sequence.Children)
+                {
+                    list.Add(ConvertNode(item));
+                }
+
+                return list;
+
+            case YamlScalarNode scalar:
+                return scalar.Value ?? string.Empty;
+
+            default:
+                return string.Empty;
+        }
     }
 }

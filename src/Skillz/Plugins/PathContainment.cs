@@ -31,7 +31,7 @@ internal static class PathContainment
 
     public static bool IsValidRelativePath(string path)
     {
-        return path.StartsWith("./", StringComparison.Ordinal);
+        return path.StartsWithOrdinal("./");
     }
 
     private static bool IsContainedNormalized(string normalizedTarget, string normalizedBase)

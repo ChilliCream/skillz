@@ -24,16 +24,33 @@ internal sealed class AddCommandExecutor(
 {
     public async Task<CommandResult> RunAsync(AddCommandOptions options, CancellationToken cancellationToken)
     {
-        ParsedSource parsed;
         try
         {
-            parsed = sourceParser.Parse(options.Source!);
+            return await RunCoreAsync(options, cancellationToken);
         }
-        catch (Exception ex)
+        catch (CliException ex)
         {
-            interaction.WriteError($"Invalid source: {ex.Message}");
+            if (ex.Title is { } title)
+            {
+                interaction.WriteErrorPanel(title, ex.Message, ex.Hint);
+            }
+            else
+            {
+                interaction.WriteError(ex.Message);
+            }
+
+            return new CommandResult.Failure(ex.ExitCode);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            interaction.WriteError(ex.Message);
             return new CommandResult.Failure(ExitCodeConstants.Failure);
         }
+    }
+
+    private async Task<CommandResult> RunCoreAsync(AddCommandOptions options, CancellationToken cancellationToken)
+    {
+        var parsed = ParseSource(options.Source!);
 
         var detection = await detector.DetectAgentAsync(cancellationToken);
         if (detection.IsAgent)
@@ -54,40 +71,16 @@ internal sealed class AddCommandExecutor(
         var skillFilters = MergeSkillFilters(options.SkillFilters, parsed);
         interaction.WriteDim($"Source: {parsed.DisplayString}");
 
-        ImmutableArray<RemoteSkill> skills;
-        try
-        {
-            skills = await FetchSkillsAsync(parsed, options, skillFilters, cancellationToken);
-        }
-        catch (CliException ex)
-        {
-            if (ex.Title is { } title)
-            {
-                interaction.WriteErrorPanel(title, ex.Message, ex.Hint);
-            }
-            else
-            {
-                interaction.WriteError(ex.Message);
-            }
-
-            return new CommandResult.Failure(ex.ExitCode);
-        }
-
+        var skills = await FetchSkillsAsync(parsed, options, skillFilters, cancellationToken);
         try
         {
             if (skills.Length == 0)
             {
-                if (parsed is ParsedSource.WellKnown)
-                {
-                    interaction.WriteError(
-                        "No skills found at this URL. Make sure the server has a /.well-known/agent-skills/index.json or /.well-known/skills/index.json file.");
-                }
-                else
-                {
-                    interaction.WriteError(
-                        "No valid skills found. Skills require a SKILL.md with name and description.");
-                }
-                return new CommandResult.Failure(ExitCodeConstants.Failure);
+                throw new CliException(
+                    ExitCodeConstants.Failure,
+                    parsed is ParsedSource.WellKnown
+                        ? "No skills found at this URL. Make sure the server has a /.well-known/agent-skills/index.json or /.well-known/skills/index.json file."
+                        : "No valid skills found. Skills require a SKILL.md with name and description.");
             }
 
             interaction.WriteLine($"Found {skills.Length} skill(s)");
@@ -104,6 +97,18 @@ internal sealed class AddCommandExecutor(
         finally
         {
             CleanupStagingPaths(skills);
+        }
+    }
+
+    private ParsedSource ParseSource(string source)
+    {
+        try
+        {
+            return sourceParser.Parse(source);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new CliException(ExitCodeConstants.Failure, $"Invalid source: {ex.Message}");
         }
     }
 
@@ -152,7 +157,7 @@ internal sealed class AddCommandExecutor(
         {
             if (skillFilters.Length > 0)
             {
-                interaction.WriteError($"No matching skills found for: {string.Join(", ", skillFilters)}");
+                interaction.WriteError($"No matching skills found for: {skillFilters.Join(", ")}");
                 interaction.WriteLine("Available skills:");
                 foreach (var s in skills)
                 {
@@ -174,8 +179,7 @@ internal sealed class AddCommandExecutor(
 
         if (targetAgents.Length == 0)
         {
-            interaction.WriteError("No agents selected.");
-            return new CommandResult.Failure(ExitCodeConstants.Failure);
+            throw new CliException(ExitCodeConstants.Failure, "No agents selected.");
         }
 
         var installGlobally = options.Global;
@@ -242,11 +246,10 @@ internal sealed class AddCommandExecutor(
 
         if (failed.Length > 0)
         {
-            var detail = string.Join(
-                Environment.NewLine,
-                failed.Select(r => $"{r.SkillName} → {r.AgentType}: {r.Result.Error}"));
-            interaction.WriteErrorPanel("Installation failed", detail);
-            return new CommandResult.Failure(ExitCodeConstants.Failure);
+            var detail = failed
+                .Select(r => $"{r.SkillName} → {r.AgentType}: {r.Result.Error}")
+                .Join(Environment.NewLine);
+            throw new CliException(ExitCodeConstants.Failure, detail, title: "Installation failed");
         }
 
         return new CommandResult.Success();
@@ -273,16 +276,16 @@ internal sealed class AddCommandExecutor(
         if (universals.Count > 0)
         {
             summary.AppendLine(
-                $"[bold]Universal:[/]  {Markup.Escape(string.Join(", ", universals.Select(GetAgentDisplay)))}");
+                $"[bold]Universal:[/]  {Markup.Escape(universals.Select(GetAgentDisplay).Join(", "))}");
         }
         if (symlinked.Count > 0)
         {
             summary.AppendLine(
-                $"[bold]Symlinked:[/]  {Markup.Escape(string.Join(", ", symlinked.Select(GetAgentDisplay)))}");
+                $"[bold]Symlinked:[/]  {Markup.Escape(symlinked.Select(GetAgentDisplay).Join(", "))}");
         }
         if (overwrites.Count > 0)
         {
-            summary.Append($"[yellow]Overwrites:[/] {Markup.Escape(string.Join(", ", overwrites))}");
+            summary.Append($"[yellow]Overwrites:[/] {Markup.Escape(overwrites.Join(", "))}");
         }
 
         interaction.WriteLine();
@@ -452,7 +455,7 @@ internal sealed class AddCommandExecutor(
         bool nonInteractive,
         CancellationToken cancellationToken)
     {
-        var validAgents = registry.ListAgentTypes();
+        var validAgents = registry.AgentTypes;
 
         // --agent provided (incl. "*")
         if (options.Agents.Length > 0)
@@ -465,7 +468,7 @@ internal sealed class AddCommandExecutor(
             var invalid = options.Agents.Where(a => !validAgents.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
-                interaction.WriteError($"Invalid agents: {string.Join(", ", invalid)}");
+                interaction.WriteError($"Invalid agents: {invalid.Join(", ")}");
                 return ImmutableArray<string>.Empty;
             }
 
@@ -479,7 +482,7 @@ internal sealed class AddCommandExecutor(
         {
             if (nonInteractive)
             {
-                return registry.GetUniversalAgents();
+                return registry.UniversalAgents;
             }
 
             return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken);
@@ -497,7 +500,7 @@ internal sealed class AddCommandExecutor(
 
     private ImmutableArray<string> EnsureUniversalAgents(IReadOnlyList<string> agents)
     {
-        var universal = registry.GetUniversalAgents();
+        var universal = registry.UniversalAgents;
         var result = new List<string>(agents);
         foreach (var u in universal)
         {
@@ -630,8 +633,10 @@ internal sealed class AddCommandExecutor(
         return skills
             .Where(s =>
                 filters.Any(f =>
-                    string.Equals(f, s.InstallName, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(f, s.Name, StringComparison.OrdinalIgnoreCase)))
+                    s.InstallName.EqualsOrdinalIgnoreCase(f)
+                    || s.Name.EqualsOrdinalIgnoreCase(f)
+                )
+            )
             .ToImmutableArray();
     }
 

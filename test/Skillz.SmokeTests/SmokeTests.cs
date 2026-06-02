@@ -15,8 +15,10 @@ public class SmokeTests
     [Fact]
     public async Task Version_Flag_Prints_Version()
     {
+        // Act
         var result = await RunSkillzAsync("--version");
 
+        // Assert
         Assert.Equal(0, result.ExitCode);
         Assert.False(string.IsNullOrWhiteSpace(result.StandardOutput));
     }
@@ -24,8 +26,10 @@ public class SmokeTests
     [Fact]
     public async Task Help_Flag_Prints_Usage()
     {
+        // Act
         var result = await RunSkillzAsync("--help");
 
+        // Assert
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Usage:", result.StandardOutput);
         Assert.Contains("skillz", result.StandardOutput);
@@ -38,11 +42,14 @@ public class SmokeTests
     [Fact]
     public async Task Init_Creates_SkillMd_In_Named_Directory()
     {
+        // Arrange
         var tempDir = CreateTempDirectory();
         try
         {
+            // Act
             var result = await RunSkillzAsync("init test-skill", workingDirectory: tempDir);
 
+            // Assert
             Assert.Equal(0, result.ExitCode);
             var skillFile = Path.Combine(tempDir, "test-skill", "SKILL.md");
             Assert.True(File.Exists(skillFile), $"Expected SKILL.md at {skillFile}");
@@ -60,11 +67,14 @@ public class SmokeTests
     [Fact]
     public async Task List_Does_Not_Crash_In_Empty_Directory()
     {
+        // Arrange
         var tempDir = CreateTempDirectory();
         try
         {
+            // Act
             var result = await RunSkillzAsync("list", workingDirectory: tempDir);
 
+            // Assert
             Assert.Equal(0, result.ExitCode);
         }
         finally

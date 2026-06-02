@@ -86,6 +86,7 @@ internal static class CliTestHelper
         services.AddTransient<ListCommand>();
         services.AddTransient<InitCommand>();
         services.AddTransient<UpdateCommand>();
+        services.AddTransient<SkillzRootCommand>();
 
         if (workspace is not null)
         {

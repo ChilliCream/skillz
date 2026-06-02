@@ -178,8 +178,8 @@ internal sealed class ProjectLockFile : IProjectLockFile
 
             if (Directory.Exists(entry))
             {
-                if (string.Equals(name, ".git", StringComparison.Ordinal)
-                    || string.Equals(name, "node_modules", StringComparison.Ordinal))
+                if (name.EqualsOrdinal(".git")
+                    || name.EqualsOrdinal("node_modules"))
                 {
                     continue;
                 }
