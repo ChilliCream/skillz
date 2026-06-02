@@ -1,4 +1,4 @@
-namespace Skillz.Lock;
+namespace Skillz.Locking;
 
 internal interface IProjectLockFile
 {

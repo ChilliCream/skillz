@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Skillz;
-using Skillz.Lock;
+using Skillz.Locking;
 using Xunit;
 
 namespace Skillz.Tests.Lock;

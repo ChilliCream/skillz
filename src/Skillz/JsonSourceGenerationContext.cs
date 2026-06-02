@@ -1,6 +1,6 @@
 using System.Text.Json.Serialization;
 using Skillz.Commands;
-using Skillz.Lock;
+using Skillz.Locking;
 using Skillz.Net;
 using Skillz.Plugins;
 using Skillz.Sources.Providers;

@@ -1,6 +1,6 @@
 using Skillz;
 using Skillz.Install;
-using Skillz.Lock;
+using Skillz.Locking;
 using Xunit;
 
 namespace Skillz.Tests.Lock;

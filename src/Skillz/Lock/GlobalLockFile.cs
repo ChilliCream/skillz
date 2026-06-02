@@ -1,164 +1,74 @@
 using System.Collections.Immutable;
-using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Skillz.Install;
-using Skillz.Utils;
 
-namespace Skillz.Lock;
+namespace Skillz.Locking;
 
-internal sealed class GlobalLockFile : IGlobalLockFile
+internal sealed class GlobalLockFile(XdgPaths xdgPaths, Func<DateTime> utcNow)
+    : JsonLockFile<SkillLockFile>
+    , IGlobalLockFile
 {
     public const int CurrentVersion = 3;
 
-    private readonly IXdgPaths _xdgPaths;
-    private readonly Func<DateTime> _utcNow;
+    public GlobalLockFile(XdgPaths xdgPaths) : this(xdgPaths, () => DateTime.UtcNow) { }
 
-    public GlobalLockFile(IXdgPaths xdgPaths) : this(xdgPaths, () => DateTime.UtcNow) { }
+    protected override int LatestVersion => CurrentVersion;
 
-    public GlobalLockFile(IXdgPaths xdgPaths, Func<DateTime> utcNow)
+    protected override string Noun => "global lock file";
+
+    protected override JsonTypeInfo<SkillLockFile> TypeInfo => JsonSourceGenerationContext.Default.SkillLockFile;
+
+    protected override int VersionOf(SkillLockFile file) => file.Version;
+
+    protected override bool HasSkills(SkillLockFile file) => file.Skills is not null;
+
+    protected override SkillLockFile CreateEmpty()
+        => new()
+        {
+            Version = CurrentVersion,
+            Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal),
+            Dismissed = null
+        };
+
+    protected override SkillLockFile PrepareForWrite(SkillLockFile file)
     {
-        _xdgPaths = xdgPaths;
-        _utcNow = utcNow;
+        // Omit `dismissed` from output when empty.
+        if (file.Dismissed is { Count: 0 })
+        {
+            file.Dismissed = null;
+        }
+
+        return file;
     }
 
-    public async Task<SkillLockFile> ReadAsync(CancellationToken cancellationToken)
-    {
-        var lockPath = _xdgPaths.GetGlobalLockPath();
+    public Task<SkillLockFile> ReadAsync(CancellationToken cancellationToken)
+        => ReadFileAsync(xdgPaths.GetGlobalLockPath(), cancellationToken);
 
-        try
-        {
-            await using var stream = File.OpenRead(lockPath);
-            var parsed = await JsonSerializer
-                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken);
+    public Task WriteAsync(SkillLockFile lockFile, CancellationToken cancellationToken)
+        => ReplaceAsync(xdgPaths.GetGlobalLockPath(), lockFile, cancellationToken);
 
-            if (parsed is null || parsed.Skills is null)
+    public Task AddEntryAsync(string skillName, SkillLockEntry entry, CancellationToken cancellationToken)
+        => MutateAsync(
+            xdgPaths.GetGlobalLockPath(),
+            lockFile =>
             {
-                return CreateEmpty();
-            }
-
-            if (parsed.Version < CurrentVersion)
-            {
-                return CreateEmpty();
-            }
-
-            if (parsed.Version > CurrentVersion)
-            {
-                Console.Error.WriteLine(
-                    $"Warning: Lock file was written by a newer version of skillz (v{parsed.Version}, this is v{CurrentVersion}). Data will be preserved but some fields may be ignored.");
-                return parsed;
-            }
-
-            return parsed;
-        }
-        catch (FileNotFoundException)
-        {
-            return CreateEmpty();
-        }
-        catch (DirectoryNotFoundException)
-        {
-            return CreateEmpty();
-        }
-        catch (JsonException)
-        {
-            Console.Error.WriteLine($"Warning: Global lock file '{lockPath}' is corrupt and will be ignored for this read.");
-            return CreateEmpty();
-        }
-    }
-
-    public async Task WriteAsync(SkillLockFile lockFile, CancellationToken cancellationToken)
-    {
-        var lockPath = _xdgPaths.GetGlobalLockPath();
-        var directory = Path.GetDirectoryName(lockPath);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        await FileLock
-            .WithLockAsync(
-                lockPath,
-                async () =>
-                {
-                    var existing = await ReadInternalAsync(true, cancellationToken);
-                    if (existing.Version > CurrentVersion)
-                    {
-                        throw CreateNewerVersionException(lockPath, existing.Version);
-                    }
-
-                    await WriteInternalAsync(lockFile, cancellationToken);
-                },
-                FileLock.DefaultTimeoutMs,
-                cancellationToken);
-    }
-
-    public async Task AddEntryAsync(
-        string skillName,
-        SkillLockEntry entry,
-        CancellationToken cancellationToken)
-    {
-        var lockPath = _xdgPaths.GetGlobalLockPath();
-        var directory = Path.GetDirectoryName(lockPath);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        await FileLock
-            .WithLockAsync(
-                lockPath,
-                async () =>
-                {
-                    var lockFile = await ReadInternalAsync(true, cancellationToken);
-                    if (lockFile.Version > CurrentVersion)
-                    {
-                        throw CreateNewerVersionException(lockPath, lockFile.Version);
-                    }
-
-                    var now = _utcNow().ToString("o");
-
-                    var installedAt = lockFile.Skills.TryGetValue(skillName, out var existing)
-                        ? existing.InstalledAt
-                        : now;
-
-                    entry.InstalledAt = installedAt;
-                    entry.UpdatedAt = now;
-                    lockFile.Skills[skillName] = entry;
-
-                    await WriteInternalAsync(lockFile, cancellationToken);
-                },
-                FileLock.DefaultTimeoutMs,
-                cancellationToken);
-    }
+                var now = utcNow().ToString("o");
+                entry.InstalledAt = lockFile.Skills.TryGetValue(skillName, out var existing)
+                    ? existing.InstalledAt
+                    : now;
+                entry.UpdatedAt = now;
+                lockFile.Skills[skillName] = entry;
+                return true;
+            },
+            cancellationToken);
 
     public async Task<bool> RemoveEntryAsync(string skillName, CancellationToken cancellationToken)
     {
-        var lockPath = _xdgPaths.GetGlobalLockPath();
-        var directory = Path.GetDirectoryName(lockPath);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
         var removed = false;
-        await FileLock
-            .WithLockAsync(
-                lockPath,
-                async () =>
-                {
-                    var lockFile = await ReadInternalAsync(true, cancellationToken);
-                    if (lockFile.Version > CurrentVersion)
-                    {
-                        throw CreateNewerVersionException(lockPath, lockFile.Version);
-                    }
-
-                    removed = lockFile.Skills.Remove(skillName);
-                    if (removed)
-                    {
-                        await WriteInternalAsync(lockFile, cancellationToken);
-                    }
-                },
-                FileLock.DefaultTimeoutMs,
-                cancellationToken);
-
+        await MutateAsync(
+            xdgPaths.GetGlobalLockPath(),
+            lockFile => removed = lockFile.Skills.Remove(skillName),
+            cancellationToken);
         return removed;
     }
 
@@ -173,11 +83,7 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         try
         {
             var lockFile = await ReadAsync(cancellationToken);
-            if (lockFile.LastSelectedAgents is { Count: > 0 } agents)
-            {
-                return [.. agents];
-            }
-            return null;
+            return lockFile.LastSelectedAgents is { Count: > 0 } agents ? [.. agents] : null;
         }
         catch
         {
@@ -185,161 +91,13 @@ internal sealed class GlobalLockFile : IGlobalLockFile
         }
     }
 
-    public async Task SaveLastSelectedAgentsAsync(
-        ImmutableArray<string> agents,
-        CancellationToken cancellationToken)
-    {
-        var lockPath = _xdgPaths.GetGlobalLockPath();
-        var directory = Path.GetDirectoryName(lockPath);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        await FileLock
-            .WithLockAsync(
-                lockPath,
-                async () =>
-                {
-                    var lockFile = await ReadInternalAsync(true, cancellationToken);
-                    if (lockFile.Version > CurrentVersion)
-                    {
-                        throw CreateNewerVersionException(lockPath, lockFile.Version);
-                    }
-
-                    lockFile.LastSelectedAgents = agents.ToList();
-                    await WriteInternalAsync(lockFile, cancellationToken);
-                },
-                FileLock.DefaultTimeoutMs,
-                cancellationToken);
-    }
-
-    private async Task<SkillLockFile> ReadInternalAsync(bool throwOnCorrupt, CancellationToken cancellationToken)
-    {
-        var lockPath = _xdgPaths.GetGlobalLockPath();
-
-        try
-        {
-            await using var stream = File.OpenRead(lockPath);
-            var parsed = await JsonSerializer
-                .DeserializeAsync(stream, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken);
-
-            if (parsed is null || parsed.Skills is null)
+    public Task SaveLastSelectedAgentsAsync(ImmutableArray<string> agents, CancellationToken cancellationToken)
+        => MutateAsync(
+            xdgPaths.GetGlobalLockPath(),
+            lockFile =>
             {
-                if (throwOnCorrupt)
-                {
-                    throw CreateCorruptLockException(lockPath);
-                }
-
-                return CreateEmpty();
-            }
-
-            if (parsed.Version < CurrentVersion)
-            {
-                return CreateEmpty();
-            }
-
-            if (parsed.Version > CurrentVersion)
-            {
-                if (!throwOnCorrupt)
-                {
-                    Console.Error.WriteLine(
-                        $"Warning: Lock file was written by a newer version of skillz (v{parsed.Version}, this is v{CurrentVersion}). Data will be preserved but some fields may be ignored.");
-                }
-                return parsed;
-            }
-
-            return parsed;
-        }
-        catch (FileNotFoundException)
-        {
-            return CreateEmpty();
-        }
-        catch (DirectoryNotFoundException)
-        {
-            return CreateEmpty();
-        }
-        catch (JsonException)
-        {
-            if (throwOnCorrupt)
-            {
-                throw CreateCorruptLockException(lockPath);
-            }
-
-            Console.Error.WriteLine($"Warning: Global lock file '{lockPath}' is corrupt and will be ignored for this read.");
-            return CreateEmpty();
-        }
-    }
-
-    private async Task WriteInternalAsync(SkillLockFile lockFile, CancellationToken cancellationToken)
-    {
-        var lockPath = _xdgPaths.GetGlobalLockPath();
-
-        // Normalize: omit `dismissed` from output when empty (TS parity)
-        if (lockFile.Dismissed is { Count: 0 })
-        {
-            lockFile.Dismissed = null;
-        }
-
-        var tempPath = lockPath + ".tmp";
-        try
-        {
-            await using (var stream = new FileStream(
-                             tempPath,
-                             FileMode.Create,
-                             FileAccess.Write,
-                             FileShare.None,
-                             bufferSize: 4096,
-                             options: FileOptions.Asynchronous))
-            {
-                await JsonSerializer
-                    .SerializeAsync(stream, lockFile, JsonSourceGenerationContext.Default.SkillLockFile, cancellationToken);
-                await stream.FlushAsync(cancellationToken);
-            }
-
-            File.Move(tempPath, lockPath, overwrite: true);
-        }
-        catch
-        {
-            TryDelete(tempPath);
-            throw;
-        }
-    }
-
-    private static CliException CreateCorruptLockException(string lockPath)
-    {
-        return new CliException(
-            ExitCodeConstants.Failure,
-            $"Refusing to modify global lock file '{lockPath}' because it is corrupt or empty. Please repair or remove the file and retry.");
-    }
-
-    private static CliException CreateNewerVersionException(string lockPath, int version)
-    {
-        return new CliException(
-            ExitCodeConstants.Failure,
-            $"Refusing to modify global lock file '{lockPath}': on-disk version v{version} is newer than this skillz supports (v{CurrentVersion}).");
-    }
-
-    private static void TryDelete(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
-        }
-        catch (IOException) { }
-        catch (UnauthorizedAccessException) { }
-    }
-
-    private static SkillLockFile CreateEmpty()
-    {
-        return new SkillLockFile
-        {
-            Version = CurrentVersion,
-            Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal),
-            Dismissed = null
-        };
-    }
+                lockFile.LastSelectedAgents = agents.ToList();
+                return true;
+            },
+            cancellationToken);
 }

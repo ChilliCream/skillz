@@ -1,5 +1,5 @@
 using System.Collections.Immutable;
-using Skillz.Lock;
+using Skillz.Locking;
 
 namespace Skillz.Tests.TestServices;
 
