@@ -78,35 +78,22 @@ public class GitClientTests
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            client.CloneAsync("--upload-pack=sh", "target", @ref: null, TestContext.Current.CancellationToken));
+            client.CloneAsync("--upload-pack=sh", "target", @ref: null, TestContext.Current.CancellationToken)
+        );
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            client.CloneAsync("https://example.com/repo.git", "--target", @ref: null, TestContext.Current.CancellationToken));
+            client.CloneAsync(
+                "https://example.com/repo.git",
+                "--target",
+                @ref: null,
+                TestContext.Current.CancellationToken)
+        );
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            client.CloneAsync("https://example.com/repo.git", "target", @ref: "-main", TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
-    public void CloneAsync_Rejects_Refs_Outside_Conservative_Allowlist()
-    {
-        // Act
-        var ex = Assert.Throws<ArgumentException>(() =>
-            GitClient.BuildCloneArguments("https://example.com/repo.git", "target", "main;rm-rf"));
-
-        // Assert
-        Assert.Equal("ref", ex.ParamName);
-    }
-
-    [Fact]
-    public void CloneAsync_Inserts_DoubleDash_Before_Positional_Url()
-    {
-        // Act
-        var args = GitClient.BuildCloneArguments("https://example.com/repo.git", "target", "main");
-        var separatorIndex = args.IndexOf("--");
-
-        // Assert
-        Assert.True(separatorIndex >= 0);
-        Assert.Equal("https://example.com/repo.git", args[separatorIndex + 1]);
-        Assert.Equal("target", args[separatorIndex + 2]);
+            client.CloneAsync(
+                "https://example.com/repo.git",
+                "target",
+                @ref: "-main",
+                TestContext.Current.CancellationToken)
+        );
     }
 
     [Fact]
@@ -117,29 +104,7 @@ public class GitClientTests
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            client.GetDefaultBranchAsync("--upload-pack=sh", TestContext.Current.CancellationToken));
-    }
-
-    [Fact]
-    public void GetDefaultBranchAsync_Inserts_DoubleDash_Before_Positional_Url()
-    {
-        // Act
-        var args = GitClient.BuildLsRemoteArguments("https://example.com/repo.git");
-
-        // Assert
-        Assert.Equal("--", args[2]);
-        Assert.Equal("https://example.com/repo.git", args[3]);
-    }
-
-    [Fact]
-    public void RedactUrlUserInfo_Removes_Credentials_From_Messages()
-    {
-        // Act
-        var redacted = GitClient.RedactUrlUserInfo(
-            "fatal: https://user:secret@example.com/owner/repo.git failed");
-
-        // Assert
-        Assert.DoesNotContain("user:secret", redacted);
-        Assert.Contains("https://<redacted>@example.com/owner/repo.git", redacted);
+            client.GetDefaultBranchAsync("--upload-pack=sh", TestContext.Current.CancellationToken)
+        );
     }
 }

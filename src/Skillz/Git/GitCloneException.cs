@@ -1,18 +1,10 @@
 namespace Skillz.Git;
 
-internal sealed class GitCloneException : Exception
+internal sealed class GitCloneException(string message, string url, bool isTimeout = false, bool isAuthError = false) : Exception(message)
 {
-    public GitCloneException(string message, string url, bool isTimeout = false, bool isAuthError = false)
-        : base(message)
-    {
-        Url = url;
-        IsTimeout = isTimeout;
-        IsAuthError = isAuthError;
-    }
+    public string Url { get; } = url;
 
-    public string Url { get; }
+    public bool IsTimeout { get; } = isTimeout;
 
-    public bool IsTimeout { get; }
-
-    public bool IsAuthError { get; }
+    public bool IsAuthError { get; } = isAuthError;
 }
