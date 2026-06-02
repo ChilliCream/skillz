@@ -13,6 +13,6 @@ internal sealed class TestSourceParser : ISourceParser
             return OnParse(input);
         }
 
-        return SourceParser.ParseInternal(input);
+        return new SourceParser().Parse(input);
     }
 }

@@ -12,7 +12,7 @@ public class SourceParserTests
     public void GitLab_CustomDomain_DeepSubgroupPath()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://git.corp.com/group/subgroup/project/-/tree/main/src");
+        var result = new SourceParser().Parse("https://git.corp.com/group/subgroup/project/-/tree/main/src");
 
         // Assert
         Assert.Equal(new SkillSource.GitLab("https://git.corp.com/group/subgroup/project.git", "main", "src"), result);
@@ -22,7 +22,7 @@ public class SourceParserTests
     public void GitLab_TreeWithBranchNoPath()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.example.com/org/repo/-/tree/v1.0");
+        var result = new SourceParser().Parse("https://gitlab.example.com/org/repo/-/tree/v1.0");
 
         // Assert
         Assert.Equal(new SkillSource.GitLab("https://gitlab.example.com/org/repo.git", "v1.0"), result);
@@ -32,7 +32,7 @@ public class SourceParserTests
     public void GitLab_CustomDomainWithPort()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://git.corp.com:8443/group/repo/-/tree/main");
+        var result = new SourceParser().Parse("https://git.corp.com:8443/group/repo/-/tree/main");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -44,7 +44,7 @@ public class SourceParserTests
     public void GitLab_HttpProtocolNonSsl()
     {
         // Act
-        var result = SourceParser.ParseInternal("http://git.local/group/repo/-/tree/dev");
+        var result = new SourceParser().Parse("http://git.local/group/repo/-/tree/dev");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -55,7 +55,7 @@ public class SourceParserTests
     public void GitLab_PersonalProjectPath()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/~user/project/-/tree/main");
+        var result = new SourceParser().Parse("https://gitlab.com/~user/project/-/tree/main");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -66,7 +66,7 @@ public class SourceParserTests
     public void SimplifiedGit_CustomDomainWithDotGit_IsGenericGit()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://git.mycompany.com/my-group/my-repo.git");
+        var result = new SourceParser().Parse("https://git.mycompany.com/my-group/my-repo.git");
 
         // Assert
         Assert.Equal(new SkillSource.Git("https://git.mycompany.com/my-group/my-repo.git"), result);
@@ -76,7 +76,7 @@ public class SourceParserTests
     public void SimplifiedGit_GenericUrlsFallThroughToWellKnown()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://google.com/search/result");
+        var result = new SourceParser().Parse("https://google.com/search/result");
 
         // Assert
         var wellKnown = Assert.IsType<SkillSource.WellKnown>(result);
@@ -87,7 +87,7 @@ public class SourceParserTests
     public void SimplifiedGit_OfficialGitlabComStillParsed()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/owner/repo");
+        var result = new SourceParser().Parse("https://gitlab.com/owner/repo");
 
         // Assert
         Assert.Equal(new SkillSource.GitLab("https://gitlab.com/owner/repo.git"), result);
@@ -97,7 +97,7 @@ public class SourceParserTests
     public void GitHub_Shorthand()
     {
         // Act
-        var result = SourceParser.ParseInternal("vercel-labs/agent-skills");
+        var result = new SourceParser().Parse("vercel-labs/agent-skills");
 
         // Assert
         Assert.Equal(new SkillSource.GitHub("https://github.com/vercel-labs/agent-skills.git"), result);
@@ -107,7 +107,7 @@ public class SourceParserTests
     public void GitHub_FullUrlWithTreeAndPath()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://github.com/owner/repo/tree/main/path");
+        var result = new SourceParser().Parse("https://github.com/owner/repo/tree/main/path");
 
         // Assert
         Assert.Equal(new SkillSource.GitHub("https://github.com/owner/repo.git", "main", "path"), result);
@@ -117,7 +117,7 @@ public class SourceParserTests
     public void GitHub_BlobAnchorIsNotARef()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://github.com/owner/repo/blob/main/README.md#L10");
+        var result = new SourceParser().Parse("https://github.com/owner/repo/blob/main/README.md#L10");
 
         // Assert
         Assert.Equal(new SkillSource.GitHub("https://github.com/owner/repo.git"), result);
@@ -127,7 +127,7 @@ public class SourceParserTests
     public void GitHub_ShorthandWithBranchFragment()
     {
         // Act
-        var result = SourceParser.ParseInternal("vercel-labs/agent-skills#feature/install");
+        var result = new SourceParser().Parse("vercel-labs/agent-skills#feature/install");
 
         // Assert
         Assert.Equal(
@@ -139,7 +139,7 @@ public class SourceParserTests
     public void GitHub_ShorthandTrailingSlash()
     {
         // Act
-        var result = SourceParser.ParseInternal("vercel-labs/agent-skills/");
+        var result = new SourceParser().Parse("vercel-labs/agent-skills/");
 
         // Assert
         Assert.Equal(new SkillSource.GitHub("https://github.com/vercel-labs/agent-skills.git"), result);
@@ -149,7 +149,7 @@ public class SourceParserTests
     public void Git_SshUrlWithBranchFragment()
     {
         // Act
-        var result = SourceParser.ParseInternal("git@github.com:owner/repo.git#feature/install");
+        var result = new SourceParser().Parse("git@github.com:owner/repo.git#feature/install");
 
         // Assert
         Assert.Equal(new SkillSource.Git("git@github.com:owner/repo.git", "feature/install"), result);
@@ -159,7 +159,7 @@ public class SourceParserTests
     public void GitHub_BasicRepoUrl()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://github.com/owner/repo");
+        var result = new SourceParser().Parse("https://github.com/owner/repo");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -172,7 +172,7 @@ public class SourceParserTests
     public void GitHub_RepoUrlWithDotGitSuffix()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://github.com/owner/repo.git");
+        var result = new SourceParser().Parse("https://github.com/owner/repo.git");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -183,7 +183,7 @@ public class SourceParserTests
     public void GitHub_RepoUrlWithDotGitAndBranchFragment()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://github.com/owner/repo.git#feature/install");
+        var result = new SourceParser().Parse("https://github.com/owner/repo.git#feature/install");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -195,7 +195,7 @@ public class SourceParserTests
     public void GitHub_TreeWithBranchOnly()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://github.com/owner/repo/tree/feature-branch");
+        var result = new SourceParser().Parse("https://github.com/owner/repo/tree/feature-branch");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -208,7 +208,7 @@ public class SourceParserTests
     public void GitHub_TreeWithBranchAndPath()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://github.com/owner/repo/tree/main/skills/my-skill");
+        var result = new SourceParser().Parse("https://github.com/owner/repo/tree/main/skills/my-skill");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -221,7 +221,7 @@ public class SourceParserTests
     public void GitHub_TreeWithSlashInPathAmbiguous()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://github.com/owner/repo/tree/feature/my-feature");
+        var result = new SourceParser().Parse("https://github.com/owner/repo/tree/feature/my-feature");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -234,7 +234,7 @@ public class SourceParserTests
     public void GitLab_BasicRepoUrl()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/owner/repo");
+        var result = new SourceParser().Parse("https://gitlab.com/owner/repo");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -246,7 +246,7 @@ public class SourceParserTests
     public void GitLab_TreeWithBranchOnly()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/owner/repo/-/tree/develop");
+        var result = new SourceParser().Parse("https://gitlab.com/owner/repo/-/tree/develop");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -259,7 +259,7 @@ public class SourceParserTests
     public void GitLab_TreeWithBranchAndPath()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/owner/repo/-/tree/main/src/skills");
+        var result = new SourceParser().Parse("https://gitlab.com/owner/repo/-/tree/main/src/skills");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -272,7 +272,7 @@ public class SourceParserTests
     public void GitLab_RepoUrlWithDotGitSuffix()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/owner/repo.git");
+        var result = new SourceParser().Parse("https://gitlab.com/owner/repo.git");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -283,7 +283,7 @@ public class SourceParserTests
     public void GitLab_Subgroup2Levels()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/group/subgroup/repo");
+        var result = new SourceParser().Parse("https://gitlab.com/group/subgroup/repo");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -295,7 +295,7 @@ public class SourceParserTests
     public void GitLab_Subgroup3Levels()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/coresofthq/ai/agent-skills");
+        var result = new SourceParser().Parse("https://gitlab.com/coresofthq/ai/agent-skills");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -307,7 +307,7 @@ public class SourceParserTests
     public void GitLab_DeepSubgroupWithDotGitSuffix()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/org/team/project/repo.git");
+        var result = new SourceParser().Parse("https://gitlab.com/org/team/project/repo.git");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -318,7 +318,7 @@ public class SourceParserTests
     public void GitLab_SubgroupWithTreeBranch()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/group/subgroup/repo/-/tree/main");
+        var result = new SourceParser().Parse("https://gitlab.com/group/subgroup/repo/-/tree/main");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -331,7 +331,7 @@ public class SourceParserTests
     public void GitLab_SubgroupWithTreeBranchPath()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/group/subgroup/repo/-/tree/main/path/to/skill");
+        var result = new SourceParser().Parse("https://gitlab.com/group/subgroup/repo/-/tree/main/path/to/skill");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -344,7 +344,7 @@ public class SourceParserTests
     public void GitLab_TrailingSlash()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/group/subgroup/repo/");
+        var result = new SourceParser().Parse("https://gitlab.com/group/subgroup/repo/");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -355,7 +355,7 @@ public class SourceParserTests
     public void GitHubShorthand_OwnerRepo()
     {
         // Act
-        var result = SourceParser.ParseInternal("owner/repo");
+        var result = new SourceParser().Parse("owner/repo");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -368,7 +368,7 @@ public class SourceParserTests
     public void GitHubShorthand_OwnerRepoPath()
     {
         // Act
-        var result = SourceParser.ParseInternal("owner/repo/skills/my-skill");
+        var result = new SourceParser().Parse("owner/repo/skills/my-skill");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -380,7 +380,7 @@ public class SourceParserTests
     public void GitHubShorthand_OwnerRepoTrailingSlash()
     {
         // Act
-        var result = SourceParser.ParseInternal("owner/repo/");
+        var result = new SourceParser().Parse("owner/repo/");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -392,7 +392,7 @@ public class SourceParserTests
     public void GitHubShorthand_OwnerRepoAtSkill()
     {
         // Act
-        var result = SourceParser.ParseInternal("owner/repo@my-skill");
+        var result = new SourceParser().Parse("owner/repo@my-skill");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -405,7 +405,7 @@ public class SourceParserTests
     public void GitHubShorthand_OwnerRepoAtHyphenatedSkill()
     {
         // Act
-        var result = SourceParser.ParseInternal("vercel-labs/agent-skills@find-skills");
+        var result = new SourceParser().Parse("vercel-labs/agent-skills@find-skills");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -417,7 +417,7 @@ public class SourceParserTests
     public void GitHubShorthand_OwnerRepoHashBranch()
     {
         // Act
-        var result = SourceParser.ParseInternal("owner/repo#my-branch");
+        var result = new SourceParser().Parse("owner/repo#my-branch");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -430,7 +430,7 @@ public class SourceParserTests
     public void GitHubShorthand_OwnerRepoPathHashBranch()
     {
         // Act
-        var result = SourceParser.ParseInternal("owner/repo/skills/my-skill#feature/skills");
+        var result = new SourceParser().Parse("owner/repo/skills/my-skill#feature/skills");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -443,7 +443,7 @@ public class SourceParserTests
     public void GitHubShorthand_OwnerRepoHashBranchAtSkill()
     {
         // Act
-        var result = SourceParser.ParseInternal("owner/repo#my-branch@my-skill");
+        var result = new SourceParser().Parse("owner/repo#my-branch@my-skill");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -456,7 +456,7 @@ public class SourceParserTests
     public void LocalPath_RelativeWithDotSlash()
     {
         // Act
-        var result = SourceParser.ParseInternal("./my-skills");
+        var result = new SourceParser().Parse("./my-skills");
 
         // Assert
         var local = Assert.IsType<SkillSource.Local>(result);
@@ -467,7 +467,7 @@ public class SourceParserTests
     public void LocalPath_RelativeWithDotDotSlash()
     {
         // Act
-        var result = SourceParser.ParseInternal("../other-skills");
+        var result = new SourceParser().Parse("../other-skills");
 
         // Assert
         var local = Assert.IsType<SkillSource.Local>(result);
@@ -478,7 +478,7 @@ public class SourceParserTests
     public void LocalPath_CurrentDirectory()
     {
         // Act
-        var result = SourceParser.ParseInternal(".");
+        var result = new SourceParser().Parse(".");
 
         // Assert
         var local = Assert.IsType<SkillSource.Local>(result);
@@ -492,7 +492,7 @@ public class SourceParserTests
         var testPath = s_isWindows ? "C:\\Users\\test\\skills" : "/home/user/skills";
 
         // Act
-        var result = SourceParser.ParseInternal(testPath);
+        var result = new SourceParser().Parse(testPath);
 
         // Assert
         var local = Assert.IsType<SkillSource.Local>(result);
@@ -503,7 +503,7 @@ public class SourceParserTests
     public void Git_SshFormat()
     {
         // Act
-        var result = SourceParser.ParseInternal("git@github.com:owner/repo.git");
+        var result = new SourceParser().Parse("git@github.com:owner/repo.git");
 
         // Assert
         Assert.Equal(new SkillSource.Git("git@github.com:owner/repo.git"), result);
@@ -513,7 +513,7 @@ public class SourceParserTests
     public void Git_SshFormatWithBranch()
     {
         // Act
-        var result = SourceParser.ParseInternal("git@github.com:owner/repo.git#feature/install");
+        var result = new SourceParser().Parse("git@github.com:owner/repo.git#feature/install");
 
         // Assert
         Assert.Equal(new SkillSource.Git("git@github.com:owner/repo.git", "feature/install"), result);
@@ -523,7 +523,7 @@ public class SourceParserTests
     public void Git_CustomHost()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://git.example.com/owner/repo.git");
+        var result = new SourceParser().Parse("https://git.example.com/owner/repo.git");
 
         // Assert
         Assert.Equal(new SkillSource.Git("https://git.example.com/owner/repo.git"), result);
@@ -533,7 +533,7 @@ public class SourceParserTests
     public void Git_HttpsWithBranch()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://git.example.com/owner/repo.git#release-2026");
+        var result = new SourceParser().Parse("https://git.example.com/owner/repo.git#release-2026");
 
         // Assert
         Assert.Equal(new SkillSource.Git("https://git.example.com/owner/repo.git", "release-2026"), result);
@@ -543,7 +543,7 @@ public class SourceParserTests
     public void GetOwnerRepo_GitHubUrl()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("https://github.com/owner/repo");
+        var parsed = new SourceParser().Parse("https://github.com/owner/repo");
 
         // Act & Assert
         Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -553,7 +553,7 @@ public class SourceParserTests
     public void GetOwnerRepo_GitHubUrlWithDotGit()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("https://github.com/owner/repo.git");
+        var parsed = new SourceParser().Parse("https://github.com/owner/repo.git");
 
         // Act & Assert
         Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -563,7 +563,7 @@ public class SourceParserTests
     public void GetOwnerRepo_GitHubUrlWithTreeBranchPath()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("https://github.com/owner/repo/tree/main/skills/my-skill");
+        var parsed = new SourceParser().Parse("https://github.com/owner/repo/tree/main/skills/my-skill");
 
         // Act & Assert
         Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -573,7 +573,7 @@ public class SourceParserTests
     public void GetOwnerRepo_GitHubShorthand()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("owner/repo");
+        var parsed = new SourceParser().Parse("owner/repo");
 
         // Act & Assert
         Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -583,7 +583,7 @@ public class SourceParserTests
     public void GetOwnerRepo_GitHubShorthandWithSubpath()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("owner/repo/skills/my-skill");
+        var parsed = new SourceParser().Parse("owner/repo/skills/my-skill");
 
         // Act & Assert
         Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -593,7 +593,7 @@ public class SourceParserTests
     public void GetOwnerRepo_GitLabUrl()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("https://gitlab.com/owner/repo");
+        var parsed = new SourceParser().Parse("https://gitlab.com/owner/repo");
 
         // Act & Assert
         Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -603,7 +603,7 @@ public class SourceParserTests
     public void GetOwnerRepo_GitLabUrlWithTree()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("https://gitlab.com/owner/repo/-/tree/main/skills");
+        var parsed = new SourceParser().Parse("https://gitlab.com/owner/repo/-/tree/main/skills");
 
         // Act & Assert
         Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -613,7 +613,7 @@ public class SourceParserTests
     public void GetOwnerRepo_GitLabUrlWithSubgroup()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("https://gitlab.com/coresofthq/ai/agent-skills");
+        var parsed = new SourceParser().Parse("https://gitlab.com/coresofthq/ai/agent-skills");
 
         // Act & Assert
         Assert.Equal("coresofthq/ai/agent-skills", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -623,7 +623,7 @@ public class SourceParserTests
     public void GetOwnerRepo_LocalPathReturnsNull()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("./my-skills");
+        var parsed = new SourceParser().Parse("./my-skills");
 
         // Act & Assert
         Assert.Null(OwnerRepoParser.GetOwnerRepo(parsed));
@@ -633,7 +633,7 @@ public class SourceParserTests
     public void GetOwnerRepo_AbsoluteLocalPathReturnsNull()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("/home/user/skills");
+        var parsed = new SourceParser().Parse("/home/user/skills");
 
         // Act & Assert
         Assert.Null(OwnerRepoParser.GetOwnerRepo(parsed));
@@ -643,7 +643,7 @@ public class SourceParserTests
     public void GetOwnerRepo_CustomGitHost()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("https://git.example.com/owner/repo.git");
+        var parsed = new SourceParser().Parse("https://git.example.com/owner/repo.git");
 
         // Act & Assert
         Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -653,7 +653,7 @@ public class SourceParserTests
     public void GetOwnerRepo_SshFormat()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("git@github.com:owner/repo.git");
+        var parsed = new SourceParser().Parse("git@github.com:owner/repo.git");
 
         // Act & Assert
         Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -663,7 +663,7 @@ public class SourceParserTests
     public void GetOwnerRepo_PrivateGitLabInstance()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("https://gitlab.company.com/team/repo");
+        var parsed = new SourceParser().Parse("https://gitlab.company.com/team/repo");
 
         // Act & Assert
         Assert.Equal("team/repo", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -673,7 +673,7 @@ public class SourceParserTests
     public void GetOwnerRepo_SelfHostedGitWithDotGitSuffix()
     {
         // Arrange
-        var parsed = SourceParser.ParseInternal("https://git.internal.io/myteam/skills.git");
+        var parsed = new SourceParser().Parse("https://git.internal.io/myteam/skills.git");
 
         // Act & Assert
         Assert.Equal("myteam/skills", OwnerRepoParser.GetOwnerRepo(parsed));
@@ -813,7 +813,7 @@ public class SourceParserTests
     public void GitHubPrefix_Basic()
     {
         // Act
-        var result = SourceParser.ParseInternal("github:owner/repo");
+        var result = new SourceParser().Parse("github:owner/repo");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -825,7 +825,7 @@ public class SourceParserTests
     public void GitHubPrefix_Subpath()
     {
         // Act
-        var result = SourceParser.ParseInternal("github:owner/repo/skills/my-skill");
+        var result = new SourceParser().Parse("github:owner/repo/skills/my-skill");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -837,7 +837,7 @@ public class SourceParserTests
     public void GitHubPrefix_AtSkillName()
     {
         // Act
-        var result = SourceParser.ParseInternal("github:owner/repo@my-skill");
+        var result = new SourceParser().Parse("github:owner/repo@my-skill");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -849,7 +849,7 @@ public class SourceParserTests
     public void GitHubPrefix_GoogleWorkspaceCli()
     {
         // Act
-        var result = SourceParser.ParseInternal("github:googleworkspace/cli");
+        var result = new SourceParser().Parse("github:googleworkspace/cli");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -860,7 +860,7 @@ public class SourceParserTests
     public void GitHubPrefix_HashBranch()
     {
         // Act
-        var result = SourceParser.ParseInternal("github:owner/repo#feature/install");
+        var result = new SourceParser().Parse("github:owner/repo#feature/install");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -872,7 +872,7 @@ public class SourceParserTests
     public void GitLabPrefix_Basic()
     {
         // Act
-        var result = SourceParser.ParseInternal("gitlab:owner/repo");
+        var result = new SourceParser().Parse("gitlab:owner/repo");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -883,7 +883,7 @@ public class SourceParserTests
     public void GitLabPrefix_GroupSubgroupRepo()
     {
         // Act
-        var result = SourceParser.ParseInternal("gitlab:group/subgroup/repo");
+        var result = new SourceParser().Parse("gitlab:group/subgroup/repo");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -894,14 +894,14 @@ public class SourceParserTests
     public void Subpath_GitHubTreeRejectsTraversal()
     {
         // Act & Assert
-        Assert.Throws<CliException>(() => SourceParser.ParseInternal("https://github.com/owner/repo/tree/main/../etc"));
+        Assert.Throws<CliException>(() => new SourceParser().Parse("https://github.com/owner/repo/tree/main/../etc"));
     }
 
     [Fact]
     public void Subpath_GitHubTreeAllowsValid()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://github.com/owner/repo/tree/main/skills/my-skill");
+        var result = new SourceParser().Parse("https://github.com/owner/repo/tree/main/skills/my-skill");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
@@ -912,16 +912,14 @@ public class SourceParserTests
     public void Subpath_GitLabTreeRejectsTraversal()
     {
         // Act & Assert
-        Assert.Throws<CliException>(() =>
-            SourceParser.ParseInternal("https://gitlab.com/owner/repo/-/tree/main/../etc")
-        );
+        Assert.Throws<CliException>(() => new SourceParser().Parse("https://gitlab.com/owner/repo/-/tree/main/../etc"));
     }
 
     [Fact]
     public void Subpath_GitLabTreeAllowsValid()
     {
         // Act
-        var result = SourceParser.ParseInternal("https://gitlab.com/owner/repo/-/tree/main/src/skills");
+        var result = new SourceParser().Parse("https://gitlab.com/owner/repo/-/tree/main/src/skills");
 
         // Assert
         var gitlab = Assert.IsType<SkillSource.GitLab>(result);
@@ -932,14 +930,14 @@ public class SourceParserTests
     public void Subpath_GitHubShorthandRejectsTraversal()
     {
         // Act & Assert
-        Assert.Throws<CliException>(() => SourceParser.ParseInternal("owner/repo/../etc"));
+        Assert.Throws<CliException>(() => new SourceParser().Parse("owner/repo/../etc"));
     }
 
     [Fact]
     public void Subpath_GitHubShorthandAllowsValid()
     {
         // Act
-        var result = SourceParser.ParseInternal("owner/repo/skills/my-skill");
+        var result = new SourceParser().Parse("owner/repo/skills/my-skill");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);

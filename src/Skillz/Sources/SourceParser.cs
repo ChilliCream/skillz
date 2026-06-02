@@ -60,11 +60,6 @@ internal sealed partial class SourceParser : ISourceParser
 
     public SkillSource Parse(string input)
     {
-        return ParseInternal(input);
-    }
-
-    public static SkillSource ParseInternal(string input)
-    {
         if (IsLocalPath(input))
         {
             var resolvedPath = Path.GetFullPath(input);
@@ -79,14 +74,14 @@ internal sealed partial class SourceParser : ISourceParser
         var githubPrefixMatch = GitHubPrefixRegex().Match(input);
         if (githubPrefixMatch.Success)
         {
-            return ParseInternal(
+            return Parse(
                 AppendFragmentRef(githubPrefixMatch.Groups[1].Value, fragmentRef, fragmentSkillFilter));
         }
 
         var gitlabPrefixMatch = GitLabPrefixRegex().Match(input);
         if (gitlabPrefixMatch.Success)
         {
-            return ParseInternal(
+            return Parse(
                 AppendFragmentRef(
                     $"https://gitlab.com/{gitlabPrefixMatch.Groups[1].Value}",
                     fragmentRef,
