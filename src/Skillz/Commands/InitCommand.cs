@@ -1,11 +1,16 @@
 using System.CommandLine;
+using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Utils;
 using Spectre.Console;
+using static Skillz.KnownConfigNames;
 
 namespace Skillz.Commands;
 
-internal sealed class InitCommand(IInteractionService interaction, IFileStore fileStore)
+internal sealed class InitCommand(
+    IInteractionService interaction,
+    IFileStore fileStore,
+    ISystemEnvironment systemEnvironment)
     : BaseCommand("init", "Initialize a new skill (creates SKILL.md)")
 {
     private readonly Argument<string?> _nameArgument = new("name")
@@ -25,7 +30,7 @@ internal sealed class InitCommand(IInteractionService interaction, IFileStore fi
     {
         var nameArg = parseResult.GetValue(_nameArgument);
 
-        var cwd = Directory.GetCurrentDirectory();
+        var cwd = systemEnvironment.CurrentDirectory;
         var hasName = !string.IsNullOrEmpty(nameArg);
         var skillName = hasName ? nameArg! : Path.GetFileName(cwd);
         if (string.IsNullOrEmpty(skillName))
@@ -34,8 +39,8 @@ internal sealed class InitCommand(IInteractionService interaction, IFileStore fi
         }
 
         var skillDir = hasName ? Path.Combine(cwd, skillName) : cwd;
-        var skillFile = Path.Combine(skillDir, KnownConfigNames.SkillFileName);
-        var displayPath = hasName ? $"{skillName}/{KnownConfigNames.SkillFileName}" : KnownConfigNames.SkillFileName;
+        var skillFile = Path.Combine(skillDir, SkillFileName);
+        var displayPath = hasName ? $"{skillName}/{SkillFileName}" : SkillFileName;
 
         if (fileStore.FileExists(skillFile))
         {
