@@ -14,6 +14,7 @@ internal sealed class ListCommand(
     AgentRegistry registry,
     IInteractionService interaction,
     IFileStore fileStore,
+    ISystemEnvironment systemEnvironment,
     CliExecutionContext executionContext) : BaseCommand("list", "List installed skills")
 {
     private readonly Option<bool> _globalOption = new(CommonOptionNames.Global, "-g")
@@ -45,9 +46,7 @@ internal sealed class ListCommand(
         Options.Add(_jsonOption);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(
-        ParseResult parseResult,
-        CancellationToken cancellationToken)
+    protected override async Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken ct)
     {
         var global = parseResult.GetValue(_globalOption);
         var agents = parseResult.GetValue(_agentOption) ?? [];
@@ -68,27 +67,11 @@ internal sealed class ListCommand(
             }
         }
 
-        var cwd = Directory.GetCurrentDirectory();
-        ImmutableArray<string> agentFilter = agents.Length > 0 ? [.. agents] : registry.AgentTypes;
-
-        var skills = await CollectInstalledSkillsAsync(
-            installer,
-            registry,
-            agentFilter,
-            global,
-            cwd,
-            cancellationToken);
+        var skills = CollectInstalledSkills(installer, registry, agents, global, ct);
 
         if (jsonOutput)
         {
-            var payload = skills
-                .Select(s => new InstalledSkillJson(
-                    s.Name,
-                    s.CanonicalPath,
-                    global ? "global" : "project",
-                    s.Agents.Select(a => registry.TryGetConfig(a, out var c) && c is not null ? c.DisplayName : a)
-                        .ToArray()))
-                .ToArray();
+            var payload = skills.Select(s => s.ToJsonType(global, registry)).ToArray();
 
             var json = JsonSerializer.Serialize(payload, JsonSourceGenerationContext.Default.InstalledSkillJsonArray);
             Console.WriteLine(json);
@@ -117,9 +100,7 @@ internal sealed class ListCommand(
 
         foreach (var skill in skills)
         {
-            var agentNames = skill
-                .Agents.Select(a => registry.TryGetConfig(a, out var c) && c is not null ? c.DisplayName : a)
-                .ToList();
+            var agentNames = skill.Agents.GetDisplayNames(registry).ToList();
 
             string agentCell;
             if (agentNames.Count == 0)
@@ -128,9 +109,10 @@ internal sealed class ListCommand(
             }
             else
             {
-                var display = agentNames.Count > 5
-                    ? agentNames.Take(5).Join(", ") + $" +{agentNames.Count - 5} more"
-                    : agentNames.Join(", ");
+                var display =
+                    agentNames.Count > 5
+                        ? agentNames.Take(5).Join(", ") + $" +{agentNames.Count - 5} more"
+                        : agentNames.Join(", ");
                 agentCell = $"[dim]{Markup.Escape(display)}[/]";
             }
 
@@ -145,14 +127,15 @@ internal sealed class ListCommand(
         return new CommandResult.Success();
     }
 
-    private async Task<ImmutableArray<InstalledSkill>> CollectInstalledSkillsAsync(
+    private ImmutableArray<InstalledSkill> CollectInstalledSkills(
         ISkillInstaller installer,
         AgentRegistry registry,
-        ImmutableArray<string> agentFilter,
+        string[] agents,
         bool global,
-        string cwd,
         CancellationToken cancellationToken)
     {
+        var cwd = systemEnvironment.CurrentDirectory;
+        var agentFilter = agents.Length > 0 ? [.. agents] : registry.AgentTypes;
         var skills = new Dictionary<string, InstalledSkill>(StringComparer.Ordinal);
         var canonicalDir = installer.GetCanonicalSkillsDir(global, cwd);
         var canonicalDirFull = Path.GetFullPath(canonicalDir);
@@ -236,18 +219,17 @@ internal sealed class ListCommand(
             }
         }
 
-        await Task.CompletedTask;
         return [.. skills.Values];
     }
 
-    private static string ShortenPath(string path)
+    private string ShortenPath(string path)
     {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var home = systemEnvironment.HomeDirectory;
         if (!string.IsNullOrEmpty(home) && path.StartsWithOrdinal(home))
         {
             return "~" + path[home.Length..];
         }
-        var cwd = Directory.GetCurrentDirectory();
+        var cwd = systemEnvironment.CurrentDirectory;
         if (!string.IsNullOrEmpty(cwd) && path.StartsWithOrdinal(cwd))
         {
             var relative = path[cwd.Length..];
@@ -256,7 +238,25 @@ internal sealed class ListCommand(
         return path;
     }
 
-    private sealed record InstalledSkill(string Name, string CanonicalPath, List<string> Agents);
+    internal sealed record InstalledSkill(string Name, string CanonicalPath, List<string> Agents);
 }
 
 internal sealed record InstalledSkillJson(string Name, string Path, string Scope, string[] Agents);
+
+file static class Extensions
+{
+    public static InstalledSkillJson ToJsonType(
+        this ListCommand.InstalledSkill skill,
+        bool global,
+        AgentRegistry registry)
+    {
+        return new InstalledSkillJson(
+            skill.Name,
+            skill.CanonicalPath,
+            global ? "global" : "project",
+            skill.Agents.GetDisplayNames(registry).ToArray());
+    }
+
+    public static IEnumerable<string> GetDisplayNames(this IEnumerable<string> agents, AgentRegistry registry)
+        => agents.Select(a => registry.TryGetConfig(a, out var c) && c is not null ? c.DisplayName : a);
+}
