@@ -1,6 +1,7 @@
 using Skillz;
 using Skillz.Install;
 using Skillz.Locking;
+using Skillz.Tests.TestServices;
 using Xunit;
 
 namespace Skillz.Tests.Lock;
@@ -17,7 +18,11 @@ public class GlobalLockFileTests : IDisposable
 
         var stateDir = Path.Combine(_tempDir, "state");
         Directory.CreateDirectory(stateDir);
-        _xdgPaths = new XdgPaths(_tempDir, name => name == "XDG_STATE_HOME" ? stateDir : null);
+        _xdgPaths = new XdgPaths(new FakeSystemEnvironment
+        {
+            HomeDirectory = _tempDir,
+            Env = { ["XDG_STATE_HOME"] = stateDir }
+        });
     }
 
     public void Dispose()
@@ -367,7 +372,7 @@ public class GlobalLockFileTests : IDisposable
         // Arrange
         var home = Path.Combine(_tempDir, "home");
         Directory.CreateDirectory(home);
-        var paths = new XdgPaths(home, _ => null);
+        var paths = new XdgPaths(new FakeSystemEnvironment { HomeDirectory = home });
 
         // Act & Assert
         Assert.Equal(Path.Combine(home, ".agents", ".skill-lock.json"), paths.GetGlobalLockPath());
@@ -378,7 +383,7 @@ public class GlobalLockFileTests : IDisposable
     {
         // Arrange
         var nestedHome = Path.Combine(_tempDir, "deeply", "nested", "home");
-        var paths = new XdgPaths(nestedHome, _ => null);
+        var paths = new XdgPaths(new FakeSystemEnvironment { HomeDirectory = nestedHome });
         var lockFile = new GlobalLockFile(paths, () => FixedNow);
 
         // Act

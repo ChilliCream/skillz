@@ -1,26 +1,23 @@
 namespace Skillz.Install;
 
-internal sealed class XdgPaths(string home, Func<string, string?> envReader)
+internal sealed class XdgPaths(ISystemEnvironment system)
 {
-    public XdgPaths()
-        : this(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), Environment.GetEnvironmentVariable) { }
-
     public string GetConfigHome()
     {
-        var fromEnv = TrimToNull(envReader("XDG_CONFIG_HOME"));
-        return fromEnv ?? Path.Combine(home, ".config");
+        var fromEnv = TrimToNull(system.GetEnvironmentVariable("XDG_CONFIG_HOME"));
+        return fromEnv ?? Path.Combine(system.HomeDirectory, ".config");
     }
 
     public string GetDataHome()
     {
-        var fromEnv = TrimToNull(envReader("XDG_DATA_HOME"));
-        return fromEnv ?? Path.Combine(home, ".local", "share");
+        var fromEnv = TrimToNull(system.GetEnvironmentVariable("XDG_DATA_HOME"));
+        return fromEnv ?? Path.Combine(system.HomeDirectory, ".local", "share");
     }
 
     public string GetStateHome()
     {
-        var fromEnv = TrimToNull(envReader("XDG_STATE_HOME"));
-        return fromEnv ?? Path.Combine(home, ".local", "state");
+        var fromEnv = TrimToNull(system.GetEnvironmentVariable("XDG_STATE_HOME"));
+        return fromEnv ?? Path.Combine(system.HomeDirectory, ".local", "state");
     }
 
     public string GetGlobalSkillsDir()
@@ -30,13 +27,13 @@ internal sealed class XdgPaths(string home, Func<string, string?> envReader)
 
     public string GetGlobalLockPath()
     {
-        var fromEnv = TrimToNull(envReader("XDG_STATE_HOME"));
+        var fromEnv = TrimToNull(system.GetEnvironmentVariable("XDG_STATE_HOME"));
         if (fromEnv is not null)
         {
             return Path.Combine(fromEnv, "skills", ".skill-lock.json");
         }
 
-        return Path.Combine(home, ".agents", ".skill-lock.json");
+        return Path.Combine(system.HomeDirectory, ".agents", ".skill-lock.json");
     }
 
     public string GetConfigDir()

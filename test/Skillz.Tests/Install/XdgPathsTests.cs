@@ -1,4 +1,5 @@
 using Skillz.Install;
+using Skillz.Tests.TestServices;
 using Xunit;
 
 namespace Skillz.Tests.Install;
@@ -10,7 +11,7 @@ public class XdgPathsTests
     private static XdgPaths Create(Dictionary<string, string?>? env = null)
     {
         env ??= new Dictionary<string, string?>(StringComparer.Ordinal);
-        return new XdgPaths(Home, name => env.GetValueOrDefault(name));
+        return new XdgPaths(new FakeSystemEnvironment { HomeDirectory = Home, Env = env });
     }
 
     [Fact]
@@ -151,7 +152,7 @@ public class XdgAgentPathsTests
     private static AgentRegistry CreateRegistry(Dictionary<string, string?>? env = null)
     {
         env ??= new Dictionary<string, string?>(StringComparer.Ordinal);
-        return new AgentRegistry(Home, name => env.GetValueOrDefault(name), _ => false);
+        return new AgentRegistry(new FakeSystemEnvironment { HomeDirectory = Home, Env = env });
     }
 
     [Fact]

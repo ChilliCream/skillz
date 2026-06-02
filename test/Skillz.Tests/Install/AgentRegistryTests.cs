@@ -1,4 +1,5 @@
 using Skillz.Install;
+using Skillz.Tests.TestServices;
 using Xunit;
 
 namespace Skillz.Tests.Install;
@@ -7,7 +8,7 @@ public class AgentRegistryTests
 {
     private static AgentRegistry CreateRegistry(string home = "/home/test")
     {
-        return new AgentRegistry(home, _ => null, _ => false);
+        return new AgentRegistry(new FakeSystemEnvironment { HomeDirectory = home });
     }
 
     [Fact]
@@ -245,14 +246,19 @@ public class AgentRegistryTests
     {
         // Arrange
         const string home = "/tmp/home";
-        var openClawDir = Path.Combine(home, ".openclaw");
-        var clawdbotDir = Path.Combine(home, ".clawdbot");
-        var moltbotDir = Path.Combine(home, ".moltbot");
-
-        bool Exists(string path) => path == openClawDir || path == clawdbotDir || path == moltbotDir;
+        var system = new FakeSystemEnvironment
+        {
+            HomeDirectory = home,
+            Dirs =
+            {
+                Path.Combine(home, ".openclaw"),
+                Path.Combine(home, ".clawdbot"),
+                Path.Combine(home, ".moltbot")
+            }
+        };
 
         // Act & Assert
-        Assert.Equal(Path.Combine(home, ".openclaw", "skills"), AgentRegistry.GetOpenClawGlobalSkillsDir(home, Exists));
+        Assert.Equal(Path.Combine(home, ".openclaw", "skills"), AgentRegistry.GetOpenClawGlobalSkillsDir(system));
     }
 
     [Fact]
@@ -260,13 +266,18 @@ public class AgentRegistryTests
     {
         // Arrange
         const string home = "/tmp/home";
-        var clawdbotDir = Path.Combine(home, ".clawdbot");
-        var moltbotDir = Path.Combine(home, ".moltbot");
-
-        bool Exists(string path) => path == clawdbotDir || path == moltbotDir;
+        var system = new FakeSystemEnvironment
+        {
+            HomeDirectory = home,
+            Dirs =
+            {
+                Path.Combine(home, ".clawdbot"),
+                Path.Combine(home, ".moltbot")
+            }
+        };
 
         // Act & Assert
-        Assert.Equal(Path.Combine(home, ".clawdbot", "skills"), AgentRegistry.GetOpenClawGlobalSkillsDir(home, Exists));
+        Assert.Equal(Path.Combine(home, ".clawdbot", "skills"), AgentRegistry.GetOpenClawGlobalSkillsDir(system));
     }
 
     [Fact]
@@ -274,12 +285,14 @@ public class AgentRegistryTests
     {
         // Arrange
         const string home = "/tmp/home";
-        var moltbotDir = Path.Combine(home, ".moltbot");
-
-        bool Exists(string path) => path == moltbotDir;
+        var system = new FakeSystemEnvironment
+        {
+            HomeDirectory = home,
+            Dirs = { Path.Combine(home, ".moltbot") }
+        };
 
         // Act & Assert
-        Assert.Equal(Path.Combine(home, ".moltbot", "skills"), AgentRegistry.GetOpenClawGlobalSkillsDir(home, Exists));
+        Assert.Equal(Path.Combine(home, ".moltbot", "skills"), AgentRegistry.GetOpenClawGlobalSkillsDir(system));
     }
 
     [Fact]
@@ -287,11 +300,12 @@ public class AgentRegistryTests
     {
         // Arrange
         const string home = "/tmp/home";
+        var system = new FakeSystemEnvironment { HomeDirectory = home };
 
         // Act & Assert
         Assert.Equal(
             Path.Combine(home, ".openclaw", "skills"),
-            AgentRegistry.GetOpenClawGlobalSkillsDir(home, _ => false));
+            AgentRegistry.GetOpenClawGlobalSkillsDir(system));
     }
 
     [Fact]
@@ -299,13 +313,14 @@ public class AgentRegistryTests
     {
         // Arrange
         const string home = "/home/test";
-        var envVars = new Dictionary<string, string?>(StringComparer.Ordinal)
+        var system = new FakeSystemEnvironment
         {
-            ["CLAUDE_CONFIG_DIR"] = "/custom/claude"
+            HomeDirectory = home,
+            Env = { ["CLAUDE_CONFIG_DIR"] = "/custom/claude" }
         };
 
         // Act
-        var registry = new AgentRegistry(home, name => envVars.GetValueOrDefault(name), _ => false);
+        var registry = new AgentRegistry(system);
         var config = registry.GetConfig("claude-code");
 
         // Assert
@@ -317,10 +332,14 @@ public class AgentRegistryTests
     {
         // Arrange
         const string home = "/home/test";
-        var envVars = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CODEX_HOME"] = "/custom/codex" };
+        var system = new FakeSystemEnvironment
+        {
+            HomeDirectory = home,
+            Env = { ["CODEX_HOME"] = "/custom/codex" }
+        };
 
         // Act
-        var registry = new AgentRegistry(home, name => envVars.GetValueOrDefault(name), _ => false);
+        var registry = new AgentRegistry(system);
         var config = registry.GetConfig("codex");
 
         // Assert
@@ -332,10 +351,14 @@ public class AgentRegistryTests
     {
         // Arrange
         const string home = "/home/test";
-        var envVars = new Dictionary<string, string?>(StringComparer.Ordinal) { ["VIBE_HOME"] = "/custom/vibe" };
+        var system = new FakeSystemEnvironment
+        {
+            HomeDirectory = home,
+            Env = { ["VIBE_HOME"] = "/custom/vibe" }
+        };
 
         // Act
-        var registry = new AgentRegistry(home, name => envVars.GetValueOrDefault(name), _ => false);
+        var registry = new AgentRegistry(system);
         var config = registry.GetConfig("mistral-vibe");
 
         // Assert

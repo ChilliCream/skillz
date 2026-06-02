@@ -1,4 +1,5 @@
 using Skillz.Install;
+using Skillz.Tests.TestServices;
 using Xunit;
 
 namespace Skillz.Tests.Install;
@@ -16,13 +17,15 @@ public class AgentEnvironmentTests
         existingDirs ??= new HashSet<string>(StringComparer.Ordinal);
         var cwdValue = cwd ?? "/workspace";
 
-        var registry = new AgentRegistry(Home, name => env.GetValueOrDefault(name), existingDirs.Contains);
-        var detector = new AgentEnvironment(
-            registry,
-            Home,
-            name => env.GetValueOrDefault(name),
-            existingDirs.Contains,
-            () => cwdValue);
+        var system = new FakeSystemEnvironment
+        {
+            HomeDirectory = Home,
+            CurrentDirectory = cwdValue,
+            Env = env,
+            Dirs = existingDirs
+        };
+        var registry = new AgentRegistry(system);
+        var detector = new AgentEnvironment(registry, system);
         return (detector, registry);
     }
 

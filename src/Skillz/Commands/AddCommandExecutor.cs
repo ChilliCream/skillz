@@ -514,7 +514,7 @@ internal sealed class AddCommandExecutor(
         var installed = agentEnvironment.InstalledAgents;
 
         // Non-interactive, or exactly one agent installed: select automatically (plus universals).
-        // EnsureUniversalAgents over an empty set yields just the universal agents.
+        // WithUniversalAgents over an empty set yields just the universal agents.
         if (nonInteractive || installed.Length == 1)
         {
             return WithUniversalAgents(installed);

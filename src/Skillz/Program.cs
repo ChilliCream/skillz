@@ -55,6 +55,7 @@ internal static class Program
         builder.Services.AddSingleton<IGitHubTokenProvider, GitHubTokenProvider>();
         builder.Services.AddSingleton<IBlobClient, BlobClient>();
 
+        builder.Services.AddSingleton<ISystemEnvironment, SystemEnvironment>();
         builder.Services.AddSingleton<AgentRegistry>();
         builder.Services.AddSingleton<AgentEnvironment>();
         builder.Services.AddSingleton<XdgPaths>();

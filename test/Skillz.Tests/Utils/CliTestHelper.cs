@@ -37,13 +37,13 @@ internal static class CliTestHelper
         services.AddSingleton<TestGitHubTokenProvider>();
         services.AddSingleton<IGitHubTokenProvider>(sp => sp.GetRequiredService<TestGitHubTokenProvider>());
 
+        services.AddSingleton<ISystemEnvironment>(new FakeSystemEnvironment
+        {
+            HomeDirectory = "/home/test",
+            CurrentDirectory = "/workspace"
+        });
         services.AddSingleton<AgentRegistry>();
-
-        const string home = "/home/test";
-        const string cwd = "/workspace";
-        services.AddSingleton(new AgentEnvironment(
-            new AgentRegistry(home, _ => null, _ => false),
-            home, _ => null, _ => false, () => cwd));
+        services.AddSingleton<AgentEnvironment>();
 
         services.AddSingleton<TestInstaller>();
         services.AddSingleton<ISkillInstaller>(sp => sp.GetRequiredService<TestInstaller>());

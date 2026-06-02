@@ -1,5 +1,6 @@
 using Skillz.Install;
 using Skillz.Skills;
+using Skillz.Tests.TestServices;
 using Xunit;
 
 namespace Skillz.Tests.Install;
@@ -19,7 +20,7 @@ public class InstallerTests : IDisposable
         Directory.CreateDirectory(_projectDir);
         Directory.CreateDirectory(_home);
 
-        var registry = new AgentRegistry(_home, _ => null, Directory.Exists);
+        var registry = new AgentRegistry(new FakeSystemEnvironment { HomeDirectory = _home });
         _installer = new SkillInstaller(registry, _home);
     }
 

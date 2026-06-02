@@ -2,17 +2,11 @@ using System.Collections.Immutable;
 
 namespace Skillz.Install;
 
-internal sealed class AgentRegistry(string home, Func<string, string?> envReader, Func<string, bool> directoryExists)
+internal sealed class AgentRegistry(ISystemEnvironment system)
 {
     public const string UniversalSkillsDir = ".agents/skills";
 
-    public AgentRegistry()
-        : this(
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Environment.GetEnvironmentVariable,
-            Directory.Exists) { }
-
-    public ImmutableDictionary<string, AgentConfig> All => field ??= BuildAgents(home, envReader, directoryExists);
+    public ImmutableDictionary<string, AgentConfig> All => field ??= BuildAgents(system);
 
     public ImmutableArray<string> AgentTypes
     {
@@ -84,19 +78,20 @@ internal sealed class AgentRegistry(string home, Func<string, string?> envReader
         return All.TryGetValue(agentType, out var config) && config.SkillsDir == UniversalSkillsDir;
     }
 
-    public static string GetOpenClawGlobalSkillsDir(string home, Func<string, bool> directoryExists)
+    public static string GetOpenClawGlobalSkillsDir(ISystemEnvironment system)
     {
-        if (directoryExists(Path.Combine(home, ".openclaw")))
+        var home = system.HomeDirectory;
+        if (system.DirectoryExists(Path.Combine(home, ".openclaw")))
         {
             return Path.Combine(home, ".openclaw", "skills");
         }
 
-        if (directoryExists(Path.Combine(home, ".clawdbot")))
+        if (system.DirectoryExists(Path.Combine(home, ".clawdbot")))
         {
             return Path.Combine(home, ".clawdbot", "skills");
         }
 
-        if (directoryExists(Path.Combine(home, ".moltbot")))
+        if (system.DirectoryExists(Path.Combine(home, ".moltbot")))
         {
             return Path.Combine(home, ".moltbot", "skills");
         }
@@ -104,15 +99,13 @@ internal sealed class AgentRegistry(string home, Func<string, string?> envReader
         return Path.Combine(home, ".openclaw", "skills");
     }
 
-    private static ImmutableDictionary<string, AgentConfig> BuildAgents(
-        string home,
-        Func<string, string?> envReader,
-        Func<string, bool> directoryExists)
+    private static ImmutableDictionary<string, AgentConfig> BuildAgents(ISystemEnvironment system)
     {
-        var configHome = ResolveEnv(envReader, "XDG_CONFIG_HOME") ?? Path.Combine(home, ".config");
-        var codexHome = ResolveEnv(envReader, "CODEX_HOME") ?? Path.Combine(home, ".codex");
-        var claudeHome = ResolveEnv(envReader, "CLAUDE_CONFIG_DIR") ?? Path.Combine(home, ".claude");
-        var vibeHome = ResolveEnv(envReader, "VIBE_HOME") ?? Path.Combine(home, ".vibe");
+        var home = system.HomeDirectory;
+        var configHome = ResolveEnv(system, "XDG_CONFIG_HOME") ?? Path.Combine(home, ".config");
+        var codexHome = ResolveEnv(system, "CODEX_HOME") ?? Path.Combine(home, ".codex");
+        var claudeHome = ResolveEnv(system, "CLAUDE_CONFIG_DIR") ?? Path.Combine(home, ".claude");
+        var vibeHome = ResolveEnv(system, "VIBE_HOME") ?? Path.Combine(home, ".vibe");
 
         var builder = ImmutableDictionary.CreateBuilder<string, AgentConfig>(StringComparer.Ordinal);
 
@@ -170,7 +163,7 @@ internal sealed class AgentRegistry(string home, Func<string, string?> envReader
                 Name: "openclaw",
                 DisplayName: "OpenClaw",
                 SkillsDir: "skills",
-                GlobalSkillsDir: GetOpenClawGlobalSkillsDir(home, directoryExists)));
+                GlobalSkillsDir: GetOpenClawGlobalSkillsDir(system)));
 
         builder.Add(
             "cline",
@@ -561,9 +554,9 @@ internal sealed class AgentRegistry(string home, Func<string, string?> envReader
         return builder.ToImmutable();
     }
 
-    private static string? ResolveEnv(Func<string, string?> envReader, string name)
+    private static string? ResolveEnv(ISystemEnvironment system, string name)
     {
-        var value = envReader(name);
+        var value = system.GetEnvironmentVariable(name);
         if (string.IsNullOrWhiteSpace(value))
         {
             return null;

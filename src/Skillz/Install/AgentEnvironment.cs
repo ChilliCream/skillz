@@ -3,12 +3,7 @@ using System.Linq;
 
 namespace Skillz.Install;
 
-internal sealed class AgentEnvironment(
-    AgentRegistry registry,
-    string home,
-    Func<string, string?> envReader,
-    Func<string, bool> directoryExists,
-    Func<string> cwdProvider)
+internal sealed class AgentEnvironment(AgentRegistry registry, ISystemEnvironment system)
 {
     private static readonly ImmutableDictionary<string, string> s_agentNameToType = new Dictionary<string, string>
     {
@@ -25,14 +20,6 @@ internal sealed class AgentEnvironment(
         ["opencode"] = "opencode",
         ["github-copilot"] = "github-copilot"
     }.ToImmutableDictionary(StringComparer.Ordinal);
-
-    public AgentEnvironment(AgentRegistry registry)
-        : this(
-            registry,
-            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            Environment.GetEnvironmentVariable,
-            Directory.Exists,
-            Directory.GetCurrentDirectory) { }
 
     public string? CurrentAgentName => field ??= DetectAgentNameFromEnvironment();
 
@@ -55,6 +42,7 @@ internal sealed class AgentEnvironment(
 
     private bool IsInstalled(string agentType)
     {
+        var home = system.HomeDirectory;
         var configHome = ResolveEnv("XDG_CONFIG_HOME") ?? Path.Combine(home, ".config");
         var codexHome = ResolveEnv("CODEX_HOME") ?? Path.Combine(home, ".codex");
         var claudeHome = ResolveEnv("CLAUDE_CONFIG_DIR") ?? Path.Combine(home, ".claude");
@@ -62,64 +50,64 @@ internal sealed class AgentEnvironment(
 
         return agentType switch
         {
-            "aider-desk" => directoryExists(Path.Combine(home, ".aider-desk")),
-            "amp" => directoryExists(Path.Combine(configHome, "amp")),
-            "antigravity" => directoryExists(Path.Combine(home, ".gemini", "antigravity")),
-            "augment" => directoryExists(Path.Combine(home, ".augment")),
-            "bob" => directoryExists(Path.Combine(home, ".bob")),
-            "claude-code" => directoryExists(claudeHome),
-            "openclaw" => directoryExists(Path.Combine(home, ".openclaw"))
-                || directoryExists(Path.Combine(home, ".clawdbot"))
-                || directoryExists(Path.Combine(home, ".moltbot")),
-            "cline" => directoryExists(Path.Combine(home, ".cline")),
-            "codearts-agent" => directoryExists(Path.Combine(home, ".codeartsdoer")),
-            "codebuddy" => directoryExists(Path.Combine(cwdProvider(), ".codebuddy"))
-                || directoryExists(Path.Combine(home, ".codebuddy")),
-            "codemaker" => directoryExists(Path.Combine(home, ".codemaker")),
-            "codestudio" => directoryExists(Path.Combine(home, ".codestudio")),
-            "codex" => directoryExists(codexHome) || directoryExists("/etc/codex"),
-            "command-code" => directoryExists(Path.Combine(home, ".commandcode")),
-            "continue" => directoryExists(Path.Combine(cwdProvider(), ".continue"))
-                || directoryExists(Path.Combine(home, ".continue")),
-            "cortex" => directoryExists(Path.Combine(home, ".snowflake", "cortex")),
-            "crush" => directoryExists(Path.Combine(home, ".config", "crush")),
-            "cursor" => directoryExists(Path.Combine(home, ".cursor")),
-            "deepagents" => directoryExists(Path.Combine(home, ".deepagents")),
-            "devin" => directoryExists(Path.Combine(configHome, "devin")),
-            "dexto" => directoryExists(Path.Combine(home, ".dexto")),
-            "droid" => directoryExists(Path.Combine(home, ".factory")),
-            "firebender" => directoryExists(Path.Combine(home, ".firebender")),
-            "forgecode" => directoryExists(Path.Combine(home, ".forge")),
-            "gemini-cli" => directoryExists(Path.Combine(home, ".gemini")),
-            "github-copilot" => directoryExists(Path.Combine(home, ".copilot")),
-            "goose" => directoryExists(Path.Combine(configHome, "goose")),
-            "hermes-agent" => directoryExists(Path.Combine(home, ".hermes")),
-            "junie" => directoryExists(Path.Combine(home, ".junie")),
-            "iflow-cli" => directoryExists(Path.Combine(home, ".iflow")),
-            "kilo" => directoryExists(Path.Combine(home, ".kilocode")),
-            "kimi-cli" => directoryExists(Path.Combine(home, ".kimi")),
-            "kiro-cli" => directoryExists(Path.Combine(home, ".kiro")),
-            "kode" => directoryExists(Path.Combine(home, ".kode")),
-            "mcpjam" => directoryExists(Path.Combine(home, ".mcpjam")),
-            "mistral-vibe" => directoryExists(vibeHome),
-            "mux" => directoryExists(Path.Combine(home, ".mux")),
-            "opencode" => directoryExists(Path.Combine(configHome, "opencode")),
-            "openhands" => directoryExists(Path.Combine(home, ".openhands")),
-            "pi" => directoryExists(Path.Combine(home, ".pi", "agent")),
-            "qoder" => directoryExists(Path.Combine(home, ".qoder")),
-            "qwen-code" => directoryExists(Path.Combine(home, ".qwen")),
-            "replit" => directoryExists(Path.Combine(cwdProvider(), ".replit")),
-            "rovodev" => directoryExists(Path.Combine(home, ".rovodev")),
-            "roo" => directoryExists(Path.Combine(home, ".roo")),
-            "tabnine-cli" => directoryExists(Path.Combine(home, ".tabnine")),
-            "trae" => directoryExists(Path.Combine(home, ".trae")),
-            "trae-cn" => directoryExists(Path.Combine(home, ".trae-cn")),
-            "warp" => directoryExists(Path.Combine(home, ".warp")),
-            "windsurf" => directoryExists(Path.Combine(home, ".codeium", "windsurf")),
-            "zencoder" => directoryExists(Path.Combine(home, ".zencoder")),
-            "neovate" => directoryExists(Path.Combine(home, ".neovate")),
-            "pochi" => directoryExists(Path.Combine(home, ".pochi")),
-            "adal" => directoryExists(Path.Combine(home, ".adal")),
+            "aider-desk" => system.DirectoryExists(Path.Combine(home, ".aider-desk")),
+            "amp" => system.DirectoryExists(Path.Combine(configHome, "amp")),
+            "antigravity" => system.DirectoryExists(Path.Combine(home, ".gemini", "antigravity")),
+            "augment" => system.DirectoryExists(Path.Combine(home, ".augment")),
+            "bob" => system.DirectoryExists(Path.Combine(home, ".bob")),
+            "claude-code" => system.DirectoryExists(claudeHome),
+            "openclaw" => system.DirectoryExists(Path.Combine(home, ".openclaw"))
+                || system.DirectoryExists(Path.Combine(home, ".clawdbot"))
+                || system.DirectoryExists(Path.Combine(home, ".moltbot")),
+            "cline" => system.DirectoryExists(Path.Combine(home, ".cline")),
+            "codearts-agent" => system.DirectoryExists(Path.Combine(home, ".codeartsdoer")),
+            "codebuddy" => system.DirectoryExists(Path.Combine(system.CurrentDirectory, ".codebuddy"))
+                || system.DirectoryExists(Path.Combine(home, ".codebuddy")),
+            "codemaker" => system.DirectoryExists(Path.Combine(home, ".codemaker")),
+            "codestudio" => system.DirectoryExists(Path.Combine(home, ".codestudio")),
+            "codex" => system.DirectoryExists(codexHome) || system.DirectoryExists("/etc/codex"),
+            "command-code" => system.DirectoryExists(Path.Combine(home, ".commandcode")),
+            "continue" => system.DirectoryExists(Path.Combine(system.CurrentDirectory, ".continue"))
+                || system.DirectoryExists(Path.Combine(home, ".continue")),
+            "cortex" => system.DirectoryExists(Path.Combine(home, ".snowflake", "cortex")),
+            "crush" => system.DirectoryExists(Path.Combine(home, ".config", "crush")),
+            "cursor" => system.DirectoryExists(Path.Combine(home, ".cursor")),
+            "deepagents" => system.DirectoryExists(Path.Combine(home, ".deepagents")),
+            "devin" => system.DirectoryExists(Path.Combine(configHome, "devin")),
+            "dexto" => system.DirectoryExists(Path.Combine(home, ".dexto")),
+            "droid" => system.DirectoryExists(Path.Combine(home, ".factory")),
+            "firebender" => system.DirectoryExists(Path.Combine(home, ".firebender")),
+            "forgecode" => system.DirectoryExists(Path.Combine(home, ".forge")),
+            "gemini-cli" => system.DirectoryExists(Path.Combine(home, ".gemini")),
+            "github-copilot" => system.DirectoryExists(Path.Combine(home, ".copilot")),
+            "goose" => system.DirectoryExists(Path.Combine(configHome, "goose")),
+            "hermes-agent" => system.DirectoryExists(Path.Combine(home, ".hermes")),
+            "junie" => system.DirectoryExists(Path.Combine(home, ".junie")),
+            "iflow-cli" => system.DirectoryExists(Path.Combine(home, ".iflow")),
+            "kilo" => system.DirectoryExists(Path.Combine(home, ".kilocode")),
+            "kimi-cli" => system.DirectoryExists(Path.Combine(home, ".kimi")),
+            "kiro-cli" => system.DirectoryExists(Path.Combine(home, ".kiro")),
+            "kode" => system.DirectoryExists(Path.Combine(home, ".kode")),
+            "mcpjam" => system.DirectoryExists(Path.Combine(home, ".mcpjam")),
+            "mistral-vibe" => system.DirectoryExists(vibeHome),
+            "mux" => system.DirectoryExists(Path.Combine(home, ".mux")),
+            "opencode" => system.DirectoryExists(Path.Combine(configHome, "opencode")),
+            "openhands" => system.DirectoryExists(Path.Combine(home, ".openhands")),
+            "pi" => system.DirectoryExists(Path.Combine(home, ".pi", "agent")),
+            "qoder" => system.DirectoryExists(Path.Combine(home, ".qoder")),
+            "qwen-code" => system.DirectoryExists(Path.Combine(home, ".qwen")),
+            "replit" => system.DirectoryExists(Path.Combine(system.CurrentDirectory, ".replit")),
+            "rovodev" => system.DirectoryExists(Path.Combine(home, ".rovodev")),
+            "roo" => system.DirectoryExists(Path.Combine(home, ".roo")),
+            "tabnine-cli" => system.DirectoryExists(Path.Combine(home, ".tabnine")),
+            "trae" => system.DirectoryExists(Path.Combine(home, ".trae")),
+            "trae-cn" => system.DirectoryExists(Path.Combine(home, ".trae-cn")),
+            "warp" => system.DirectoryExists(Path.Combine(home, ".warp")),
+            "windsurf" => system.DirectoryExists(Path.Combine(home, ".codeium", "windsurf")),
+            "zencoder" => system.DirectoryExists(Path.Combine(home, ".zencoder")),
+            "neovate" => system.DirectoryExists(Path.Combine(home, ".neovate")),
+            "pochi" => system.DirectoryExists(Path.Combine(home, ".pochi")),
+            "adal" => system.DirectoryExists(Path.Combine(home, ".adal")),
             "universal" => false,
             _ => false
         };
@@ -205,7 +193,7 @@ internal sealed class AgentEnvironment(
         }
 
         // 12. Devin (filesystem probe)
-        if (directoryExists("/opt/.devin"))
+        if (system.DirectoryExists("/opt/.devin"))
         {
             return "devin";
         }
@@ -242,7 +230,7 @@ internal sealed class AgentEnvironment(
 
     private string? ResolveEnv(string name)
     {
-        var value = envReader(name);
+        var value = system.GetEnvironmentVariable(name);
         if (string.IsNullOrWhiteSpace(value))
         {
             return null;
