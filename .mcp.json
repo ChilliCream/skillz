@@ -2,10 +2,13 @@
   "mcpServers": {
     "local-pr-review": {
       "type": "stdio",
-      "command": "./bin/local-pr-review-mcp",
+      "command": "node",
       "args": [
+        "/home/pascal/later/packages/mcp/dist/server.js",
         "--repo",
-        "."
+        ".",
+        "--author",
+        "Claude"
       ],
       "env": {}
     }
