@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace Skillz.Net;
 
-internal sealed class BlobClient : IBlobClient
+internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTokenProvider tokenProvider) : IBlobClient
 {
     internal const string HttpClientName = "Skillz.GitHub";
 
@@ -13,15 +13,6 @@ internal sealed class BlobClient : IBlobClient
 
     private static readonly object s_rateLimitLock = new();
     private static bool s_rateLimitedThisSession;
-
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IGitHubTokenProvider _tokenProvider;
-
-    public BlobClient(IHttpClientFactory httpClientFactory, IGitHubTokenProvider tokenProvider)
-    {
-        _httpClientFactory = httpClientFactory;
-        _tokenProvider = tokenProvider;
-    }
 
     internal static void ResetAuthStateForTests()
     {
@@ -39,13 +30,13 @@ internal sealed class BlobClient : IBlobClient
         CancellationToken cancellationToken)
     {
         var ownerRepo = $"{owner}/{repo}";
-        var branches = string.IsNullOrEmpty(@ref) ? new[] { "HEAD", "main", "master" } : new[] { @ref };
+        var branches = string.IsNullOrEmpty(@ref) ? ["HEAD", "main", "master"] : new[] { @ref };
 
         var rateLimitedAtStart = IsRateLimited();
 
         if (rateLimitedAtStart)
         {
-            var token = await _tokenProvider.GetTokenAsync(cancellationToken);
+            var token = await tokenProvider.GetTokenAsync(cancellationToken);
             if (token is null)
             {
                 return null;
@@ -85,7 +76,7 @@ internal sealed class BlobClient : IBlobClient
         }
 
         MarkRateLimited();
-        var fallbackToken = await _tokenProvider.GetTokenAsync(cancellationToken);
+        var fallbackToken = await tokenProvider.GetTokenAsync(cancellationToken);
         if (fallbackToken is null)
         {
             return null;
@@ -113,7 +104,7 @@ internal sealed class BlobClient : IBlobClient
         var branch = string.IsNullOrEmpty(@ref) ? "HEAD" : @ref;
         var url = $"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}";
 
-        var client = _httpClientFactory.CreateClient(HttpClientName);
+        var client = httpClientFactory.CreateClient(HttpClientName);
 
         try
         {
@@ -146,7 +137,7 @@ internal sealed class BlobClient : IBlobClient
         CancellationToken cancellationToken)
     {
         var url = $"https://api.github.com/repos/{ownerRepo}/git/trees/{Uri.EscapeDataString(branch)}?recursive=1";
-        var client = _httpClientFactory.CreateClient(HttpClientName);
+        var client = httpClientFactory.CreateClient(HttpClientName);
 
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github.v3+json"));
@@ -165,10 +156,11 @@ internal sealed class BlobClient : IBlobClient
             using var response = await client.SendAsync(request, timeoutCts.Token);
             if (response.IsSuccessStatusCode)
             {
-                await using var stream = await response
-                    .Content.ReadAsStreamAsync(timeoutCts.Token);
-                var data = await JsonSerializer
-                    .DeserializeAsync(stream, JsonSourceGenerationContext.Default.GitHubTreeResponse, timeoutCts.Token);
+                await using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
+                var data = await JsonSerializer.DeserializeAsync(
+                    stream,
+                    JsonSourceGenerationContext.Default.GitHubTreeResponse,
+                    timeoutCts.Token);
 
                 if (data is null)
                 {
