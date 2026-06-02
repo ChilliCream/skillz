@@ -1,13 +1,31 @@
 using System.Collections.Immutable;
+using System.Runtime.CompilerServices;
 using Skillz.Plugins;
 
 namespace Skillz.Skills;
 
-internal sealed class SkillDiscovery : ISkillDiscovery
+/// <summary>
+/// Default <see cref="ISkillDiscovery"/> implementation that scans the filesystem for
+/// <c>SKILL.md</c>-defined skills.
+/// </summary>
+/// <remarks>
+/// Searching proceeds from cheapest to most expensive: a root <c>SKILL.md</c> (the
+/// "this directory is a skill" case) is checked first, then a curated set of
+/// convention-based priority directories (<c>s_priorityRelativeDirs</c>) plus any
+/// plugin-provided paths, and finally a bounded recursive crawl that only runs when
+/// nothing was found yet or <see cref="SkillDiscoveryOptions.FullDepth"/> is requested.
+/// Results are deduplicated by sanitized name, so a skill found in an earlier (higher
+/// priority) location wins over a later duplicate.
+/// </remarks>
+internal sealed class SkillDiscovery(IPluginManifest pluginManifest, IPluginGrouping pluginGrouping) : ISkillDiscovery
 {
+    /// <summary>
+    /// Maximum directory depth walked by the recursive fallback crawl.
+    /// </summary>
     private const int MaxDepth = 5;
 
-    private static readonly HashSet<string> SkipDirs = new(StringComparer.Ordinal)
+    /// <summary>Directory names skipped during the recursive crawl to avoid noise and large trees.</summary>
+    private static readonly HashSet<string> s_skipDirs = new(StringComparer.Ordinal)
     {
         "node_modules",
         ".git",
@@ -16,7 +34,11 @@ internal sealed class SkillDiscovery : ISkillDiscovery
         "__pycache__"
     };
 
-    private static readonly string[] PriorityRelativeDirs =
+    /// <summary>
+    /// Convention-based locations searched (one level deep) before falling back to a full
+    /// crawl, in priority order. The empty string represents the search path itself.
+    /// </summary>
+    private static readonly string[] s_priorityRelativeDirs =
     [
         "",
         "skills",
@@ -48,179 +70,137 @@ internal sealed class SkillDiscovery : ISkillDiscovery
         ".zencoder/skills"
     ];
 
-    private readonly IPluginManifest _pluginManifest;
-    private readonly IPluginGrouping _pluginGrouping;
-
-    public SkillDiscovery(IPluginManifest pluginManifest, IPluginGrouping pluginGrouping)
-    {
-        _pluginManifest = pluginManifest;
-        _pluginGrouping = pluginGrouping;
-    }
-
+    /// <inheritdoc />
     public async Task<ImmutableArray<Skill>> DiscoverAsync(
         string basePath,
         string? subpath,
         SkillDiscoveryOptions? options,
         CancellationToken cancellationToken)
     {
-        options ??= new SkillDiscoveryOptions();
+        options ??= SkillDiscoveryOptions.Default;
 
+        // Reject a subpath that would resolve outside the base repository directory.
         if (subpath is not null && !SubpathValidator.IsSubpathSafe(basePath, subpath))
         {
             throw new CliException(
                 ExitCodeConstants.Failure,
                 $"""Invalid subpath: "{subpath}" resolves outside the repository directory. Subpath must not contain ".." segments that escape the base path.""");
         }
-
         var searchPath = subpath is null ? basePath : Path.Combine(basePath, subpath);
 
-        var groupings = await _pluginGrouping.GetPluginGroupingsAsync(searchPath, cancellationToken);
+        // Plugin metadata, used to tag each discovered skill with its plugin grouping.
+        var groupings = await pluginGrouping.GetPluginGroupingsAsync(searchPath, cancellationToken);
 
         var skills = new List<Skill>();
         var seenNames = new HashSet<string>(StringComparer.Ordinal);
 
-        if (HasSkillMd(searchPath))
+        async Task AddSkill(string dir)
         {
-            var rootSkill = await ParseSkillMdAsync(
-                    Path.Combine(searchPath, KnownConfigNames.SkillFileName),
-                    options,
-                    cancellationToken);
-
-            if (rootSkill is not null)
+            if (!File.Exists(Path.Combine(dir, KnownConfigNames.SkillFileName)))
             {
-                rootSkill = Enhance(rootSkill, groupings);
-                skills.Add(rootSkill);
-                seenNames.Add(NameSanitizer.SanitizeName(rootSkill.Name));
-
-                if (!options.FullDepth)
-                {
-                    return [.. skills];
-                }
+                return;
             }
+
+            var skill = await ParseSkillMdAsync(Path.Combine(dir, KnownConfigNames.SkillFileName), cancellationToken);
+
+            if (skill is null)
+            {
+                return;
+            }
+
+            if (skill.IsInternal
+                && !options.IncludeInternal
+                && Environment.GetEnvironmentVariable("INSTALL_INTERNAL_SKILLS") is not "1" and not "true")
+            {
+                return;
+            }
+
+            if (!seenNames.Add(SkillNameSanitizer.SanitizeName(skill.Name)))
+            {
+                return;
+            }
+
+            skills.Add(
+                groupings.TryGetValue(Path.GetFullPath(skill.Path), out var pluginName)
+                    ? skill with { PluginName = pluginName }
+                    : skill);
         }
 
-        var prioritySearchDirs = new List<string>(PriorityRelativeDirs.Length + 4);
-        foreach (var relative in PriorityRelativeDirs)
+        // Walk the source once and keep the first skill found for each sanitized name, tagging it
+        // with its owning plugin when its resolved path matches a known grouping.
+        await foreach (var dir in EnumerateSkillsAsync(searchPath, options, cancellationToken))
         {
-            prioritySearchDirs.Add(relative.Length == 0 ? searchPath : Path.Combine(searchPath, relative));
+            await AddSkill(dir);
         }
 
-        var pluginPaths = await _pluginManifest.GetPluginSkillPathsAsync(searchPath, cancellationToken);
-        prioritySearchDirs.AddRange(pluginPaths);
-
-        foreach (var dir in prioritySearchDirs)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            IEnumerable<string> entries;
-            try
-            {
-                entries = Directory.EnumerateDirectories(dir);
-            }
-            catch
-            {
-                continue;
-            }
-
-            foreach (var skillDir in entries)
-            {
-                if (!HasSkillMd(skillDir))
-                {
-                    continue;
-                }
-
-                var skill = await ParseSkillMdAsync(
-                        Path.Combine(skillDir, KnownConfigNames.SkillFileName),
-                        options,
-                        cancellationToken);
-
-                if (skill is null)
-                {
-                    continue;
-                }
-
-                var sanitized = NameSanitizer.SanitizeName(skill.Name);
-                if (seenNames.Contains(sanitized))
-                {
-                    continue;
-                }
-
-                skills.Add(Enhance(skill, groupings));
-                seenNames.Add(sanitized);
-            }
-        }
-
+        // If we found nothing and didn't do a full scan yet, fall back to a crawl of the entire tree up to a max depth.
         if (skills.Count == 0 || options.FullDepth)
         {
-            var allSkillDirs = new List<string>();
-            CollectSkillDirs(searchPath, depth: 0, allSkillDirs, cancellationToken);
-
-            foreach (var skillDir in allSkillDirs)
+            foreach (var dir in EnumerateCrawlSkillDirs(searchPath, depth: 0, cancellationToken))
             {
-                var skill = await ParseSkillMdAsync(
-                        Path.Combine(skillDir, KnownConfigNames.SkillFileName),
-                        options,
-                        cancellationToken);
-
-                if (skill is null)
-                {
-                    continue;
-                }
-
-                var sanitized = NameSanitizer.SanitizeName(skill.Name);
-                if (seenNames.Contains(sanitized))
-                {
-                    continue;
-                }
-
-                skills.Add(Enhance(skill, groupings));
-                seenNames.Add(sanitized);
+                await AddSkill(dir);
             }
         }
 
         return [.. skills];
     }
 
-    private static bool HasSkillMd(string dir)
+    private async IAsyncEnumerable<string> EnumerateSkillsAsync(
+        string searchPath,
+        SkillDiscoveryOptions options,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        try
+        // The source directory is itself a skill; a shallow scan needs nothing more.
+        yield return searchPath;
+
+        if (!options.FullDepth)
         {
-            return File.Exists(Path.Combine(dir, KnownConfigNames.SkillFileName));
+            yield break;
         }
-        catch
+
+        // Fast path: convention-based priority roots plus plugin paths, scanned one level deep.
+        var priorityRoots = new List<string>(s_priorityRelativeDirs.Length + 4);
+        foreach (var relative in s_priorityRelativeDirs)
         {
-            return false;
+            priorityRoots.Add(relative.Length == 0 ? searchPath : Path.Combine(searchPath, relative));
+        }
+        priorityRoots.AddRange(await pluginManifest.GetPluginSkillPathsAsync(searchPath, cancellationToken));
+
+        foreach (var priorityRoot in priorityRoots)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            IEnumerable<string> entries;
+            try
+            {
+                entries = Directory.EnumerateDirectories(priorityRoot);
+            }
+            catch
+            {
+                // Missing or inaccessible directory - nothing to scan here.
+                continue;
+            }
+
+            foreach (var dir in entries)
+            {
+                yield return dir;
+            }
         }
     }
 
-    private static Skill Enhance(Skill skill, Dictionary<string, string> groupings)
-    {
-        var resolved = Path.GetFullPath(skill.Path);
-        if (groupings.TryGetValue(resolved, out var pluginName))
-        {
-            return skill with { PluginName = pluginName };
-        }
-
-        return skill;
-    }
-
-    private static void CollectSkillDirs(
+    private static IEnumerable<string> EnumerateCrawlSkillDirs(
         string dir,
         int depth,
-        List<string> results,
         CancellationToken cancellationToken)
     {
         if (depth > MaxDepth)
         {
-            return;
+            yield break;
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (HasSkillMd(dir))
-        {
-            results.Add(dir);
-        }
+        yield return dir;
 
         string[] subDirs;
         try
@@ -229,25 +209,34 @@ internal sealed class SkillDiscovery : ISkillDiscovery
         }
         catch
         {
-            return;
+            subDirs = [];
         }
 
         foreach (var subDir in subDirs)
         {
             var name = Path.GetFileName(subDir);
-            if (SkipDirs.Contains(name))
+            if (s_skipDirs.Contains(name))
             {
                 continue;
             }
 
-            CollectSkillDirs(subDir, depth + 1, results, cancellationToken);
+            foreach (var skillDir in EnumerateCrawlSkillDirs(subDir, depth + 1, cancellationToken))
+            {
+                yield return skillDir;
+            }
         }
     }
 
-    internal static async Task<Skill?> ParseSkillMdAsync(
-        string skillMdPath,
-        SkillDiscoveryOptions options,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Reads and parses a <c>SKILL.md</c> file into a <see cref="Skill"/>. Parsing is policy-free;
+    /// the caller decides whether to keep the result (e.g. internal-skill filtering).
+    /// </summary>
+    /// <returns>
+    /// The parsed skill, or <see langword="null"/> when the file is unreadable, has invalid
+    /// frontmatter, or is missing a non-empty <c>name</c>/<c>description</c>. Name and description
+    /// are run through <see cref="TerminalSanitizer"/> to neutralize untrusted terminal escapes.
+    /// </returns>
+    private static async Task<Skill?> ParseSkillMdAsync(string skillMdPath, CancellationToken cancellationToken)
     {
         string content;
         try
@@ -299,17 +288,6 @@ internal sealed class SkillDiscovery : ISkillDiscovery
             }
         }
 
-        var isInternal =
-            metadata is not null
-            && metadata.TryGetValue("internal", out var internalFlag)
-            && internalFlag is string s
-            && (string.Equals(s, "true", StringComparison.OrdinalIgnoreCase));
-
-        if (isInternal && !options.IncludeInternal && !ShouldInstallInternalSkills())
-        {
-            return null;
-        }
-
         var skillDir = Path.GetDirectoryName(skillMdPath) ?? skillMdPath;
 
         return new Skill(
@@ -319,10 +297,17 @@ internal sealed class SkillDiscovery : ISkillDiscovery
             RawContent: content,
             Metadata: metadata);
     }
+}
 
-    internal static bool ShouldInstallInternalSkills()
+file static class Extensions
+{
+    extension(Skill skill)
     {
-        var env = Environment.GetEnvironmentVariable("INSTALL_INTERNAL_SKILLS");
-        return env == "1" || string.Equals(env, "true", StringComparison.OrdinalIgnoreCase);
+        /// <summary>Returns whether <paramref name="skill"/> is marked <c>internal: true</c> in its metadata.</summary>
+        public bool IsInternal
+            => skill.Metadata is { } metadata
+            && metadata.TryGetValue("internal", out var flag)
+            && flag is string value
+            && string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
     }
 }
