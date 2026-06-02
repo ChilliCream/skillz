@@ -348,18 +348,17 @@ internal sealed class AddCommandExecutor(
 
     private void RenderFailurePanel(ImmutableArray<InstallEntry> failed)
     {
-        var details = new StringBuilder();
-        foreach (var entry in failed)
+        var rows = new Rows(failed.Select(entry =>
         {
             var error = string.IsNullOrEmpty(entry.Result.Error) ? "unknown error" : entry.Result.Error;
-            details.AppendLine(
+            return new Markup(
                 $"[red]✗[/] {Markup.Escape(entry.SkillName)} → "
                 + $"{Markup.Escape(GetAgentDisplay(entry.AgentType))}: {Markup.Escape(error)}");
-        }
+        }));
 
         interaction.WriteLine();
         interaction.WriteRenderable(
-            new Panel(new Markup(details.ToString().TrimEnd()))
+            new Panel(rows)
                 .Header($"[bold red]Installation failed for {failed.Length} skill(s)[/]")
                 .BorderColor(Color.Red)
                 .Expand());
