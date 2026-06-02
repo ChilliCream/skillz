@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Text;
 using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Locking;
@@ -11,6 +12,18 @@ internal sealed class AddCommandPrompter(
     AgentRegistry registry,
     IGlobalLockFile globalLock) : IAddCommandPrompter
 {
+    private static readonly ImmutableArray<(string Label, InstallMode Value)> s_installModeChoices =
+    [
+        ("Symlink (Recommended)", InstallMode.Symlink),
+        ("Copy to all agents", InstallMode.Copy)
+    ];
+
+    private static readonly ImmutableArray<(string Label, bool Value)> s_globalScopeChoices =
+    [
+        ("Project (install in current directory)", false),
+        ("Global (install in home directory)", true)
+    ];
+
     public async Task<ImmutableArray<ResolvedSkill>> SelectSkillsAsync(
         ImmutableArray<ResolvedSkill> skills,
         CancellationToken cancellationToken)
@@ -29,8 +42,7 @@ internal sealed class AddCommandPrompter(
         var sorted = skills
             .OrderBy(s => s.PluginName is null ? 1 : 0)
             .ThenBy(s => s.PluginName, StringComparer.Ordinal)
-            .ThenBy(s => s.InstallName, StringComparer.Ordinal)
-            .ToList();
+            .ThenBy(s => s.InstallName, StringComparer.Ordinal);
 
         var choices = sorted.Select(s =>
         {
@@ -102,24 +114,12 @@ internal sealed class AddCommandPrompter(
 
     public async Task<bool> SelectGlobalScopeAsync(CancellationToken cancellationToken)
     {
-        var choices = new (string Label, bool Value)[]
-        {
-            ("Project (install in current directory)", false),
-            ("Global (install in home directory)", true)
-        };
-
-        return await interaction.SelectAsync("Installation scope", choices, cancellationToken);
+        return await interaction.SelectAsync("Installation scope", s_globalScopeChoices, cancellationToken);
     }
 
     public async Task<InstallMode> SelectInstallModeAsync(CancellationToken cancellationToken)
     {
-        var choices = new (string Label, InstallMode Value)[]
-        {
-            ("Symlink (Recommended)", InstallMode.Symlink),
-            ("Copy to all agents", InstallMode.Copy)
-        };
-
-        return await interaction.SelectAsync("Installation method", choices, cancellationToken);
+        return await interaction.SelectAsync("Installation method", s_installModeChoices, cancellationToken);
     }
 
     public Task<bool> ConfirmInstallationAsync(
@@ -128,17 +128,22 @@ internal sealed class AddCommandPrompter(
         ImmutableArray<OverwriteTarget> overwrites,
         CancellationToken cancellationToken)
     {
-        var skillNames = skills.Select(s => s.InstallName).Join(", ");
-        var agentNames = agents.Join(", ");
-        var message = $"Install {skills.Length} skill(s) [{skillNames}] to {agents.Length} agent(s) [{agentNames}]?";
+        var sb = new StringBuilder();
+        sb.Append("Install ").Append(skills.Length).Append(" skill(s) [");
+        sb.AppendJoin(", ", skills.Select(s => s.InstallName));
+        sb.Append("] to ").Append(agents.Length).Append(" agent(s) [");
+        sb.AppendJoin(", ", agents);
+        sb.Append(']');
+
         if (overwrites.Length > 0)
         {
-            var targets = overwrites
-                .Select(o => $"  - {o.SkillName}: {o.DestinationPath}")
-                .Join(Environment.NewLine);
-            message += $"{Environment.NewLine}Existing installs will be overwritten:{Environment.NewLine}{targets}";
+            sb.AppendLine().Append("Existing installs will be overwritten:");
+            foreach (var o in overwrites)
+            {
+                sb.AppendLine().Append("  - ").Append(o.SkillName).Append(": ").Append(o.DestinationPath);
+            }
         }
 
-        return interaction.ConfirmAsync(message, defaultValue: true, cancellationToken);
+        return interaction.ConfirmAsync(sb.ToString(), defaultValue: true, cancellationToken);
     }
 }
