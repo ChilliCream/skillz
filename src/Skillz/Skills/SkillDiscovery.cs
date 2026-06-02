@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Skillz.Plugins;
+using Skillz.Utils;
 
 namespace Skillz.Skills;
 
@@ -17,7 +18,10 @@ namespace Skillz.Skills;
 /// Results are deduplicated by sanitized name, so a skill found in an earlier (higher
 /// priority) location wins over a later duplicate.
 /// </remarks>
-internal sealed class SkillDiscovery(IPluginManifest pluginManifest, IPluginGrouping pluginGrouping) : ISkillDiscovery
+internal sealed class SkillDiscovery(
+    IPluginManifest pluginManifest,
+    IPluginGrouping pluginGrouping,
+    IFileStore fileStore) : ISkillDiscovery
 {
     /// <summary>
     /// Maximum directory depth walked by the recursive fallback crawl.
@@ -96,7 +100,7 @@ internal sealed class SkillDiscovery(IPluginManifest pluginManifest, IPluginGrou
 
         async Task AddSkill(string dir)
         {
-            if (!File.Exists(Path.Combine(dir, KnownConfigNames.SkillFileName)))
+            if (!fileStore.FileExists(Path.Combine(dir, KnownConfigNames.SkillFileName)))
             {
                 return;
             }
@@ -173,7 +177,7 @@ internal sealed class SkillDiscovery(IPluginManifest pluginManifest, IPluginGrou
             IEnumerable<string> entries;
             try
             {
-                entries = Directory.EnumerateDirectories(priorityRoot);
+                entries = fileStore.EnumerateDirectories(priorityRoot);
             }
             catch
             {
@@ -188,7 +192,7 @@ internal sealed class SkillDiscovery(IPluginManifest pluginManifest, IPluginGrou
         }
     }
 
-    private static IEnumerable<string> EnumerateCrawlSkillDirs(
+    private IEnumerable<string> EnumerateCrawlSkillDirs(
         string dir,
         int depth,
         CancellationToken cancellationToken)
@@ -205,7 +209,7 @@ internal sealed class SkillDiscovery(IPluginManifest pluginManifest, IPluginGrou
         string[] subDirs;
         try
         {
-            subDirs = Directory.GetDirectories(dir);
+            subDirs = fileStore.EnumerateDirectories(dir).ToArray();
         }
         catch
         {
@@ -236,12 +240,12 @@ internal sealed class SkillDiscovery(IPluginManifest pluginManifest, IPluginGrou
     /// frontmatter, or is missing a non-empty <c>name</c>/<c>description</c>. Name and description
     /// are run through <see cref="TerminalSanitizer"/> to neutralize untrusted terminal escapes.
     /// </returns>
-    private static async Task<Skill?> ParseSkillMdAsync(string skillMdPath, CancellationToken cancellationToken)
+    private async Task<Skill?> ParseSkillMdAsync(string skillMdPath, CancellationToken cancellationToken)
     {
         string content;
         try
         {
-            content = await File.ReadAllTextAsync(skillMdPath, cancellationToken);
+            content = await fileStore.ReadAllTextAsync(skillMdPath, cancellationToken);
         }
         catch
         {

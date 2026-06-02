@@ -1,10 +1,11 @@
 using System.CommandLine;
 using Skillz.Interaction;
+using Skillz.Utils;
 using Spectre.Console;
 
 namespace Skillz.Commands;
 
-internal sealed class InitCommand(IInteractionService interaction)
+internal sealed class InitCommand(IInteractionService interaction, IFileStore fileStore)
     : BaseCommand("init", "Initialize a new skill (creates SKILL.md)")
 {
     private readonly Argument<string?> _nameArgument = new("name")
@@ -36,7 +37,7 @@ internal sealed class InitCommand(IInteractionService interaction)
         var skillFile = Path.Combine(skillDir, KnownConfigNames.SkillFileName);
         var displayPath = hasName ? $"{skillName}/{KnownConfigNames.SkillFileName}" : KnownConfigNames.SkillFileName;
 
-        if (File.Exists(skillFile))
+        if (fileStore.FileExists(skillFile))
         {
             interaction.WriteWarning($"Skill already exists at {displayPath}");
             return new CommandResult.Success();
@@ -44,11 +45,11 @@ internal sealed class InitCommand(IInteractionService interaction)
 
         if (hasName)
         {
-            Directory.CreateDirectory(skillDir);
+            fileStore.CreateDirectory(skillDir);
         }
 
         var content = BuildSkillTemplate(skillName);
-        await File.WriteAllTextAsync(skillFile, content, cancellationToken);
+        await fileStore.WriteAllTextAsync(skillFile, content, cancellationToken);
 
         interaction.WriteMarkupLine(
             $"""

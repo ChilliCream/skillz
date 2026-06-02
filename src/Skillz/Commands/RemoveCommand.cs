@@ -4,6 +4,7 @@ using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Locking;
 using Skillz.Skills;
+using Skillz.Utils;
 
 namespace Skillz.Commands;
 
@@ -15,6 +16,7 @@ internal sealed class RemoveCommand(
     IProjectLockFile projectLock,
     IGlobalLockFile globalLock,
     AgentEnvironment agentEnvironment,
+    IFileStore fileStore,
     ConsoleEnvironment consoleEnvironment) : BaseCommand("remove", "Remove installed skills")
 {
     private readonly Argument<string[]> _skillsArgument = new("skills")
@@ -195,7 +197,7 @@ internal sealed class RemoveCommand(
         return new CommandResult.Success();
     }
 
-    private static async Task<ImmutableArray<string>> ScanInstalledSkillsAsync(
+    private async Task<ImmutableArray<string>> ScanInstalledSkillsAsync(
         ISkillInstaller installer,
         AgentRegistry registry,
         bool global,
@@ -223,12 +225,12 @@ internal sealed class RemoveCommand(
 
         foreach (var dir in directoriesToScan)
         {
-            if (!Directory.Exists(dir))
+            if (!fileStore.DirectoryExists(dir))
             {
                 continue;
             }
 
-            foreach (var entry in Directory.EnumerateDirectories(dir))
+            foreach (var entry in fileStore.EnumerateDirectories(dir))
             {
                 skills.Add(Path.GetFileName(entry));
             }
@@ -238,7 +240,7 @@ internal sealed class RemoveCommand(
         return [.. skills.OrderBy(s => s, StringComparer.Ordinal)];
     }
 
-    private static bool IsCanonicalStillUsed(
+    private bool IsCanonicalStillUsed(
         ISkillInstaller installer,
         AgentRegistry registry,
         string skillName,
@@ -264,11 +266,11 @@ internal sealed class RemoveCommand(
         return false;
     }
 
-    private static bool PathExists(string path)
+    private bool PathExists(string path)
     {
         try
         {
-            return File.Exists(path) || Directory.Exists(path);
+            return fileStore.FileExists(path) || fileStore.DirectoryExists(path);
         }
         catch
         {
@@ -276,11 +278,11 @@ internal sealed class RemoveCommand(
         }
     }
 
-    private static void TryDeletePath(string path)
+    private void TryDeletePath(string path)
     {
         try
         {
-            if (Directory.Exists(path))
+            if (fileStore.DirectoryExists(path))
             {
                 var info = new DirectoryInfo(path);
                 if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
@@ -289,12 +291,12 @@ internal sealed class RemoveCommand(
                 }
                 else
                 {
-                    Directory.Delete(path, recursive: true);
+                    fileStore.DeleteDirectory(path, recursive: true);
                 }
             }
-            else if (File.Exists(path))
+            else if (fileStore.FileExists(path))
             {
-                File.Delete(path);
+                fileStore.DeleteFile(path);
             }
         }
         catch

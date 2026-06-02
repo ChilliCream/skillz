@@ -10,6 +10,7 @@ using Skillz.Plugins;
 using Skillz.Skills;
 using Skillz.Sources;
 using Skillz.Sources.Providers;
+using Skillz.Utils;
 using Spectre.Console;
 
 namespace Skillz;
@@ -56,6 +57,7 @@ internal static class Program
         builder.Services.AddSingleton<IBlobClient, BlobClient>();
 
         builder.Services.AddSingleton<ISystemEnvironment, SystemEnvironment>();
+        builder.Services.AddSingleton<IFileStore, SystemFileStore>();
         builder.Services.AddSingleton<AgentRegistry>();
         builder.Services.AddSingleton<AgentEnvironment>();
         builder.Services.AddSingleton<XdgPaths>();

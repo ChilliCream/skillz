@@ -51,7 +51,7 @@ public class AddCommandTests : IDisposable
             RawContent: $"---\nname: {name}\ndescription: {description}\n---\n");
     }
 
-    private static IServiceProvider BuildServices(
+    private IServiceProvider BuildServices(
         Action<TestSourceParser>? configureParser = null,
         Action<TestSkillDiscovery>? configureDiscovery = null,
         Action<TestAddCommandPrompter>? configurePrompter = null,
@@ -60,6 +60,10 @@ public class AddCommandTests : IDisposable
         Action<TestGlobalLockFile>? configureGlobalLock = null)
     {
         var services = CliTestHelper.CreateServiceProvider();
+
+        // The real LocalProvider guards on the source directory existing; register the workspace
+        // so local-source installs proceed to the (faked) discovery step.
+        services.GetRequiredService<FakeFileStore>().CreateDirectory(_workspace);
 
         configureParser?.Invoke(services.GetRequiredService<TestSourceParser>());
         configureDiscovery?.Invoke(services.GetRequiredService<TestSkillDiscovery>());
@@ -273,7 +277,6 @@ public class AddCommandTests : IDisposable
     {
         // Arrange
         var canonical = Path.Combine(_workspace, ".skillz", "skills", "alpha");
-        Directory.CreateDirectory(canonical);
 
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
@@ -288,6 +291,7 @@ public class AddCommandTests : IDisposable
                 i.OnGetCanonicalPath = (skill, _, _) => Path.Combine(_workspace, ".skillz", "skills", skill);
                 i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, canonical);
             });
+        services.GetRequiredService<FakeFileStore>().CreateDirectory(canonical);
 
         // Act
         var cmd = services.GetRequiredService<AddCommand>();
@@ -306,7 +310,6 @@ public class AddCommandTests : IDisposable
     {
         // Arrange
         var canonical = Path.Combine(_workspace, ".skillz", "skills", "alpha");
-        Directory.CreateDirectory(canonical);
         var installed = false;
 
         var services = BuildServices(
@@ -322,6 +325,7 @@ public class AddCommandTests : IDisposable
                     return new InstallResult(true, canonical);
                 };
             });
+        services.GetRequiredService<FakeFileStore>().CreateDirectory(canonical);
 
         // Act
         var cmd = services.GetRequiredService<AddCommand>();
@@ -338,11 +342,11 @@ public class AddCommandTests : IDisposable
     {
         // Arrange
         var canonical = Path.Combine(_workspace, ".skillz", "skills", "alpha");
-        Directory.CreateDirectory(canonical);
 
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") });
+        services.GetRequiredService<FakeFileStore>().CreateDirectory(canonical);
         var interaction = services.GetRequiredService<TestInteractionService>();
         var installer = services.GetRequiredService<TestInstaller>();
         installer.OnGetCanonicalPath = (skill, _, _) => Path.Combine(_workspace, ".skillz", "skills", skill);

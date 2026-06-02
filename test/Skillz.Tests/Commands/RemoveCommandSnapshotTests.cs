@@ -55,7 +55,7 @@ public class RemoveCommandSnapshotTests : IDisposable
 
     private IServiceProvider BuildServices()
     {
-        var services = CliTestHelper.CreateServiceProvider();
+        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
         ConfigureInstaller((TestInstaller)services.GetRequiredService<ISkillInstaller>());
         return services;
     }

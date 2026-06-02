@@ -5,6 +5,7 @@ using Skillz.Interaction;
 using Skillz.Locking;
 using Skillz.Net;
 using Skillz.Skills;
+using Skillz.Utils;
 using Spectre.Console;
 
 namespace Skillz.Commands;
@@ -14,6 +15,7 @@ internal sealed class UpdateCommand(
     IGlobalLockFile globalLockFile,
     IProjectLockFile projectLockFile,
     IBlobClient blobClient,
+    IFileStore fileStore,
     ConsoleEnvironment consoleEnvironment) : BaseCommand(CommandName, "Check for skill updates.")
 {
     public const string CommandName = "update";
@@ -184,11 +186,11 @@ internal sealed class UpdateCommand(
         return choice;
     }
 
-    private static Task<bool> HasProjectSkillsAsync(CancellationToken cancellationToken)
+    private Task<bool> HasProjectSkillsAsync(CancellationToken cancellationToken)
     {
         var cwd = Directory.GetCurrentDirectory();
 
-        if (File.Exists(Path.Combine(cwd, KnownConfigNames.ProjectLockFileName)))
+        if (fileStore.FileExists(Path.Combine(cwd, KnownConfigNames.ProjectLockFileName)))
         {
             return Task.FromResult(true);
         }
@@ -196,15 +198,15 @@ internal sealed class UpdateCommand(
         var skillsDir = Path.Combine(cwd, KnownConfigNames.UniversalSkillsDir);
         try
         {
-            if (!Directory.Exists(skillsDir))
+            if (!fileStore.DirectoryExists(skillsDir))
             {
                 return Task.FromResult(false);
             }
 
-            foreach (var entry in Directory.EnumerateDirectories(skillsDir))
+            foreach (var entry in fileStore.EnumerateDirectories(skillsDir))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                if (File.Exists(Path.Combine(entry, KnownConfigNames.SkillFileName)))
+                if (fileStore.FileExists(Path.Combine(entry, KnownConfigNames.SkillFileName)))
                 {
                     return Task.FromResult(true);
                 }

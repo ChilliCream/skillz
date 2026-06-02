@@ -4,6 +4,7 @@ using System.Text.Json;
 using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Skills;
+using Skillz.Utils;
 using Spectre.Console;
 
 namespace Skillz.Commands;
@@ -12,6 +13,7 @@ internal sealed class ListCommand(
     ISkillInstaller installer,
     AgentRegistry registry,
     IInteractionService interaction,
+    IFileStore fileStore,
     CliExecutionContext executionContext) : BaseCommand("list", "List installed skills")
 {
     private readonly Option<bool> _globalOption = new(CommonOptionNames.Global, "-g")
@@ -143,7 +145,7 @@ internal sealed class ListCommand(
         return new CommandResult.Success();
     }
 
-    private static async Task<ImmutableArray<InstalledSkill>> CollectInstalledSkillsAsync(
+    private async Task<ImmutableArray<InstalledSkill>> CollectInstalledSkillsAsync(
         ISkillInstaller installer,
         AgentRegistry registry,
         ImmutableArray<string> agentFilter,
@@ -155,9 +157,9 @@ internal sealed class ListCommand(
         var canonicalDir = installer.GetCanonicalSkillsDir(global, cwd);
         var canonicalDirFull = Path.GetFullPath(canonicalDir);
 
-        if (Directory.Exists(canonicalDir))
+        if (fileStore.DirectoryExists(canonicalDir))
         {
-            foreach (var entry in Directory.EnumerateDirectories(canonicalDir))
+            foreach (var entry in fileStore.EnumerateDirectories(canonicalDir))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var name = Path.GetFileName(entry);
@@ -167,7 +169,7 @@ internal sealed class ListCommand(
                 }
 
                 var skillMd = Path.Combine(entry, KnownConfigNames.SkillFileName);
-                if (!File.Exists(skillMd))
+                if (!fileStore.FileExists(skillMd))
                 {
                     continue;
                 }
@@ -201,12 +203,12 @@ internal sealed class ListCommand(
                 continue;
             }
 
-            if (!Directory.Exists(agentDir))
+            if (!fileStore.DirectoryExists(agentDir))
             {
                 continue;
             }
 
-            foreach (var entry in Directory.EnumerateDirectories(agentDir))
+            foreach (var entry in fileStore.EnumerateDirectories(agentDir))
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var name = Path.GetFileName(entry);
@@ -216,7 +218,7 @@ internal sealed class ListCommand(
                 }
 
                 var skillMd = Path.Combine(entry, KnownConfigNames.SkillFileName);
-                if (!File.Exists(skillMd))
+                if (!fileStore.FileExists(skillMd))
                 {
                     continue;
                 }

@@ -3,6 +3,7 @@ using System.Text;
 using Skillz.Sources;
 using Skillz.Sources.Providers;
 using Skillz.Tests.Net;
+using Skillz.Tests.TestServices;
 using Xunit;
 
 namespace Skillz.Tests.Sources.Providers;
@@ -26,7 +27,7 @@ public class WellKnownProviderTests
     public void CanHandle_Returns_True_For_WellKnown_Source()
     {
         // Arrange
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(new StubHttpMessageHandler()));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(new StubHttpMessageHandler()), new FakeFileStore());
 
         // Act & Assert
         Assert.True(provider.CanHandle(new SkillSource.WellKnown("https://example.com")));
@@ -38,7 +39,7 @@ public class WellKnownProviderTests
     public void Id_Is_WellKnown()
     {
         // Arrange
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(new StubHttpMessageHandler()));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(new StubHttpMessageHandler()), new FakeFileStore());
 
         // Act & Assert
         Assert.Equal("well-known", provider.Id);
@@ -77,7 +78,7 @@ public class WellKnownProviderTests
             LegacySkillMd,
             contentType: "text/markdown");
 
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
 
         // Act
         var skills = await provider.FetchSkillsAsync(
@@ -115,7 +116,7 @@ public class WellKnownProviderTests
             "---\nname: claude\ndescription: Claude Code.\n---\n# Claude",
             contentType: "text/markdown");
 
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
 
         // Act
         var skills = await provider.FetchSkillsAsync(
@@ -155,7 +156,7 @@ public class WellKnownProviderTests
             SampleSkillMd,
             contentType: "text/markdown");
 
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
 
         // Act
         var skills = await provider.FetchSkillsAsync(
@@ -194,7 +195,7 @@ public class WellKnownProviderTests
             """);
         handler.AddRoute("https://example.com/skills/code-review/SKILL.md", SampleSkillMd);
 
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
 
         // Act
         var skills = await provider.FetchSkillsAsync(
@@ -220,7 +221,7 @@ public class WellKnownProviderTests
             }
             """);
 
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
 
         // Act
         var skills = await provider.FetchSkillsAsync(
@@ -239,7 +240,7 @@ public class WellKnownProviderTests
         var handler = new StubHttpMessageHandler();
         handler.AddRouteNotFound("https://example.com/.well-known/agent-skills/index.json");
         handler.AddRouteNotFound("https://example.com/.well-known/skills/index.json");
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
 
         // Act
         var skills = await provider.FetchSkillsAsync(
@@ -258,7 +259,7 @@ public class WellKnownProviderTests
         var handler = new StubHttpMessageHandler();
         handler.AddRoute("https://example.com/.well-known/agent-skills/index.json", "{ not valid json");
 
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
 
         // Act
         var skills = await provider.FetchSkillsAsync(
@@ -289,7 +290,7 @@ public class WellKnownProviderTests
             }
             """);
 
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
 
         // Act
         var skills = await provider.FetchSkillsAsync(
@@ -320,7 +321,7 @@ public class WellKnownProviderTests
             }
             """);
 
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
 
         // Act
         var skills = await provider.FetchSkillsAsync(
@@ -336,7 +337,7 @@ public class WellKnownProviderTests
     public async Task FetchSkillsAsync_Throws_On_Wrong_Source_Type()
     {
         // Arrange
-        var provider = new WellKnownProvider(new FakeHttpClientFactory(new StubHttpMessageHandler()));
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(new StubHttpMessageHandler()), new FakeFileStore());
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>

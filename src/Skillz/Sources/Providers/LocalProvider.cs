@@ -1,9 +1,10 @@
 using System.Collections.Immutable;
 using Skillz.Skills;
+using Skillz.Utils;
 
 namespace Skillz.Sources.Providers;
 
-internal sealed class LocalProvider(ISkillDiscovery skillDiscovery) : IProvider
+internal sealed class LocalProvider(ISkillDiscovery skillDiscovery, IFileStore fileStore) : IProvider
 {
     public string Id => "local";
 
@@ -19,7 +20,7 @@ internal sealed class LocalProvider(ISkillDiscovery skillDiscovery) : IProvider
             throw new ArgumentException($"LocalProvider cannot handle {source.GetType().Name}.", nameof(source));
         }
 
-        if (!Directory.Exists(local.LocalPath))
+        if (!fileStore.DirectoryExists(local.LocalPath))
         {
             throw new CliException(ExitCodeConstants.Failure, $"Local path does not exist: {local.LocalPath}");
         }

@@ -5,10 +5,11 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Skillz.Plugins;
 using Skillz.Skills;
+using Skillz.Utils;
 
 namespace Skillz.Sources.Providers;
 
-internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFactory) : IProvider
+internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFactory, IFileStore fileStore) : IProvider
 {
     internal const string HttpClientName = "Skillz.WellKnown";
     internal const string DiscoverySchemaV2 = "https://schemas.agentskills.io/discovery/0.2.0/schema.json";
@@ -270,8 +271,8 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
                 return null;
             }
 
-            Directory.CreateDirectory(skillDir);
-            await File.WriteAllTextAsync(Path.Combine(skillDir, "SKILL.md"), content, cancellationToken);
+            fileStore.CreateDirectory(skillDir);
+            await fileStore.WriteAllTextAsync(Path.Combine(skillDir, "SKILL.md"), content, cancellationToken);
 
             if (entry.Files is not null)
             {
@@ -312,10 +313,10 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
                         var parent = Path.GetDirectoryName(destination);
                         if (!string.IsNullOrEmpty(parent))
                         {
-                            Directory.CreateDirectory(parent);
+                            fileStore.CreateDirectory(parent);
                         }
 
-                        await File.WriteAllBytesAsync(destination, bytes, cancellationToken);
+                        await fileStore.WriteAllBytesAsync(destination, bytes, cancellationToken);
                     }
                     catch (HttpRequestException) { }
                     catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { }

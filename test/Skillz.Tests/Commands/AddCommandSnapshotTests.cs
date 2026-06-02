@@ -69,6 +69,10 @@ public class AddCommandSnapshotTests : IDisposable
     {
         var services = CliTestHelper.CreateServiceProvider();
 
+        // The real LocalProvider guards on the source directory existing; register the workspace
+        // so local-source installs proceed to the (faked) discovery step.
+        services.GetRequiredService<FakeFileStore>().CreateDirectory(_workspace);
+
         configureParser?.Invoke(services.GetRequiredService<TestSourceParser>());
         configureDiscovery?.Invoke(services.GetRequiredService<TestSkillDiscovery>());
         configureInstaller?.Invoke(services.GetRequiredService<TestInstaller>());

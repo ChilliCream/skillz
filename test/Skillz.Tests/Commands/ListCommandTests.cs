@@ -71,7 +71,7 @@ public class ListCommandTests : IDisposable
     public async Task List_With_No_Installed_Skills_Reports_Empty()
     {
         // Arrange
-        var services = CliTestHelper.CreateServiceProvider();
+        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
         var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
@@ -95,7 +95,7 @@ public class ListCommandTests : IDisposable
         CreateSkill(canonical, "alpha");
         CreateSkill(canonical, "beta");
 
-        var services = CliTestHelper.CreateServiceProvider();
+        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
         var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
@@ -120,7 +120,7 @@ public class ListCommandTests : IDisposable
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
 
-        var services = CliTestHelper.CreateServiceProvider();
+        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
         var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 

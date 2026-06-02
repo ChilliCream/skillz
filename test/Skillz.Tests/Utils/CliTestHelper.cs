@@ -10,6 +10,7 @@ using Skillz.Skills;
 using Skillz.Sources;
 using Skillz.Sources.Providers;
 using Skillz.Tests.TestServices;
+using Skillz.Utils;
 
 namespace Skillz.Tests.Utils;
 
@@ -17,7 +18,8 @@ internal static class CliTestHelper
 {
     public static IServiceProvider CreateServiceProvider(
         string? workspace = null,
-        Action<IServiceCollection>? configure = null)
+        Action<IServiceCollection>? configure = null,
+        bool useRealFileStore = false)
     {
         var services = new ServiceCollection();
 
@@ -42,6 +44,19 @@ internal static class CliTestHelper
             HomeDirectory = "/home/test",
             CurrentDirectory = "/workspace"
         });
+
+        services.AddSingleton<FakeFileStore>();
+        if (useRealFileStore)
+        {
+            // Integration-style command tests create real files under a temp workspace and assert
+            // against the real filesystem, so they run on the production SystemFileStore.
+            services.AddSingleton<IFileStore, SystemFileStore>();
+        }
+        else
+        {
+            services.AddSingleton<IFileStore>(sp => sp.GetRequiredService<FakeFileStore>());
+        }
+
         services.AddSingleton<AgentRegistry>();
         services.AddSingleton<AgentEnvironment>();
 
@@ -80,7 +95,9 @@ internal static class CliTestHelper
         services.AddSingleton<IProvider>(sp => new GitProvider(
             sp.GetRequiredService<IGitClient>(),
             sp.GetRequiredService<ISkillDiscovery>()));
-        services.AddSingleton<IProvider>(sp => new LocalProvider(sp.GetRequiredService<ISkillDiscovery>()));
+        services.AddSingleton<IProvider>(sp => new LocalProvider(
+            sp.GetRequiredService<ISkillDiscovery>(),
+            sp.GetRequiredService<IFileStore>()));
         services.AddSingleton<ProviderRegistry>();
 
         services.AddTransient<AddCommandExecutor>();
