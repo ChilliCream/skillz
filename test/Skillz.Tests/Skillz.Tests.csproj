@@ -8,6 +8,7 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="CookieCrumble.Xunit3" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Skillz/Skillz.csproj" />

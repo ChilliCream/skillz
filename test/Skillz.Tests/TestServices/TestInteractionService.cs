@@ -22,6 +22,10 @@ internal sealed class TestInteractionService : IInteractionService
                 Interactive = InteractionSupport.No,
                 Out = new AnsiConsoleOutput(_writer)
             });
+
+        // Pin the render width so panels and grids have deterministic geometry regardless of the
+        // host terminal (CI vs local, narrow vs wide), which keeps the inline snapshots stable.
+        _console.Profile.Width = 80;
     }
 
     public IReadOnlyList<string> Output => _output;
