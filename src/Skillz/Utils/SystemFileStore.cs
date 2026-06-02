@@ -2,6 +2,24 @@ namespace Skillz.Utils;
 
 internal sealed class SystemFileStore : IFileStore
 {
+    public bool PathExists(string path)
+    {
+        if (Directory.Exists(path) || File.Exists(path))
+        {
+            return true;
+        }
+
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+        }
+        catch (Exception ex)
+            when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
     public bool FileExists(string path) => File.Exists(path);
 
     public bool DirectoryExists(string path) => Directory.Exists(path);

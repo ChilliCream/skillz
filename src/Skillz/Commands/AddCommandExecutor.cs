@@ -6,8 +6,8 @@ using Skillz.Locking;
 using Skillz.Skills;
 using Skillz.Sources;
 using Skillz.Sources.Providers;
+using Skillz.Utils;
 using Spectre.Console;
-using Spectre.Console.Rendering;
 
 namespace Skillz.Commands;
 
@@ -21,6 +21,7 @@ internal sealed class AddCommandExecutor(
     IProjectLockFile projectLock,
     IGlobalLockFile globalLock,
     IAddCommandPrompter prompter,
+    IFileStore fileStore,
     ConsoleEnvironment consoleEnvironment)
 {
     public async Task<CommandResult> RunAsync(AddCommandOptions options, CancellationToken cancellationToken)
@@ -52,13 +53,30 @@ internal sealed class AddCommandExecutor(
     private async Task<CommandResult> RunCoreAsync(AddCommandOptions options, CancellationToken cancellationToken)
     {
         // Resolve the source argument (owner/repo, URL, or local path) into a typed source.
-        var parsed = ParseSource(options.Source!);
+        var parsed = sourceParser.Parse(options.Source!);
 
-        // When invoked by an agent (e.g. Claude Code), switch to a non-interactive install for it.
-        options = ApplyAgentContext(options);
+        // Adapts the run for an agent host: when one is detected, default the target to that agent
+        // (plus the universal agents) and skip every prompt, since an agent can't answer them.
+        if (agentEnvironment.CurrentAgentName is { } agentName)
+        {
+            var agents = options.Agents;
 
-        // Combine any inline source filter (e.g. owner/repo#skill) with the --skill options.
-        var skillFilters = MergeSkillFilters(options.SkillFilters, parsed);
+            if (agents.Length == 0 && agentEnvironment.FindAgentType(agentName) is { } mapped)
+            {
+                agents = registry.UniversalAgents.Append(mapped).Distinct(StringComparer.Ordinal).ToImmutableArray();
+            }
+
+            interaction.WriteMarkupLine(
+                $"[on cyan] {Markup.Escape(agentName)} [/] Agent detected — installing non-interactively");
+
+            options = options with { Yes = true, Agents = agents };
+        }
+
+        var skillFilters =
+            parsed.GetSkillFilter() is { } sourceFilter
+            && !options.SkillFilters.Contains(sourceFilter, StringComparer.OrdinalIgnoreCase)
+                ? [.. options.SkillFilters, sourceFilter]
+                : options.SkillFilters;
         interaction.WriteDim($"Source: {parsed.DisplayString}");
 
         // Fetch skills into a temp staging area, and clean it up no matter how we exit below.
@@ -80,7 +98,7 @@ internal sealed class AddCommandExecutor(
 
             if (options.List)
             {
-                ListSkills(ApplyFilters(skills, skillFilters));
+                RenderListSkills(skills.ApplyFilters(skillFilters));
                 return new CommandResult.Success();
             }
 
@@ -89,41 +107,6 @@ internal sealed class AddCommandExecutor(
         finally
         {
             CleanupStagingPaths(skills);
-        }
-    }
-
-    // Adapts the run for an agent host: when one is detected, default the target to that agent
-    // (plus the universal agents) and skip every prompt, since an agent can't answer them.
-    private AddCommandOptions ApplyAgentContext(AddCommandOptions options)
-    {
-        if (agentEnvironment.CurrentAgentName is not { } agentName)
-        {
-            return options;
-        }
-
-        var agents = options.Agents;
-
-        if (agents.Length == 0
-            && agentEnvironment.FindAgentType(agentName) is { } mapped)
-        {
-            agents = WithUniversalAgents([mapped]);
-        }
-
-        interaction.WriteMarkupLine(
-            $"[on cyan] {Markup.Escape(agentName)} [/] Agent detected — installing non-interactively");
-
-        return options with { Yes = true, Agents = agents };
-    }
-
-    private SkillSource ParseSource(string source)
-    {
-        try
-        {
-            return sourceParser.Parse(source);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            throw new CliException(ExitCodeConstants.Failure, $"Invalid source: {ex.Message}");
         }
     }
 
@@ -160,9 +143,9 @@ internal sealed class AddCommandExecutor(
         ImmutableArray<ResolvedSkill> skills,
         ImmutableArray<string> skillFilters,
         AddCommandOptions options,
-        CancellationToken cancellationToken)
+        CancellationToken ct)
     {
-        var selectedSkills = await SelectSkillsAsync(skills, skillFilters, options, cancellationToken);
+        var selectedSkills = await SelectSkillsAsync(skills, skillFilters, options, ct);
         if (selectedSkills.Length == 0)
         {
             if (skillFilters.Length > 0)
@@ -179,9 +162,9 @@ internal sealed class AddCommandExecutor(
             return new CommandResult.Cancelled();
         }
 
-        var nonInteractive = IsNonInteractive(options);
+        var nonInteractive = options.Yes || options.All || consoleEnvironment.IsInputRedirected;
 
-        var selectedAgents = await SelectAgentsAsync(options, nonInteractive, cancellationToken);
+        var selectedAgents = await SelectAgentsAsync(options, nonInteractive, ct);
         if (selectedAgents is not { } targetAgents)
         {
             return new CommandResult.Cancelled();
@@ -198,22 +181,24 @@ internal sealed class AddCommandExecutor(
             var supportsGlobal = targetAgents.Any(a => registry.GetConfig(a).GlobalSkillsDir is not null);
             if (supportsGlobal)
             {
-                installGlobally = await prompter.SelectGlobalScopeAsync(cancellationToken);
+                installGlobally = await prompter.SelectGlobalScopeAsync(ct);
             }
         }
 
         var installMode = options.Copy ? InstallMode.Copy : InstallMode.Symlink;
-        var uniqueDirs = new HashSet<string>(
-            targetAgents.Select(a => registry.GetConfig(a).SkillsDir),
-            StringComparer.Ordinal);
+        var hasMultipleSkillsDirs = targetAgents
+            .Select(a => registry.GetConfig(a).SkillsDir)
+            .Distinct(StringComparer.Ordinal)
+            .Skip(1)
+            .Any();
 
-        if (uniqueDirs.Count <= 1)
+        if (!hasMultipleSkillsDirs)
         {
             installMode = InstallMode.Copy;
         }
         else if (!options.Copy && !nonInteractive)
         {
-            installMode = await prompter.SelectInstallModeAsync(cancellationToken);
+            installMode = await prompter.SelectInstallModeAsync(ct);
         }
         // else: non-interactive, multiple distinct skills dirs → keep the symlink default.
 
@@ -221,11 +206,8 @@ internal sealed class AddCommandExecutor(
 
         if (!nonInteractive)
         {
-            var confirmed = await prompter.ConfirmInstallationAsync(
-                selectedSkills,
-                targetAgents,
-                overwriteTargets,
-                cancellationToken);
+            var confirmed = await prompter.ConfirmInstallationAsync(selectedSkills, targetAgents, overwriteTargets, ct);
+
             if (!confirmed)
             {
                 interaction.WriteWarning("Installation cancelled");
@@ -244,21 +226,19 @@ internal sealed class AddCommandExecutor(
             }
         }
 
-        var results = await InstallSkillsAsync(selectedSkills, targetAgents, installOptions, cancellationToken);
+        var results = await InstallSkillsAsync(selectedSkills, targetAgents, installOptions, ct);
 
         var successful = results.Where(r => r.Result.Success).ToImmutableArray();
         var failed = results.Where(r => !r.Result.Success).ToImmutableArray();
 
         if (successful.Length > 0)
         {
-            await UpdateLocksAsync(parsed, successful, installGlobally, cancellationToken);
+            await UpdateLocksAsync(parsed, successful, installGlobally, ct);
         }
 
         RenderInstallationReport(targetAgents, successful, failed, existingSkills, installGlobally, installMode);
 
-        return failed.Length > 0
-            ? new CommandResult.Failure(ExitCodeConstants.Failure)
-            : new CommandResult.Success();
+        return failed.Length > 0 ? new CommandResult.Failure(ExitCodeConstants.Failure) : new CommandResult.Success();
     }
 
     private void RenderInstallationReport(
@@ -302,13 +282,11 @@ internal sealed class AddCommandExecutor(
         summary.AppendLine($"[bold]Canonical:[/] [dim]{Markup.Escape(canonical)}[/]");
         if (universals.Count > 0)
         {
-            summary.AppendLine(
-                $"[bold]Universal:[/]  {Markup.Escape(universals.Select(GetAgentDisplay).Join(", "))}");
+            summary.AppendLine($"[bold]Universal:[/]  {Markup.Escape(universals.Select(GetAgentDisplay).Join(", "))}");
         }
         if (linked.Count > 0)
         {
-            summary.AppendLine(
-                $"[bold]{linkedLabel}[/]  {Markup.Escape(linked.Select(GetAgentDisplay).Join(", "))}");
+            summary.AppendLine($"[bold]{linkedLabel}[/]  {Markup.Escape(linked.Select(GetAgentDisplay).Join(", "))}");
         }
         if (overwrites.Count > 0)
         {
@@ -325,10 +303,12 @@ internal sealed class AddCommandExecutor(
         var installed = new StringBuilder();
         foreach (var skillName in skillNames)
         {
-            var firstPath = successful
-                .Where(r => r.SkillName == skillName)
-                .Select(r => r.Result.Path)
-                .FirstOrDefault(p => !string.IsNullOrEmpty(p)) ?? string.Empty;
+            var firstPath =
+                successful
+                    .Where(r => r.SkillName == skillName)
+                    .Select(r => r.Result.Path)
+                    .FirstOrDefault(p => !string.IsNullOrEmpty(p))
+                ?? string.Empty;
             installed.AppendLine($"[green]✓[/] {Markup.Escape(skillName)}");
             installed.AppendLine($"  [dim]→ {Markup.Escape(firstPath)}[/]");
         }
@@ -345,13 +325,14 @@ internal sealed class AddCommandExecutor(
 
     private void RenderFailurePanel(ImmutableArray<InstallEntry> failed)
     {
-        var rows = new Rows(failed.Select(entry =>
-        {
-            var error = string.IsNullOrEmpty(entry.Result.Error) ? "unknown error" : entry.Result.Error;
-            return new Markup(
-                $"[red]✗[/] {Markup.Escape(entry.SkillName)} → "
-                + $"{Markup.Escape(GetAgentDisplay(entry.AgentType))}: {Markup.Escape(error)}");
-        }));
+        var rows = new Rows(
+            failed.Select(entry =>
+            {
+                var error = string.IsNullOrEmpty(entry.Result.Error) ? "unknown error" : entry.Result.Error;
+                return new Markup(
+                    $"[red]✗[/] {Markup.Escape(entry.SkillName)} → "
+                        + $"{Markup.Escape(GetAgentDisplay(entry.AgentType))}: {Markup.Escape(error)}");
+            }));
 
         interaction.WriteLine();
         interaction.WriteRenderable(
@@ -369,7 +350,7 @@ internal sealed class AddCommandExecutor(
         foreach (var skill in selectedSkills)
         {
             var canonicalPath = installer.GetCanonicalPath(skill.InstallName, installGlobally);
-            if (PathExists(canonicalPath))
+            if (fileStore.PathExists(canonicalPath))
             {
                 overwrites.Add(new OverwriteTarget(skill.InstallName, canonicalPath));
             }
@@ -378,46 +359,13 @@ internal sealed class AddCommandExecutor(
         return overwrites.ToImmutable();
     }
 
-    private static bool PathExists(string path)
-    {
-        if (Directory.Exists(path) || File.Exists(path))
-        {
-            return true;
-        }
-
-        try
-        {
-            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
-        }
-        catch (Exception ex) when (
-            ex is IOException
-                or UnauthorizedAccessException
-                or ArgumentException
-                or NotSupportedException)
-        {
-            return false;
-        }
-    }
-
     private string GetAgentDisplay(string agentType)
     {
         var config = registry.GetConfig(agentType);
         return config.DisplayName;
     }
 
-    private static ImmutableArray<string> MergeSkillFilters(ImmutableArray<string> existing, SkillSource parsed)
-    {
-        if (parsed is SkillSource.ISkillFilterable filterable
-            && !string.IsNullOrEmpty(filterable.SkillFilter)
-            && !existing.Contains(filterable.SkillFilter, StringComparer.OrdinalIgnoreCase))
-        {
-            return [.. existing, filterable.SkillFilter];
-        }
-
-        return existing;
-    }
-
-    private void ListSkills(ImmutableArray<ResolvedSkill> skills)
+    private void RenderListSkills(ImmutableArray<ResolvedSkill> skills)
     {
         interaction.WriteLine();
         interaction.WriteMarkupLine("[bold]Available Skills[/]");
@@ -460,7 +408,7 @@ internal sealed class AddCommandExecutor(
     {
         if (skillFilters.Length > 0)
         {
-            return ApplyFilters(skills, skillFilters);
+            return skills.ApplyFilters(skillFilters);
         }
 
         if (skills.Length == 1 || options.Yes)
@@ -471,14 +419,11 @@ internal sealed class AddCommandExecutor(
         if (consoleEnvironment.IsInputRedirected)
         {
             interaction.WriteWarning("Installation cancelled");
-            return ImmutableArray<ResolvedSkill>.Empty;
+            return [];
         }
 
         return await prompter.SelectSkillsAsync(skills, cancellationToken);
     }
-
-    private bool IsNonInteractive(AddCommandOptions options)
-        => options.Yes || options.All || consoleEnvironment.IsInputRedirected;
 
     private async Task<ImmutableArray<string>?> SelectAgentsAsync(
         AddCommandOptions options,
@@ -511,32 +456,17 @@ internal sealed class AddCommandExecutor(
             return options.Agents;
         }
 
-        var installed = agentEnvironment.InstalledAgents;
-
         // Non-interactive, or exactly one agent installed: select automatically (plus universals).
-        // WithUniversalAgents over an empty set yields just the universal agents.
-        if (nonInteractive || installed.Length == 1)
+        if (nonInteractive || agentEnvironment.InstalledAgents.Length == 1)
         {
-            return WithUniversalAgents(installed);
+            return agentEnvironment
+                .InstalledAgents.AddRange(registry.UniversalAgents)
+                .Distinct(StringComparer.Ordinal)
+                .ToImmutableArray();
         }
 
         // Zero or several installed in interactive mode: let the user choose.
         return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken);
-    }
-
-    private ImmutableArray<string> WithUniversalAgents(IReadOnlyList<string> agents)
-    {
-        var universal = registry.UniversalAgents;
-        var result = new List<string>(agents);
-        foreach (var u in universal)
-        {
-            if (!result.Contains(u, StringComparer.Ordinal))
-            {
-                result.Add(u);
-            }
-        }
-
-        return [.. result];
     }
 
     private static void CleanupStagingPaths(IEnumerable<ResolvedSkill> skills)
@@ -565,34 +495,32 @@ internal sealed class AddCommandExecutor(
         CancellationToken cancellationToken)
     {
         var results = ImmutableArray.CreateBuilder<InstallEntry>();
-        await interaction.StatusAsync(
-            "Installing skills...",
-            async () =>
+        await interaction.StatusAsync("Installing skills...", async () =>
+        {
+            foreach (var skill in selectedSkills)
             {
-                foreach (var skill in selectedSkills)
+                foreach (var agentType in targetAgents)
                 {
-                    foreach (var agentType in targetAgents)
+                    InstallResult result;
+                    try
                     {
-                        InstallResult result;
-                        try
-                        {
-                            result = await installer.InstallAsync(skill, agentType, installOptions, cancellationToken);
-                        }
-                        catch (Exception ex) when (ex is not OperationCanceledException)
-                        {
-                            // A throwing installer must not unwind the whole command: record this
-                            // single skill/agent pair as a failure and keep installing the rest.
-                            result = new InstallResult(
-                                Success: false,
-                                Path: string.Empty,
-                                Mode: installOptions.Mode,
-                                Error: ex.Message);
-                        }
-
-                        results.Add(new InstallEntry(skill, agentType, result));
+                        result = await installer.InstallAsync(skill, agentType, installOptions, cancellationToken);
                     }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        // A throwing installer must not unwind the whole command: record this
+                        // single skill/agent pair as a failure and keep installing the rest.
+                        result = new InstallResult(
+                            Success: false,
+                            Path: string.Empty,
+                            Mode: installOptions.Mode,
+                            Error: ex.Message);
+                    }
+
+                    results.Add(new InstallEntry(skill, agentType, result));
                 }
-            });
+            }
+        });
 
         return results.ToImmutable();
     }
@@ -627,7 +555,7 @@ internal sealed class AddCommandExecutor(
                     continue;
                 }
 
-                var skillFolderHash = await ComputeHashSafeAsync(installPath, cancellationToken);
+                var skillFolderHash = await ComputeHashAsync(installPath, cancellationToken);
 
                 var lockEntry = new SkillLockEntry
                 {
@@ -652,7 +580,7 @@ internal sealed class AddCommandExecutor(
             }
             else
             {
-                var computedHash = await ComputeHashSafeAsync(installPath, cancellationToken);
+                var computedHash = await ComputeHashAsync(installPath, cancellationToken);
 
                 var lockEntry = new LocalSkillLockEntry
                 {
@@ -675,26 +603,7 @@ internal sealed class AddCommandExecutor(
         }
     }
 
-    private static ImmutableArray<ResolvedSkill> ApplyFilters(
-        ImmutableArray<ResolvedSkill> skills,
-        ImmutableArray<string> filters)
-    {
-        if (filters.Length == 0 || filters.Contains("*", StringComparer.Ordinal))
-        {
-            return skills;
-        }
-
-        return skills
-            .Where(s =>
-                filters.Any(f =>
-                    f.EqualsOrdinalIgnoreCase(s.InstallName)
-                    || f.EqualsOrdinalIgnoreCase(s.Name)
-                )
-            )
-            .ToImmutableArray();
-    }
-
-    private async Task<string> ComputeHashSafeAsync(string? path, CancellationToken cancellationToken)
+    private async Task<string> ComputeHashAsync(string? path, CancellationToken cancellationToken)
     {
         try
         {
@@ -715,4 +624,24 @@ internal sealed class AddCommandExecutor(
     {
         public string SkillName => Skill.InstallName;
     }
+}
+
+file static class Extensions
+{
+    internal static ImmutableArray<ResolvedSkill> ApplyFilters(
+        this ImmutableArray<ResolvedSkill> skills,
+        ImmutableArray<string> filters)
+    {
+        if (filters.Length == 0 || filters.Contains("*", StringComparer.Ordinal))
+        {
+            return skills;
+        }
+
+        return skills
+            .Where(s => filters.Any(f => f.EqualsOrdinalIgnoreCase(s.InstallName) || f.EqualsOrdinalIgnoreCase(s.Name)))
+            .ToImmutableArray();
+    }
+
+    internal static string? GetSkillFilter(this SkillSource source)
+        => source is SkillSource.ISkillFilterable { SkillFilter: { Length: > 0 } filter } ? filter : null;
 }

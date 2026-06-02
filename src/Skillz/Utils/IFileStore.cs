@@ -9,6 +9,12 @@ namespace Skillz.Utils;
 internal interface IFileStore
 {
     /// <summary>
+    /// Determines whether anything (file, directory, or symlink/reparse point) exists at
+    /// the given path.
+    /// </summary>
+    bool PathExists(string path);
+
+    /// <summary>
     /// Determines whether a file exists at the given path.
     /// </summary>
     bool FileExists(string path);

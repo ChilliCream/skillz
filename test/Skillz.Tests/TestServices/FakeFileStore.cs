@@ -8,6 +8,12 @@ internal sealed class FakeFileStore : IFileStore
     public Dictionary<string, byte[]> Files { get; init; } = new(StringComparer.Ordinal);
     public HashSet<string> Dirs { get; init; } = new(StringComparer.Ordinal);
 
+    public bool PathExists(string path)
+    {
+        var normalized = Normalize(path);
+        return Files.ContainsKey(normalized) || Dirs.Contains(normalized);
+    }
+
     public bool FileExists(string path) => Files.ContainsKey(Normalize(path));
 
     public bool DirectoryExists(string path) => Dirs.Contains(Normalize(path));
