@@ -96,9 +96,7 @@ internal sealed class AddCommandExecutor(
     // (plus the universal agents) and skip every prompt, since an agent can't answer them.
     private AddCommandOptions ApplyAgentContext(AddCommandOptions options)
     {
-        var detection = agentEnvironment.CurrentAgent;
-
-        if (!detection.IsAgent)
+        if (agentEnvironment.CurrentAgentName is not { } agentName)
         {
             return options;
         }
@@ -106,14 +104,13 @@ internal sealed class AddCommandExecutor(
         var agents = options.Agents;
 
         if (agents.Length == 0
-            && detection.Name is { } name
-            && agentEnvironment.FindAgentType(name) is { } mapped)
+            && agentEnvironment.FindAgentType(agentName) is { } mapped)
         {
             agents = WithUniversalAgents([mapped]);
         }
 
         interaction.WriteMarkupLine(
-            $"[on cyan] {Markup.Escape(detection.Name ?? "agent")} [/] Agent detected — installing non-interactively");
+            $"[on cyan] {Markup.Escape(agentName)} [/] Agent detected — installing non-interactively");
 
         return options with { Yes = true, Agents = agents };
     }
@@ -516,24 +513,14 @@ internal sealed class AddCommandExecutor(
 
         var installed = agentEnvironment.InstalledAgents;
 
-        // Zero installed
-        if (installed.Length == 0)
-        {
-            if (nonInteractive)
-            {
-                return registry.UniversalAgents;
-            }
-
-            return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken);
-        }
-
-        // One installed OR non-interactive → no prompt
-        if (installed.Length == 1 || nonInteractive)
+        // Non-interactive, or exactly one agent installed: select automatically (plus universals).
+        // EnsureUniversalAgents over an empty set yields just the universal agents.
+        if (nonInteractive || installed.Length == 1)
         {
             return WithUniversalAgents(installed);
         }
 
-        // Multiple installed → prompt
+        // Zero or several installed in interactive mode: let the user choose.
         return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken);
     }
 

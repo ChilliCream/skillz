@@ -87,7 +87,7 @@ internal sealed class RemoveCommand(
             yes
             || all
             || consoleEnvironment.IsInputRedirected
-            || agentEnvironment.CurrentAgent.IsAgent;
+            || agentEnvironment.IsRunningInsideAgent;
 
         ImmutableArray<string> selected;
         if (all)

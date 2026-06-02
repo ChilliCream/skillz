@@ -113,6 +113,6 @@ internal sealed class BannerService(
             return true;
         }
 
-        return agentEnvironment.CurrentAgent.IsAgent;
+        return agentEnvironment.IsRunningInsideAgent;
     }
 }

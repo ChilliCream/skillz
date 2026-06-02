@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 
 namespace Skillz.Install;
 
@@ -9,8 +10,7 @@ internal sealed class AgentEnvironment(
     Func<string, bool> directoryExists,
     Func<string> cwdProvider)
 {
-    private static readonly ImmutableDictionary<string, string> s_agentNameToType = new Dictionary<string, string>(
-        StringComparer.Ordinal)
+    private static readonly ImmutableDictionary<string, string> s_agentNameToType = new Dictionary<string, string>
     {
         ["cursor"] = "cursor",
         ["cursor-cli"] = "cursor",
@@ -34,15 +34,11 @@ internal sealed class AgentEnvironment(
             Directory.Exists,
             Directory.GetCurrentDirectory) { }
 
-    public AgentDetectionResult CurrentAgent =>
-        field ??= DetectAgentNameFromEnvironment() is { } name
-            ? new AgentDetectionResult(true, name)
-            : new AgentDetectionResult(false, null);
+    public string? CurrentAgentName => field ??= DetectAgentNameFromEnvironment();
 
-    public string? FindAgentType(string agentName)
-    {
-        return s_agentNameToType.GetValueOrDefault(agentName);
-    }
+    public bool IsRunningInsideAgent => CurrentAgentName is not null;
+
+    public string? FindAgentType(string agentName) => s_agentNameToType.GetValueOrDefault(agentName);
 
     public ImmutableArray<string> InstalledAgents
     {
@@ -50,16 +46,7 @@ internal sealed class AgentEnvironment(
         {
             if (field.IsDefault)
             {
-                var installed = new List<string>();
-                foreach (var (type, _) in registry.All)
-                {
-                    if (IsInstalled(type))
-                    {
-                        installed.Add(type);
-                    }
-                }
-
-                field = [.. installed];
+                field = [.. registry.All.Keys.Where(IsInstalled)];
             }
 
             return field;
@@ -264,5 +251,3 @@ internal sealed class AgentEnvironment(
         return value.Trim();
     }
 }
-
-internal sealed record AgentDetectionResult(bool IsAgent, string? Name);

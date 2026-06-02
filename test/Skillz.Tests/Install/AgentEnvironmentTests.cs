@@ -58,104 +58,95 @@ public class AgentEnvironmentTests
     }
 
     [Fact]
-    public void CurrentAgent_NoEnv_ReturnsNotAgent()
+    public void CurrentAgentName_NoEnv_ReturnsNotAgent()
     {
         // Arrange
         var (detector, _) = Create();
 
-        // Act
-        var result = detector.CurrentAgent;
-
-        // Assert
-        Assert.False(result.IsAgent);
-        Assert.Null(result.Name);
+        // Act & Assert
+        Assert.False(detector.IsRunningInsideAgent);
+        Assert.Null(detector.CurrentAgentName);
     }
 
     [Fact]
-    public void CurrentAgent_CursorEnv_ReturnsCursor()
+    public void CurrentAgentName_CursorEnv_ReturnsCursor()
     {
         // Arrange
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CURSOR_TRACE_ID"] = "abc123" };
         var (detector, _) = Create(env);
 
-        // Act
-        var result = detector.CurrentAgent;
-
-        // Assert
-        Assert.True(result.IsAgent);
-        Assert.Equal("cursor", result.Name);
+        // Act & Assert
+        Assert.True(detector.IsRunningInsideAgent);
+        Assert.Equal("cursor", detector.CurrentAgentName);
     }
 
     [Fact]
-    public void CurrentAgent_ClaudeCodeEnv_ReturnsClaude()
+    public void CurrentAgentName_ClaudeCodeEnv_ReturnsClaude()
     {
         // Arrange
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CLAUDECODE"] = "1" };
         var (detector, _) = Create(env);
 
-        // Act
-        var result = detector.CurrentAgent;
-
-        // Assert
-        Assert.True(result.IsAgent);
-        Assert.Equal("claude", result.Name);
+        // Act & Assert
+        Assert.True(detector.IsRunningInsideAgent);
+        Assert.Equal("claude", detector.CurrentAgentName);
     }
 
     [Fact]
-    public void CurrentAgent_CachesResult()
+    public void CurrentAgentName_CachesResult()
     {
         // Arrange
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["CURSOR_AGENT"] = "1" };
         var (detector, _) = Create(env);
 
         // Act
-        var first = detector.CurrentAgent;
-        var second = detector.CurrentAgent;
+        var first = detector.CurrentAgentName;
+        var second = detector.CurrentAgentName;
 
         // Assert
         Assert.Same(first, second);
     }
 
     [Fact]
-    public void CurrentAgent_IsAgent_TrueWhenAgentDetected()
+    public void IsRunningInsideAgent_TrueWhenAgentDetected()
     {
         // Arrange
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["REPL_ID"] = "id" };
         var (detector, _) = Create(env);
 
         // Act & Assert
-        Assert.True(detector.CurrentAgent.IsAgent);
+        Assert.True(detector.IsRunningInsideAgent);
     }
 
     [Fact]
-    public void CurrentAgent_IsAgent_FalseWhenNoAgent()
+    public void IsRunningInsideAgent_FalseWhenNoAgent()
     {
         // Arrange
         var (detector, _) = Create();
 
         // Act & Assert
-        Assert.False(detector.CurrentAgent.IsAgent);
+        Assert.False(detector.IsRunningInsideAgent);
     }
 
     [Fact]
-    public void CurrentAgent_Name_ReturnsNullWhenNotInAgent()
+    public void CurrentAgentName_ReturnsNullWhenNotInAgent()
     {
         // Arrange
         var (detector, _) = Create();
 
         // Act & Assert
-        Assert.Null(detector.CurrentAgent.Name);
+        Assert.Null(detector.CurrentAgentName);
     }
 
     [Fact]
-    public void CurrentAgent_Name_ReturnsNameWhenInAgent()
+    public void CurrentAgentName_ReturnsNameWhenInAgent()
     {
         // Arrange
         var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["OPENCODE_CLIENT"] = "1" };
         var (detector, _) = Create(env);
 
         // Act & Assert
-        Assert.Equal("opencode", detector.CurrentAgent.Name);
+        Assert.Equal("opencode", detector.CurrentAgentName);
     }
 
     [Fact]
