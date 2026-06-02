@@ -384,4 +384,200 @@ public class AddCommandTests : IDisposable
         // Assert
         Assert.NotEqual(0, exitCode);
     }
+
+    [Fact]
+    public async Task RunAsync_Should_ReportInvalidAgentOnce_When_AgentIsUnknown()
+    {
+        // Arrange
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") });
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "bogus"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        var interaction = services.GetRequiredService<TestInteractionService>();
+        Assert.Equal(ExitCodeConstants.Failure, exitCode);
+        Assert.Contains(interaction.Output, line => line.Contains("Invalid agents", StringComparison.Ordinal)
+            && line.Contains("bogus", StringComparison.Ordinal));
+        Assert.Contains(interaction.Output, line => line.Contains("TIP:", StringComparison.Ordinal)
+            && line.Contains("Valid agents", StringComparison.Ordinal));
+        Assert.DoesNotContain(interaction.Output, line => line.Contains("No agents selected", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunAsync_Should_FailAndRecordOnlySuccesses_When_SomeInstallsFail()
+    {
+        // Arrange
+        var lockEntries = new List<string>();
+
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha"), CreateSkill("beta") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) => skill.InstallName == "beta"
+                    ? new InstallResult(false, string.Empty, Error: "disk is full")
+                    : new InstallResult(true, $"/installed/{skill.InstallName}"),
+            configureProjectLock: l => l.OnAddEntry = (name, _, _) => lockEntries.Add(name));
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        var interaction = services.GetRequiredService<TestInteractionService>();
+        Assert.Equal(ExitCodeConstants.Failure, exitCode);
+        Assert.Contains("alpha", lockEntries);
+        Assert.DoesNotContain("beta", lockEntries);
+        Assert.Contains("Installed 1 skill(s)", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("Installation failed", interaction.OutputText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunAsync_Should_FailWithoutLockWrites_When_AllInstallsFail()
+    {
+        // Arrange
+        var lockEntries = new List<string>();
+
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (_, _, _) => new InstallResult(false, string.Empty, Error: "boom"),
+            configureProjectLock: l => l.OnAddEntry = (name, _, _) => lockEntries.Add(name));
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        var interaction = services.GetRequiredService<TestInteractionService>();
+        Assert.Equal(ExitCodeConstants.Failure, exitCode);
+        Assert.Empty(lockEntries);
+        Assert.Contains("Installation failed", interaction.OutputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Installed 1 skill(s)", interaction.OutputText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunAsync_Should_RenderSymlinkedLabel_When_InstallingAcrossDistinctSkillDirs()
+    {
+        // Arrange: two non-universal agents with distinct skills dirs, non-interactive → symlink default.
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, agent, _) => new InstallResult(true, $"/installed/{agent}/{skill.InstallName}"));
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code", "--agent", "augment"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        var interaction = services.GetRequiredService<TestInteractionService>();
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Symlinked:", interaction.OutputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Copied:", interaction.OutputText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunAsync_Should_RenderCopiedLabel_When_InstallingWithCopyMode()
+    {
+        // Arrange
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, $"/installed/{skill.InstallName}"));
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--copy", "--agent", "claude-code", "--agent", "augment"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        var interaction = services.GetRequiredService<TestInteractionService>();
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Copied:", interaction.OutputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Symlinked:", interaction.OutputText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunAsync_Should_SucceedAndWarn_When_LockWriteThrows()
+    {
+        // Arrange
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, $"/installed/{skill.InstallName}"),
+            configureProjectLock: l =>
+                l.OnAddEntry = (_, _, _) => throw new IOException("lock file is read-only"));
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        var interaction = services.GetRequiredService<TestInteractionService>();
+        Assert.Equal(0, exitCode);
+        Assert.Contains(interaction.Output, line =>
+            line.Contains("Could not record lock entry", StringComparison.Ordinal)
+            && line.Contains("lock file is read-only", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RunAsync_Should_RecordFailure_When_InstallerThrowsNonCancellation()
+    {
+        // Arrange
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (_, _, _) => throw new InvalidOperationException("installer exploded"));
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: the throw becomes a failed entry, the command reports failure instead of unwinding.
+        var interaction = services.GetRequiredService<TestInteractionService>();
+        Assert.Equal(ExitCodeConstants.Failure, exitCode);
+        Assert.Contains("Installation failed", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("installer exploded", interaction.OutputText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunAsync_Should_PropagateCancellation_When_InstallerThrowsOperationCanceled()
+    {
+        // Arrange
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (_, _, _) => throw new OperationCanceledException());
+
+        var executor = services.GetRequiredService<AddCommandExecutor>();
+        var options = new AddCommandOptions(
+            Source: "./local-path",
+            Global: false,
+            Agents: ["claude-code"],
+            SkillFilters: [],
+            Yes: true,
+            All: false,
+            Copy: false,
+            FullDepth: false,
+            List: false);
+
+        // Act & Assert: cancellation is not swallowed by the per-skill failure aggregation.
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => executor.RunAsync(options, TestContext.Current.CancellationToken));
+    }
 }
