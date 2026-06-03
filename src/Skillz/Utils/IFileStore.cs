@@ -41,6 +41,13 @@ internal interface IFileStore
     void DeleteFile(string path);
 
     /// <summary>
+    /// Deletes whatever exists at the given path. A reparse point (symlink) is removed as a
+    /// link without recursing through it, so the target it points at is never touched; a real
+    /// directory is deleted recursively, and a file is deleted directly.
+    /// </summary>
+    void DeletePath(string path);
+
+    /// <summary>
     /// Returns the immediate child directories of the given path.
     /// </summary>
     IEnumerable<string> EnumerateDirectories(string path);

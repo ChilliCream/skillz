@@ -42,7 +42,7 @@ internal static class CliTestHelper
         services.AddSingleton<ISystemEnvironment>(new FakeSystemEnvironment
         {
             HomeDirectory = "/home/test",
-            CurrentDirectory = "/workspace"
+            CurrentDirectory = workspace ?? "/workspace"
         });
 
         services.AddSingleton<FakeFileStore>();

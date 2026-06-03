@@ -16,12 +16,8 @@ internal sealed class UpdateCommand(
     IProjectLockFile projectLockFile,
     IBlobClient blobClient,
     IFileStore fileStore,
-    ConsoleEnvironment consoleEnvironment) : BaseCommand(CommandName, "Check for skill updates.")
+    ConsoleEnvironment consoleEnvironment) : BaseCommand("update", "Check for skill updates.")
 {
-    public const string CommandName = "update";
-
-    public static readonly ImmutableArray<string> CommandAliases = ["upgrade", "check"];
-
     private readonly Argument<string[]> _skillsArgument = new("skills")
     {
         Description = "Optional skill names to update.",
@@ -39,11 +35,8 @@ internal sealed class UpdateCommand(
 
     protected override void Configure()
     {
-        foreach (var alias in CommandAliases)
-        {
-            Aliases.Add(alias);
-        }
-
+        Aliases.Add("upgrade");
+        Aliases.Add("check");
         Arguments.Add(_skillsArgument);
         Options.Add(_globalOption);
         Options.Add(_projectOption);
@@ -58,10 +51,10 @@ internal sealed class UpdateCommand(
         var skillFilter = skills is { Length: > 0 } ? skills : null;
 
         var options = new UpdateCheckOptions(
-            Global: parseResult.GetValue(_globalOption),
-            Project: parseResult.GetValue(_projectOption),
-            Yes: parseResult.GetValue(_yesOption),
-            Skills: skillFilter);
+            parseResult.GetValue(_globalOption),
+            parseResult.GetValue(_projectOption),
+            parseResult.GetValue(_yesOption),
+            skillFilter);
 
         var scope = await ResolveScopeAsync(options, cancellationToken);
 
@@ -167,23 +160,18 @@ internal sealed class UpdateCommand(
 
         if (options.Yes || consoleEnvironment.IsInputRedirected)
         {
-            return await HasProjectSkillsAsync(cancellationToken)
-                ? UpdateScope.Project
-                : UpdateScope.Global;
+            return await HasProjectSkillsAsync(cancellationToken) ? UpdateScope.Project : UpdateScope.Global;
         }
 
-        var choice = await interaction
-            .SelectAsync(
-                "Update scope",
-                new[]
-                {
-                    ("Project (update skills in current directory)", UpdateScope.Project),
-                    ("Global (update skills in home directory)", UpdateScope.Global),
-                    ("Both (update all skills)", UpdateScope.Both)
-                },
-                cancellationToken);
-
-        return choice;
+        return await interaction.SelectAsync(
+            "Update scope",
+            new[]
+            {
+                ("Project (update skills in current directory)", UpdateScope.Project),
+                ("Global (update skills in home directory)", UpdateScope.Global),
+                ("Both (update all skills)", UpdateScope.Both)
+            },
+            cancellationToken);
     }
 
     private Task<bool> HasProjectSkillsAsync(CancellationToken cancellationToken)
@@ -275,10 +263,10 @@ internal sealed class UpdateCommand(
             }
 
             var latestHash = await TryFetchSkillFolderHashAsync(
-                    entry.Source,
-                    entry.SkillPath!,
-                    entry.Ref,
-                    cancellationToken);
+                entry.Source,
+                entry.SkillPath!,
+                entry.Ref,
+                cancellationToken);
             if (latestHash?.EqualsOrdinal(entry.SkillFolderHash) == false)
             {
                 updates.Add((skillName, entry));
@@ -345,8 +333,7 @@ internal sealed class UpdateCommand(
                 continue;
             }
 
-            if (entry.SourceType.EqualsOrdinal("node_modules")
-                || entry.SourceType.EqualsOrdinal("local"))
+            if (entry.SourceType.EqualsOrdinal("node_modules") || entry.SourceType.EqualsOrdinal("local"))
             {
                 continue;
             }
@@ -409,8 +396,7 @@ internal sealed class UpdateCommand(
 
         try
         {
-            var tree = await blobClient
-                .FetchTreeAsync(owner, repo, @ref, path: null, cancellationToken);
+            var tree = await blobClient.FetchTreeAsync(owner, repo, @ref, path: null, cancellationToken);
             if (tree is null)
             {
                 return null;
@@ -424,8 +410,7 @@ internal sealed class UpdateCommand(
 
             foreach (var entry in tree.Tree)
             {
-                if (entry.Type.EqualsOrdinal("tree")
-                    && entry.Path.EqualsOrdinal(folderPath))
+                if (entry.Type.EqualsOrdinal("tree") && entry.Path.EqualsOrdinal(folderPath))
                 {
                     return entry.Sha;
                 }

@@ -39,7 +39,7 @@ public class ListCommandSnapshotTests : IDisposable
 
     private IServiceProvider BuildServices()
     {
-        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
         var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         installer.OnGetCanonicalSkillsDir = (_, cwd) => Path.Combine(cwd ?? _workspace, ".agents", "skills");
         installer.OnGetAgentBaseDir = (agentType, _, cwd) => agentType == "claude-code"

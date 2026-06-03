@@ -5,6 +5,9 @@ internal static class PathContainment
     internal static StringComparison Comparison =>
         OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
 
+    internal static StringComparer Comparer =>
+        OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
+
     public static bool IsContainedIn(string targetPath, string basePath)
     {
         var normalizedBase = Path.GetFullPath(basePath);

@@ -15,14 +15,15 @@ internal sealed class RemoveCommandPrompter(IInteractionService interaction) : I
         }
 
         var choices = installed.Select(s => (s, s));
-        return await interaction
-            .MultiSelectAsync("Select skills to remove", choices, cancellationToken);
+        return await interaction.MultiSelectAsync("Select skills to remove", choices, cancellationToken);
     }
 
     public Task<bool> ConfirmRemovalAsync(ImmutableArray<string> skills, CancellationToken cancellationToken)
     {
         var skillNames = skills.Join(", ");
+
         var message = $"Are you sure you want to remove {skills.Length} skill(s) [{skillNames}]?";
+
         return interaction.ConfirmAsync(message, defaultValue: false, cancellationToken);
     }
 }

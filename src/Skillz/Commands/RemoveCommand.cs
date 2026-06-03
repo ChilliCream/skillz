@@ -3,6 +3,7 @@ using System.CommandLine;
 using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Locking;
+using Skillz.Plugins;
 using Skillz.Skills;
 using Skillz.Utils;
 
@@ -17,6 +18,7 @@ internal sealed class RemoveCommand(
     IGlobalLockFile globalLock,
     AgentEnvironment agentEnvironment,
     IFileStore fileStore,
+    ISystemEnvironment systemEnvironment,
     ConsoleEnvironment consoleEnvironment) : BaseCommand("remove", "Remove installed skills")
 {
     private readonly Argument<string[]> _skillsArgument = new("skills")
@@ -76,8 +78,8 @@ internal sealed class RemoveCommand(
             }
         }
 
-        var cwd = Directory.GetCurrentDirectory();
-        var installed = await ScanInstalledSkillsAsync(installer, registry, global, cwd, cancellationToken);
+        var cwd = systemEnvironment.CurrentDirectory;
+        var installed = CollectInstalledSkills(installer, registry, global);
 
         if (installed.Length == 0)
         {
@@ -86,21 +88,16 @@ internal sealed class RemoveCommand(
         }
 
         var nonInteractive =
-            yes
-            || all
-            || consoleEnvironment.IsInputRedirected
-            || agentEnvironment.IsRunningInsideAgent;
+            yes || all || consoleEnvironment.IsInputRedirected || agentEnvironment.IsRunningInsideAgent;
 
-        ImmutableArray<string> selected;
+        var selected = ImmutableArray<string>.Empty;
         if (all)
         {
             selected = installed;
         }
         else if (requestedSkills.Length > 0)
         {
-            selected = installed
-                .Where(s => requestedSkills.Any(r => r.EqualsOrdinalIgnoreCase(s)))
-                .ToImmutableArray();
+            selected = installed.Where(s => requestedSkills.Any(r => r.EqualsOrdinalIgnoreCase(s))).ToImmutableArray();
 
             if (selected.Length == 0)
             {
@@ -123,7 +120,7 @@ internal sealed class RemoveCommand(
             }
         }
 
-        var targetAgents = agents.Length > 0 ? (IReadOnlyList<string>)agents : registry.AgentTypes;
+        var targetAgents = agents.Length > 0 ? agents.ToImmutableArray() : registry.AgentTypes;
 
         if (!nonInteractive)
         {
@@ -138,45 +135,47 @@ internal sealed class RemoveCommand(
         var failures = new List<(string Skill, string Error)>();
         var removed = 0;
 
-        await interaction
-            .StatusAsync("Removing skills...", async () => { foreach (var skillName in selected)
+        await interaction.StatusAsync("Removing skills...", async () =>
+        {
+            foreach (var skillName in selected)
+            {
+                try
                 {
-                    try
+                    var canonicalPath = installer.GetCanonicalPath(skillName, global, cwd);
+
+                    foreach (var agentType in targetAgents)
                     {
-                        var canonicalPath = installer.GetCanonicalPath(skillName, global, cwd);
-
-                        foreach (var agentType in targetAgents)
+                        var installPath = installer.GetInstallPath(skillName, agentType, global, cwd);
+                        if (string.Equals(installPath, canonicalPath, PathContainment.Comparison))
                         {
-                            var installPath = installer.GetInstallPath(skillName, agentType, global, cwd);
-                            if (string.Equals(installPath, canonicalPath, GetPathComparison()))
-                            {
-                                continue;
-                            }
-
-                            TryDeletePath(installPath);
+                            continue;
                         }
 
-                        if (!IsCanonicalStillUsed(installer, registry, skillName, global, cwd, targetAgents))
-                        {
-                            TryDeletePath(canonicalPath);
-                        }
-
-                        if (global)
-                        {
-                            await globalLock.RemoveEntryAsync(skillName, cancellationToken);
-                        }
-                        else
-                        {
-                            await projectLock.RemoveEntryAsync(skillName, cwd, cancellationToken);
-                        }
-
-                        removed++;
+                        TryDeletePath(installPath);
                     }
-                    catch (Exception ex)
+
+                    if (!IsCanonicalStillUsed(installer, registry, skillName, global, cwd, targetAgents))
                     {
-                        failures.Add((skillName, ex.Message));
+                        TryDeletePath(canonicalPath);
                     }
-                } });
+
+                    if (global)
+                    {
+                        await globalLock.RemoveEntryAsync(skillName, cancellationToken);
+                    }
+                    else
+                    {
+                        await projectLock.RemoveEntryAsync(skillName, cwd, cancellationToken);
+                    }
+
+                    removed++;
+                }
+                catch (Exception ex)
+                {
+                    failures.Add((skillName, ex.Message));
+                }
+            }
+        });
 
         if (removed > 0)
         {
@@ -197,17 +196,14 @@ internal sealed class RemoveCommand(
         return new CommandResult.Success();
     }
 
-    private async Task<ImmutableArray<string>> ScanInstalledSkillsAsync(
+    private ImmutableArray<string> CollectInstalledSkills(
         ISkillInstaller installer,
         AgentRegistry registry,
-        bool global,
-        string cwd,
-        CancellationToken cancellationToken)
+        bool global)
     {
-        cancellationToken.ThrowIfCancellationRequested();
-
+        var cwd = systemEnvironment.CurrentDirectory;
         var skills = new HashSet<string>(StringComparer.Ordinal);
-        var directoriesToScan = new HashSet<string>(GetPathComparer())
+        var directoriesToScan = new HashSet<string>(PathContainment.Comparer)
         {
             installer.GetCanonicalSkillsDir(global, cwd)
         };
@@ -236,10 +232,13 @@ internal sealed class RemoveCommand(
             }
         }
 
-        await Task.CompletedTask;
         return [.. skills.OrderBy(s => s, StringComparer.Ordinal)];
     }
 
+    /// <summary>
+    /// Returns <see langword="true"/> if at least one agent outside <paramref name="removedAgents"/>
+    /// still has an install path for the skill, meaning the canonical directory must be kept.
+    /// </summary>
     private bool IsCanonicalStillUsed(
         ISkillInstaller installer,
         AgentRegistry registry,
@@ -257,7 +256,7 @@ internal sealed class RemoveCommand(
             }
 
             var path = installer.GetInstallPath(skillName, agentType, global, cwd);
-            if (PathExists(path))
+            if (fileStore.PathExists(path))
             {
                 return true;
             }
@@ -266,52 +265,15 @@ internal sealed class RemoveCommand(
         return false;
     }
 
-    private bool PathExists(string path)
-    {
-        try
-        {
-            return fileStore.FileExists(path) || fileStore.DirectoryExists(path);
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
     private void TryDeletePath(string path)
     {
         try
         {
-            if (fileStore.DirectoryExists(path))
-            {
-                var info = new DirectoryInfo(path);
-                if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
-                {
-                    info.Delete();
-                }
-                else
-                {
-                    fileStore.DeleteDirectory(path, recursive: true);
-                }
-            }
-            else if (fileStore.FileExists(path))
-            {
-                fileStore.DeleteFile(path);
-            }
+            fileStore.DeletePath(path);
         }
         catch
         {
             // Best-effort
         }
-    }
-
-    private static StringComparer GetPathComparer()
-    {
-        return OperatingSystem.IsLinux() ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase;
-    }
-
-    private static StringComparison GetPathComparison()
-    {
-        return OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
     }
 }

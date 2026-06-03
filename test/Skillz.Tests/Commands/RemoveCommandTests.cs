@@ -61,7 +61,7 @@ public class RemoveCommandTests : IDisposable
     public async Task Remove_With_No_Skills_Reports_Empty()
     {
         // Arrange
-        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
         var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
@@ -85,7 +85,7 @@ public class RemoveCommandTests : IDisposable
         CreateSkill(canonical, "alpha");
         CreateSkill(canonical, "beta");
 
-        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
         var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
@@ -118,7 +118,7 @@ public class RemoveCommandTests : IDisposable
         CreateSkill(canonical, "alpha");
         CreateSkill(canonical, "beta");
 
-        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
         var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
 
@@ -142,7 +142,7 @@ public class RemoveCommandTests : IDisposable
         CreateSkill(canonical, "alpha");
         CreateSkill(canonical, "beta");
 
-        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true, configure: s =>
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true, configure: s =>
             s.AddSingleton<ConsoleEnvironment>(new TestConsoleEnvironment { InputRedirected = false })
         );
 

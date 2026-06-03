@@ -39,7 +39,7 @@ public class InitCommandTests : IDisposable
     public async Task Init_Without_Name_Creates_SkillMd_In_Cwd()
     {
         // Arrange
-        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
         var cmd = services.GetRequiredService<InitCommand>();
 
         // Act
@@ -60,7 +60,7 @@ public class InitCommandTests : IDisposable
     public async Task Init_With_Name_Creates_Subdirectory_With_SkillMd()
     {
         // Arrange
-        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
         var cmd = services.GetRequiredService<InitCommand>();
 
         // Act
@@ -82,7 +82,7 @@ public class InitCommandTests : IDisposable
         var existing = Path.Combine(_workspace, "SKILL.md");
         await File.WriteAllTextAsync(existing, "existing content", TestContext.Current.CancellationToken);
 
-        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
         var cmd = services.GetRequiredService<InitCommand>();
 
         // Act

@@ -30,6 +30,28 @@ internal sealed class SystemFileStore : IFileStore
 
     public void DeleteFile(string path) => File.Delete(path);
 
+    public void DeletePath(string path)
+    {
+        if (Directory.Exists(path))
+        {
+            var info = new DirectoryInfo(path);
+            if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
+            {
+                // Delete the symlink as a link — never recurse through it,
+                // so the link target's contents are left untouched.
+                info.Delete();
+            }
+            else
+            {
+                Directory.Delete(path, recursive: true);
+            }
+        }
+        else if (File.Exists(path))
+        {
+            File.Delete(path);
+        }
+    }
+
     public IEnumerable<string> EnumerateDirectories(string path) => Directory.EnumerateDirectories(path);
 
     public Task<string> ReadAllTextAsync(string path, CancellationToken cancellationToken)

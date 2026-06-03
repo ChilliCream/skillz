@@ -43,6 +43,18 @@ internal sealed class FakeFileStore : IFileStore
 
     public void DeleteFile(string path) => Files.Remove(Normalize(path));
 
+    public void DeletePath(string path)
+    {
+        if (DirectoryExists(path))
+        {
+            DeleteDirectory(path, recursive: true);
+        }
+        else if (FileExists(path))
+        {
+            DeleteFile(path);
+        }
+    }
+
     public IEnumerable<string> EnumerateDirectories(string path)
     {
         var normalized = Normalize(path);

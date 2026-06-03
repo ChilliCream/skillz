@@ -37,7 +37,7 @@ public class InitCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Init_With_Name_Creates_Skill()
     {
-        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
 
         var output = await CommandSnapshot.RunAsync(services, "init", "my-skill");
 
@@ -69,7 +69,7 @@ public class InitCommandSnapshotTests : IDisposable
             Path.Combine(skillDir, "SKILL.md"),
             "existing content",
             TestContext.Current.CancellationToken);
-        var services = CliTestHelper.CreateServiceProvider(useRealFileStore: true);
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
 
         var output = await CommandSnapshot.RunAsync(services, "init", "my-skill");
 
