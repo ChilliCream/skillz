@@ -110,16 +110,29 @@ internal sealed class ConsoleInteractionService(IAnsiConsole? console = null) : 
             throw new InvalidOperationException("SelectAsync requires at least one choice.");
         }
 
-        var labels = pairs.Select(c => c.Label).ToArray();
-        var prompt = new SelectionPrompt<string>().Title(Markup.Escape(message)).EnableSearch().AddChoices(labels);
+        // The choice presented to Spectre is the index into 'pairs', not the label, so identical
+        // labels can never cross-select: the selected index maps back to exactly one value.
+        var prompt = new SelectionPrompt<int>()
+            .Title(Markup.Escape(message))
+            .EnableSearch()
+            .UseConverter(i => pairs[i].Label)
+            .AddChoices(Enumerable.Range(0, pairs.Count));
 
-        var selected = await _console.PromptAsync(prompt, cancellationToken);
-        return pairs.First(c => c.Label == selected).Value;
+        var selectedIndex = await _console.PromptAsync(prompt, cancellationToken);
+        return pairs[selectedIndex].Value;
     }
+
+    public Task<ImmutableArray<T>> MultiSelectAsync<T>(
+        string message,
+        IEnumerable<(string Label, T Value)> choices,
+        CancellationToken cancellationToken)
+        where T : notnull
+        => MultiSelectAsync(message, choices, [], cancellationToken);
 
     public async Task<ImmutableArray<T>> MultiSelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
+        IEnumerable<T> preSelected,
         CancellationToken cancellationToken)
         where T : notnull
     {
@@ -129,11 +142,30 @@ internal sealed class ConsoleInteractionService(IAnsiConsole? console = null) : 
             return [];
         }
 
-        var labels = pairs.Select(c => c.Label).ToArray();
-        var prompt = new MultiSelectionPrompt<string>().Title(Markup.Escape(message)).PageSize(20).AddChoices(labels);
+        var preSelectedSet = new HashSet<T>(preSelected);
 
-        var selected = await _console.PromptAsync(prompt, cancellationToken);
-        var selectedSet = new HashSet<string>(selected, StringComparer.Ordinal);
-        return [.. pairs.Where(c => selectedSet.Contains(c.Label)).Select(c => c.Value)];
+        // Present the index into 'pairs' (not the label) so identical labels can't cross-select;
+        // each returned index maps back to exactly one value.
+        var prompt = new MultiSelectionPrompt<int>()
+            .Title(Markup.Escape(message))
+            .PageSize(20)
+            .UseConverter(i => pairs[i].Label);
+
+        for (var i = 0; i < pairs.Count; i++)
+        {
+            var isSelected = preSelectedSet.Contains(pairs[i].Value);
+            prompt.AddChoices(
+                i,
+                item =>
+                {
+                    if (isSelected)
+                    {
+                        item.Select();
+                    }
+                });
+        }
+
+        var selectedIndices = await _console.PromptAsync(prompt, cancellationToken);
+        return [.. selectedIndices.Order().Select(i => pairs[i].Value)];
     }
 }

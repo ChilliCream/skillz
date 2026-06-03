@@ -73,11 +73,8 @@ internal sealed class AddCommandExecutor(
             options = options with { Yes = true, Agents = agents };
         }
 
-        var skillFilters =
-            parsed.GetSkillFilter() is { } sourceFilter
-            && !options.SkillFilters.Contains(sourceFilter, StringComparer.OrdinalIgnoreCase)
-                ? [.. options.SkillFilters, sourceFilter]
-                : options.SkillFilters;
+        var skillFilters = options.SkillFilters.AppendFilter(parsed.GetSkillFilter());
+
         interaction.WriteDim($"Source: {GitUrl.RedactUrlUserInfo(parsed.DisplayString)}");
 
         // Fetch skills into a temp staging area, and clean it up no matter how we exit below.
@@ -207,7 +204,11 @@ internal sealed class AddCommandExecutor(
 
         if (!nonInteractive)
         {
-            var confirmed = await prompter.ConfirmInstallationAsync(selectedSkills, targetAgents, overwriteTargets, cancellationToken);
+            var confirmed = await prompter.ConfirmInstallationAsync(
+                selectedSkills,
+                targetAgents,
+                overwriteTargets,
+                cancellationToken);
 
             if (!confirmed)
             {
@@ -656,4 +657,14 @@ file static class Extensions
 
     internal static string? GetSkillFilter(this SkillSource source)
         => source is SkillSource.ISkillFilterable { SkillFilter: { Length: > 0 } filter } ? filter : null;
+
+    internal static ImmutableArray<string> AppendFilter(this ImmutableArray<string> filters, string? newFilter)
+    {
+        if (string.IsNullOrEmpty(newFilter) || filters.Contains(newFilter, StringComparer.OrdinalIgnoreCase))
+        {
+            return filters;
+        }
+
+        return [.. filters, newFilter];
+    }
 }
