@@ -254,7 +254,9 @@ internal sealed partial class SourceParser : ISourceParser
             return false;
         }
 
-        return true;
+        // Well-known discovery fetches an attacker-supplied host, so require HTTPS and block
+        // loopback/private/link-local/metadata targets to prevent SSRF.
+        return UrlSafetyGuard.IsSafeFetchTarget(uri);
     }
 
     private readonly record struct FragmentRefResult(string InputWithoutFragment, string? Ref, string? SkillFilter);

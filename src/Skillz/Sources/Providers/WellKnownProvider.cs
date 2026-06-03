@@ -163,6 +163,13 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
                     continue;
                 }
 
+                // A malicious index can supply an absolute url pointing at any host/scheme.
+                // Reject anything that is not a same-origin HTTPS target before it is ever fetched.
+                if (!IsSafeIndexDerivedUrl(indexUrl, artifactUri))
+                {
+                    continue;
+                }
+
                 entries.Add(
                     new NormalizedEntry(
                         Version: "0.2.0",
@@ -253,6 +260,15 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
             var skillBaseUrl = $"{entry.BaseUrl!.TrimEnd('/')}/{entry.WellKnownPath}/{entry.Name}";
             var skillMdUrl = $"{skillBaseUrl}/SKILL.md";
 
+            // The legacy base url is derived from the index origin; validate the resolved fetch
+            // target is a same-origin HTTPS, non-private host before issuing the request.
+            if (!Uri.TryCreate(skillMdUrl, UriKind.Absolute, out var skillMdUri)
+                || !IsSafeIndexDerivedUrl(entry.BaseUrl!, skillMdUri))
+            {
+                TempDirCleanup.SafeDelete(stagingRoot);
+                return null;
+            }
+
             using var response = await client.GetAsync(skillMdUrl, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
@@ -289,6 +305,12 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
                     }
 
                     var fileUrl = $"{skillBaseUrl}/{relativeFile}";
+                    if (!Uri.TryCreate(fileUrl, UriKind.Absolute, out var fileUri)
+                        || !IsSafeIndexDerivedUrl(entry.BaseUrl!, fileUri))
+                    {
+                        continue;
+                    }
+
                     try
                     {
                         using var fileResponse = await client
@@ -397,6 +419,29 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Returns whether <paramref name="target"/> is a safe fetch target derived from an index at
+    /// <paramref name="referenceUrl"/>: it must be HTTPS, pass the SSRF host guard, and share the
+    /// same origin (scheme, host, and port) as the reference url so a malicious index cannot
+    /// redirect fetches to a different host or scheme.
+    /// </summary>
+    private static bool IsSafeIndexDerivedUrl(string referenceUrl, Uri target)
+    {
+        if (!UrlSafetyGuard.IsSafeFetchTarget(target))
+        {
+            return false;
+        }
+
+        if (!Uri.TryCreate(referenceUrl, UriKind.Absolute, out var reference))
+        {
+            return false;
+        }
+
+        return string.Equals(reference.Scheme, target.Scheme, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(reference.Host, target.Host, StringComparison.OrdinalIgnoreCase)
+            && reference.Port == target.Port;
     }
 
     private static string ComputeDigest(byte[] bytes)

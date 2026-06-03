@@ -943,4 +943,105 @@ public class SourceParserTests
         var github = Assert.IsType<SkillSource.GitHub>(result);
         Assert.Equal("skills/my-skill", github.Subpath);
     }
+
+    [Fact]
+    public void WellKnown_Should_Be_Returned_When_Host_Is_NormalHttps()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://docs.example.com/skills");
+
+        // Assert
+        var wellKnown = Assert.IsType<SkillSource.WellKnown>(result);
+        Assert.Equal("https://docs.example.com/skills", wellKnown.Url);
+    }
+
+    [Fact]
+    public void WellKnown_Should_Not_Be_Returned_When_Host_Is_MetadataIp()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://169.254.169.254/latest/meta-data");
+
+        // Assert
+        Assert.IsNotType<SkillSource.WellKnown>(result);
+    }
+
+    [Fact]
+    public void WellKnown_Should_Not_Be_Returned_When_Host_Is_Localhost()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://localhost/skills");
+
+        // Assert
+        Assert.IsNotType<SkillSource.WellKnown>(result);
+    }
+
+    [Fact]
+    public void WellKnown_Should_Not_Be_Returned_When_Host_Is_LoopbackIp()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://127.0.0.1/skills");
+
+        // Assert
+        Assert.IsNotType<SkillSource.WellKnown>(result);
+    }
+
+    [Fact]
+    public void WellKnown_Should_Not_Be_Returned_When_Host_Is_PrivateIp()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://10.0.0.5/skills");
+
+        // Assert
+        Assert.IsNotType<SkillSource.WellKnown>(result);
+    }
+
+    [Fact]
+    public void WellKnown_Should_Not_Be_Returned_When_Host_Is_PrivateIp172()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://172.16.5.5/skills");
+
+        // Assert
+        Assert.IsNotType<SkillSource.WellKnown>(result);
+    }
+
+    [Fact]
+    public void WellKnown_Should_Not_Be_Returned_When_Host_Is_PrivateIp192()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://192.168.1.1/skills");
+
+        // Assert
+        Assert.IsNotType<SkillSource.WellKnown>(result);
+    }
+
+    [Fact]
+    public void WellKnown_Should_Not_Be_Returned_When_Scheme_Is_Http()
+    {
+        // Act
+        var result = new SourceParser().Parse("http://docs.example.com/skills");
+
+        // Assert
+        Assert.IsNotType<SkillSource.WellKnown>(result);
+    }
+
+    [Fact]
+    public void WellKnown_Should_Not_Be_Returned_When_Host_Is_LinkLocalIpv6()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://[fe80::1]/skills");
+
+        // Assert
+        Assert.IsNotType<SkillSource.WellKnown>(result);
+    }
+
+    [Fact]
+    public void WellKnown_Should_Not_Be_Returned_When_Host_Is_LoopbackIpv6()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://[::1]/skills");
+
+        // Assert
+        Assert.IsNotType<SkillSource.WellKnown>(result);
+    }
 }
