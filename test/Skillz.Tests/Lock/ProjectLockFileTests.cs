@@ -353,6 +353,87 @@ public class ProjectLockFileTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadAsync_Drops_Entry_With_Control_Byte_And_Keeps_Clean_Sibling()
+    {
+        // Arrange: the JSON \u001b escape decodes to a real ESC byte in the poisoned source.
+        var content = """
+            {
+              "version": 1,
+              "skills": {
+                "poisoned": {
+                  "source": "org/\u001brepo",
+                  "sourceType": "github",
+                  "skillPath": "skills/poisoned/SKILL.md",
+                  "computedHash": "aaa"
+                },
+                "clean": {
+                  "source": "org/repo",
+                  "sourceType": "github",
+                  "skillPath": "skills/clean/SKILL.md",
+                  "computedHash": "bbb"
+                }
+              }
+            }
+            """;
+        await File.WriteAllTextAsync(
+            Path.Combine(_tempDir, "skills-lock.json"),
+            content,
+            TestContext.Current.CancellationToken);
+
+        var lockFile = new ProjectLockFile();
+
+        // Act
+        var result = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
+
+        // Assert
+        var entry = Assert.Single(result.Skills);
+        Assert.Equal("clean", entry.Key);
+        Assert.Equal("skills/clean/SKILL.md", entry.Value.SkillPath);
+    }
+
+    [Theory]
+    [InlineData("/etc/passwd")]
+    [InlineData("skills/../../escape")]
+    // Two backslashes here are the JSON escape for one literal backslash on disk.
+    [InlineData("skills\\\\windows\\\\style")]
+    public async Task ReadAsync_Drops_Entry_With_Unsafe_SkillPath_And_Keeps_Clean_Sibling(string unsafeSkillPath)
+    {
+        // Arrange
+        var content = $$"""
+            {
+              "version": 1,
+              "skills": {
+                "poisoned": {
+                  "source": "org/repo",
+                  "sourceType": "github",
+                  "skillPath": "{{unsafeSkillPath}}",
+                  "computedHash": "aaa"
+                },
+                "clean": {
+                  "source": "org/repo",
+                  "sourceType": "github",
+                  "skillPath": "skills/clean/SKILL.md",
+                  "computedHash": "bbb"
+                }
+              }
+            }
+            """;
+        await File.WriteAllTextAsync(
+            Path.Combine(_tempDir, "skills-lock.json"),
+            content,
+            TestContext.Current.CancellationToken);
+
+        var lockFile = new ProjectLockFile();
+
+        // Act
+        var result = await lockFile.ReadAsync(_tempDir, TestContext.Current.CancellationToken);
+
+        // Assert
+        var entry = Assert.Single(result.Skills);
+        Assert.Equal("clean", entry.Key);
+    }
+
+    [Fact]
     public async Task AddEntryAsync_Adds_New_Skill_To_Empty_Lock()
     {
         // Arrange

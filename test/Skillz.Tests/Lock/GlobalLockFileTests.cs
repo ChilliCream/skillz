@@ -282,6 +282,162 @@ public class GlobalLockFileTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadAsync_Drops_Entry_With_Control_Byte_And_Keeps_Clean_Sibling()
+    {
+        // Arrange: the poisoned source uses the JSON \u001b escape, which decodes to a real ESC byte.
+        var lockPath = _xdgPaths.GetGlobalLockPath();
+        Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
+        await File.WriteAllTextAsync(
+            lockPath,
+            $$"""
+            {
+              "version": {{GlobalLockFile.CurrentVersion}},
+              "skills": {
+                "poisoned": {
+                  "source": "org/\u001brepo",
+                  "sourceType": "github",
+                  "sourceUrl": "u",
+                  "skillPath": "skills/poisoned/SKILL.md",
+                  "skillFolderHash": "h",
+                  "installedAt": "2025-01-01T00:00:00Z",
+                  "updatedAt": "2025-01-01T00:00:00Z"
+                },
+                "clean": {
+                  "source": "org/repo",
+                  "sourceType": "github",
+                  "sourceUrl": "https://github.com/org/repo.git",
+                  "skillPath": "skills/clean/SKILL.md",
+                  "skillFolderHash": "h",
+                  "installedAt": "2025-01-01T00:00:00Z",
+                  "updatedAt": "2025-01-01T00:00:00Z"
+                }
+              }
+            }
+            """,
+            TestContext.Current.CancellationToken);
+
+        var lockFile = new GlobalLockFile(_xdgPaths, new FakeTimeProvider(FixedNow));
+
+        // Act
+        var result = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        var entry = Assert.Single(result.Skills);
+        Assert.Equal("clean", entry.Key);
+        Assert.Equal("skills/clean/SKILL.md", entry.Value.SkillPath);
+    }
+
+    [Fact]
+    public async Task ReadAsync_Drops_Entry_With_Traversing_SkillPath_And_Keeps_Clean_Sibling()
+    {
+        // Arrange: rooted, "..", and backslash skill paths are all structurally unsafe.
+        var lockPath = _xdgPaths.GetGlobalLockPath();
+        Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
+        await File.WriteAllTextAsync(
+            lockPath,
+            $$"""
+            {
+              "version": {{GlobalLockFile.CurrentVersion}},
+              "skills": {
+                "rooted": {
+                  "source": "org/repo",
+                  "sourceType": "github",
+                  "sourceUrl": "u",
+                  "skillPath": "/etc/passwd",
+                  "skillFolderHash": "h",
+                  "installedAt": "2025-01-01T00:00:00Z",
+                  "updatedAt": "2025-01-01T00:00:00Z"
+                },
+                "traversal": {
+                  "source": "org/repo",
+                  "sourceType": "github",
+                  "sourceUrl": "u",
+                  "skillPath": "skills/../../escape",
+                  "skillFolderHash": "h",
+                  "installedAt": "2025-01-01T00:00:00Z",
+                  "updatedAt": "2025-01-01T00:00:00Z"
+                },
+                "clean": {
+                  "source": "org/repo",
+                  "sourceType": "github",
+                  "sourceUrl": "u",
+                  "skillPath": "skills/clean/SKILL.md",
+                  "skillFolderHash": "h",
+                  "installedAt": "2025-01-01T00:00:00Z",
+                  "updatedAt": "2025-01-01T00:00:00Z"
+                }
+              }
+            }
+            """,
+            TestContext.Current.CancellationToken);
+
+        var lockFile = new GlobalLockFile(_xdgPaths, new FakeTimeProvider(FixedNow));
+
+        // Act
+        var result = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        var entry = Assert.Single(result.Skills);
+        Assert.Equal("clean", entry.Key);
+    }
+
+    [Fact]
+    public async Task RemoveEntryAsync_Drops_Poisoned_Sibling_While_Removing_Target()
+    {
+        // Arrange: one poisoned entry must not block a remove of an unrelated clean entry.
+        var lockPath = _xdgPaths.GetGlobalLockPath();
+        Directory.CreateDirectory(Path.GetDirectoryName(lockPath)!);
+        await File.WriteAllTextAsync(
+            lockPath,
+            $$"""
+            {
+              "version": {{GlobalLockFile.CurrentVersion}},
+              "skills": {
+                "poisoned": {
+                  "source": "org/repo",
+                  "sourceType": "github",
+                  "sourceUrl": "u",
+                  "skillPath": "/rooted/escape",
+                  "skillFolderHash": "h",
+                  "installedAt": "2025-01-01T00:00:00Z",
+                  "updatedAt": "2025-01-01T00:00:00Z"
+                },
+                "keep-me": {
+                  "source": "org/repo",
+                  "sourceType": "github",
+                  "sourceUrl": "u",
+                  "skillPath": "skills/keep/SKILL.md",
+                  "skillFolderHash": "h",
+                  "installedAt": "2025-01-01T00:00:00Z",
+                  "updatedAt": "2025-01-01T00:00:00Z"
+                },
+                "drop-me": {
+                  "source": "org/repo",
+                  "sourceType": "github",
+                  "sourceUrl": "u",
+                  "skillPath": "skills/drop/SKILL.md",
+                  "skillFolderHash": "h",
+                  "installedAt": "2025-01-01T00:00:00Z",
+                  "updatedAt": "2025-01-01T00:00:00Z"
+                }
+              }
+            }
+            """,
+            TestContext.Current.CancellationToken);
+
+        var lockFile = new GlobalLockFile(_xdgPaths, new FakeTimeProvider(FixedNow));
+
+        // Act
+        var removed = await lockFile.RemoveEntryAsync("drop-me", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(removed);
+        var result = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
+        var entry = Assert.Single(result.Skills);
+        Assert.Equal("keep-me", entry.Key);
+    }
+
+    [Fact]
     public async Task ReadWrite_Round_Trip_Preserves_Entries()
     {
         // Arrange

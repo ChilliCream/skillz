@@ -39,6 +39,23 @@ internal sealed class GlobalLockFile(XdgPaths xdgPaths, TimeProvider timeProvide
         return file;
     }
 
+    protected override void SanitizeOnRead(SkillLockFile file)
+    {
+        var poisoned = file.Skills
+            .Where(pair => IsPoisoned(pair.Key, pair.Value))
+            .Select(pair => pair.Key)
+            .ToList();
+
+        foreach (var key in poisoned)
+        {
+            file.Skills.Remove(key);
+        }
+    }
+
+    private static bool IsPoisoned(string key, SkillLockEntry entry)
+        => HasControl(key, entry.Source, entry.SkillPath, entry.Ref, entry.SourceUrl)
+            || IsUnsafeSkillPath(entry.SkillPath);
+
     public Task<SkillLockFile> ReadAsync(CancellationToken cancellationToken)
         => ReadFileAsync(xdgPaths.GetGlobalLockPath(), cancellationToken);
 

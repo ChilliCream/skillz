@@ -303,6 +303,80 @@ public class WellKnownProviderTests
     }
 
     [Fact]
+    public async Task Rejects_Legacy_Entries_With_Control_Byte_In_File_Path()
+    {
+        // Arrange: the second file carries a real ESC byte ( decodes to U+001B).
+        var handler = new StubHttpMessageHandler();
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            "{\n  \"skills\": [\n    {\n      \"name\": \"bad-skill\",\n      \"description\": \"Bad skill.\",\n      \"files\": [\"SKILL.md\", \"\\u001bevil.md\"]\n    }\n  ]\n}");
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/bad-skill/SKILL.md",
+            LegacySkillMd,
+            contentType: "text/markdown");
+
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
+
+        // Act
+        var skills = await provider.FetchSkillsAsync(
+            new SkillSource.WellKnown("https://example.com"),
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: the control-byte file invalidates the whole entry, so no skill is produced even
+        // though SKILL.md is reachable.
+        Assert.Empty(skills);
+    }
+
+    [Fact]
+    public async Task Skips_V2_Entry_With_Non_Http_Artifact_Url_And_Keeps_Https_Sibling()
+    {
+        // Arrange: a file:// artifact URL must be skipped while a normal https entry survives.
+        var handler = new StubHttpMessageHandler();
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            $$"""
+            {
+              "$schema": "{{SchemaV2}}",
+              "skills": [
+                {
+                  "name": "evil-skill",
+                  "type": "skill-md",
+                  "description": "Local file.",
+                  "url": "file:///etc/passwd",
+                  "digest": "{{Digest(SampleSkillMd)}}"
+                },
+                {
+                  "name": "code-review",
+                  "type": "skill-md",
+                  "description": "Review code.",
+                  "url": "code-review/SKILL.md",
+                  "digest": "{{Digest(SampleSkillMd)}}"
+                }
+              ]
+            }
+            """);
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/code-review/SKILL.md",
+            SampleSkillMd,
+            contentType: "text/markdown");
+
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
+
+        // Act
+        var skills = await provider.FetchSkillsAsync(
+            new SkillSource.WellKnown("https://example.com"),
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        var skill = Assert.Single(skills);
+        Assert.Equal("code-review", skill.InstallName);
+        // The file:// artifact must be dropped before any fetch is attempted against it.
+        Assert.DoesNotContain(handler.Requests, r => r.RequestUri!.Scheme == "file");
+    }
+
+    [Fact]
     public async Task Rejects_Legacy_Entries_Missing_SkillMd()
     {
         // Arrange

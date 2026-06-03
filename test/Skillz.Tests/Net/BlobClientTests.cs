@@ -188,6 +188,55 @@ public class BlobClientTests
     }
 
     [Fact]
+    public async Task FetchTreeAsync_Escapes_Control_Bytes_In_Owner_Path_Segment()
+    {
+        // Arrange: a poisoned owner with a CR/LF must not inject extra request lines.
+        var handler = new StubHttpMessageHandler();
+        handler.EnqueueOk(SampleTreeJson);
+
+        var tokenProvider = new FakeGitHubTokenProvider(() => null);
+        var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
+
+        // Act
+        var result = await client.FetchTreeAsync(
+            "ev\r\nil",
+            "skills",
+            "main",
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.NotNull(result);
+        var requestUrl = handler.Requests[0].RequestUri!.ToString();
+        Assert.Contains("ev%0D%0Ail", requestUrl);
+        Assert.DoesNotContain("\r", requestUrl);
+        Assert.DoesNotContain("\n", requestUrl);
+    }
+
+    [Fact]
+    public async Task FetchTreeAsync_Leaves_Normal_Owner_Repo_Unescaped()
+    {
+        // Arrange: an ordinary owner/repo must be unchanged by the escaping belt.
+        var handler = new StubHttpMessageHandler();
+        handler.EnqueueOk(SampleTreeJson);
+
+        var tokenProvider = new FakeGitHubTokenProvider(() => null);
+        var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
+
+        // Act
+        var result = await client.FetchTreeAsync(
+            "vercel",
+            "skills",
+            "main",
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(
+            "https://api.github.com/repos/vercel/skills/git/trees/main?recursive=1",
+            handler.Requests[0].RequestUri!.ToString());
+    }
+
+    [Fact]
     public async Task FetchTreeAsync_Returns_Null_When_Declared_ContentLength_Exceeds_Cap()
     {
         // Arrange

@@ -34,6 +34,13 @@ internal static class PathContainment
 
     public static bool IsValidRelativePath(string path)
     {
+        // Reject control bytes here too: this single gate guards plugin source, metadata.pluginRoot
+        // and skills[] entries, and a NUL would otherwise reach Path.Combine and crash discovery.
+        if (path.ContainsControlCharacter())
+        {
+            return false;
+        }
+
         return path.StartsWithOrdinal("./");
     }
 

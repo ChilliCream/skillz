@@ -161,4 +161,33 @@ public class PluginGroupingTests : IDisposable
         // Assert
         Assert.Empty(groupings);
     }
+
+    [Fact]
+    public async Task GetPluginGroupings_Should_DropOnlyPoisonedSkill_When_SkillPathContainsControlByte()
+    {
+        // Arrange
+        // The poisoned entry carries a NUL and must be dropped (without it Path.Combine would crash),
+        // while the clean sibling under the same plugin is still mapped.
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
+            {
+              "plugins": [
+                {
+                  "name": "mixed-plugin",
+                  "source": "./",
+                  "skills": ["./skills/\u0000POISON", "./skills/clean"]
+                }
+              ]
+            }
+            """);
+
+        // Act
+        var groupings = await _grouping.GetPluginGroupingsAsync(_testDir, TestContext.Current.CancellationToken);
+
+        // Assert
+        var cleanPath = Path.GetFullPath(Path.Combine(_testDir, "skills", "clean"));
+        Assert.Equal("mixed-plugin", groupings[cleanPath]);
+        Assert.DoesNotContain(groupings.Keys, k => k.Contains("POISON", StringComparison.Ordinal));
+    }
 }

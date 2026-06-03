@@ -27,7 +27,9 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
         string? @ref,
         CancellationToken cancellationToken)
     {
-        var ownerRepo = $"{owner}/{repo}";
+        // Escape each path segment so a poisoned owner/repo (e.g. a CR/LF or '/' smuggled in from a
+        // lock Source) cannot inject extra path segments or headers into the api.github.com request.
+        var ownerRepo = $"{Uri.EscapeDataString(owner)}/{Uri.EscapeDataString(repo)}";
         var branches = string.IsNullOrEmpty(@ref) ? ["HEAD", "main", "master"] : new[] { @ref };
 
         var rateLimitedAtStart = IsRateLimited();

@@ -118,6 +118,20 @@ public class PathContainmentTests : IDisposable
     }
 
     [Fact]
+    public void IsValidRelativePath_ControlCharacter_ReturnsFalse()
+    {
+        // Act & Assert
+        Assert.False(PathContainment.IsValidRelativePath("./skills/\u001bfoo"));
+    }
+
+    [Fact]
+    public void IsValidRelativePath_NulByte_ReturnsFalse()
+    {
+        // A NUL would otherwise reach Path.Combine and crash discovery.
+        Assert.False(PathContainment.IsValidRelativePath("./skills/\0foo"));
+    }
+
+    [Fact]
     public void IsContainedInRealPath_SymlinkedBaseDirectory_ReturnsTrue()
     {
         // Arrange

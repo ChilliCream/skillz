@@ -44,6 +44,25 @@ internal static class StringExtensions
         => string.Join(separator, values);
 
     /// <summary>
+    /// Returns whether <paramref name="value"/> contains any control character as classified by
+    /// <see cref="char.IsControl(char)"/>: the C0 range (U+0000..U+001F, including TAB, CR, and LF),
+    /// DEL (U+007F), and the C1 range (U+0080..U+009F). In a path, URL, git ref, or lock field such a
+    /// byte is illegitimate (and CR/LF is an injection vector).
+    /// </summary>
+    public static bool ContainsControlCharacter(this string value)
+    {
+        foreach (var c in value)
+        {
+            if (char.IsControl(c))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Produces a title-cased copy of <paramref name="value"/>: splits on <c>-</c>, <c>_</c>, and
     /// space, upper-cases the first character of each word, and rejoins with single spaces. Returns
     /// the input unchanged when it is null or empty.

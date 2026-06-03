@@ -39,6 +39,23 @@ internal sealed class ProjectLockFile : JsonLockFile<LocalSkillLockFile>, IProje
         return new LocalSkillLockFile { Version = file.Version, Skills = sorted };
     }
 
+    protected override void SanitizeOnRead(LocalSkillLockFile file)
+    {
+        var poisoned = file.Skills
+            .Where(pair => IsPoisoned(pair.Key, pair.Value))
+            .Select(pair => pair.Key)
+            .ToList();
+
+        foreach (var key in poisoned)
+        {
+            file.Skills.Remove(key);
+        }
+    }
+
+    private static bool IsPoisoned(string key, LocalSkillLockEntry entry)
+        => HasControl(key, entry.Source, entry.SkillPath, entry.Ref)
+            || IsUnsafeSkillPath(entry.SkillPath);
+
     public string GetLockPath(string? cwd = null)
         => Path.Combine(cwd ?? Directory.GetCurrentDirectory(), LockFileName);
 

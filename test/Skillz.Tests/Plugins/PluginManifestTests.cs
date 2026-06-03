@@ -329,6 +329,51 @@ public class PluginManifestTests : IDisposable
     }
 
     [Fact]
+    public async Task GetPluginSkillPaths_Should_IgnoreSkillPath_When_SkillPathContainsControlByte()
+    {
+        // Arrange
+        // A NUL in a skills[] entry would otherwise reach Path.Combine and crash discovery; the
+        // poisoned entry must be dropped while a clean sibling under the same plugin survives.
+        WriteManifest(
+            ".claude-plugin/plugin.json",
+            """
+            {
+              "skills": ["./skills/\u0000bad-skill", "./valid-loc/valid-skill"]
+            }
+            """);
+
+        // Act
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
+
+        // Assert
+        var validParent = Path.Combine(_testDir, "valid-loc");
+        Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(validParent));
+        Assert.DoesNotContain(dirs, d => d.Contains("bad-skill", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task GetPluginSkillPaths_Should_ReturnEmpty_When_PluginRootContainsControlByte()
+    {
+        // Arrange
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
+            {
+              "metadata": { "pluginRoot": "./plug\u001bins" },
+              "plugins": [
+                { "source": "./my-plugin", "skills": ["./skills/skill"] }
+              ]
+            }
+            """);
+
+        // Act
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Empty(dirs);
+    }
+
+    [Fact]
     public async Task ReadPlugins_Should_StripTerminalEscapesFromName_When_MarketplaceNameContainsEscapes()
     {
         // Arrange

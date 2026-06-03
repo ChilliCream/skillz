@@ -163,6 +163,13 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
                     continue;
                 }
 
+                // Restrict artifact fetches to HTTP(S); a file://, gopher://, etc. URL in the index
+                // would let an untrusted origin redirect the fetch to a local or non-web resource.
+                if (artifactUri.Scheme is not "http" and not "https")
+                {
+                    continue;
+                }
+
                 entries.Add(
                     new NormalizedEntry(
                         Version: "0.2.0",
@@ -445,7 +452,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
             return false;
         }
 
-        if (filePath.Contains('\0'))
+        if (filePath.ContainsControlCharacter())
         {
             return false;
         }

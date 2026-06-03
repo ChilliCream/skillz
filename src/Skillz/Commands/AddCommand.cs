@@ -73,7 +73,7 @@ internal sealed class AddCommand(IInteractionService interaction, AddCommandExec
     {
         var options = ParseOptions(parseResult);
 
-        if (string.IsNullOrEmpty(options.Source))
+        if (string.IsNullOrWhiteSpace(options.Source))
         {
             interaction.WriteError("Missing required argument: source");
             interaction.WriteLine("Usage: skillz add <source> [options]");

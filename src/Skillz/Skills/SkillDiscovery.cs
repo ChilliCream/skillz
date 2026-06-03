@@ -275,7 +275,12 @@ internal sealed class SkillDiscovery(
             return null;
         }
 
-        if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(description))
+        // Sanitize before the empty-check: a name/description of pure escape bytes is non-empty here
+        // but collapses to "" once neutralized, so it must be rejected against the sanitized value.
+        var sanitizedName = TerminalSanitizer.SanitizeMetadata(name);
+        var sanitizedDescription = TerminalSanitizer.SanitizeMetadata(description);
+
+        if (string.IsNullOrEmpty(sanitizedName) || string.IsNullOrEmpty(sanitizedDescription))
         {
             return null;
         }
@@ -296,9 +301,16 @@ internal sealed class SkillDiscovery(
 
         var skillDir = Path.GetDirectoryName(skillMdPath) ?? skillMdPath;
 
+        // Reject (do not sanitize) a directory containing control bytes: Skill.Path must stay
+        // byte-exact for file I/O, so we skip the skill rather than rewrite the path.
+        if (skillDir.ContainsControlCharacter())
+        {
+            return null;
+        }
+
         return new Skill(
-            Name: TerminalSanitizer.SanitizeMetadata(name),
-            Description: TerminalSanitizer.SanitizeMetadata(description),
+            Name: sanitizedName,
+            Description: sanitizedDescription,
             Path: skillDir,
             RawContent: content,
             Metadata: metadata);

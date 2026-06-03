@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text.RegularExpressions;
 using Skillz.Skills;
 
@@ -60,6 +61,13 @@ internal sealed partial class SourceParser : ISourceParser
 
     public SkillSource Parse(string input)
     {
+        if (input.ContainsControlCharacter())
+        {
+            throw new CliException(
+                ExitCodeConstants.Failure,
+                "Invalid source: contains a disallowed control character. A source must be a repository URL, owner/repo, or a local path.");
+        }
+
         if (IsLocalPath(input))
         {
             var resolvedPath = Path.GetFullPath(input);
@@ -71,11 +79,19 @@ internal sealed partial class SourceParser : ISourceParser
         var fragmentSkillFilter = fragment.SkillFilter;
         input = fragment.InputWithoutFragment;
 
+        // The repository portion (everything before any leading '#fragment') must not be empty/blank,
+        // otherwise we would fall through to a git clone of an empty/whitespace source.
+        var hashIndex = input.IndexOfOrdinal('#');
+        var repositoryPortion = hashIndex >= 0 ? input[..hashIndex] : input;
+        if (string.IsNullOrWhiteSpace(repositoryPortion))
+        {
+            throw new CliException(ExitCodeConstants.Failure, "Missing required argument: source");
+        }
+
         var githubPrefixMatch = GitHubPrefixRegex().Match(input);
         if (githubPrefixMatch.Success)
         {
-            return Parse(
-                AppendFragmentRef(githubPrefixMatch.Groups[1].Value, fragmentRef, fragmentSkillFilter));
+            return Parse(AppendFragmentRef(githubPrefixMatch.Groups[1].Value, fragmentRef, fragmentSkillFilter));
         }
 
         var gitlabPrefixMatch = GitLabPrefixRegex().Match(input);
@@ -199,7 +215,58 @@ internal sealed partial class SourceParser : ISourceParser
             return new SkillSource.WellKnown(input);
         }
 
+        ValidateGitTransport(input);
         return new SkillSource.Git(input, fragmentRef);
+    }
+
+    // Allowed URL schemes for the generic git transport. `file` and any "word::" transport helper
+    // (e.g. ext::/fd::) are excluded because they can execute arbitrary local commands.
+    private static readonly string[] s_allowedGitSchemes = ["http", "https", "ssh", "git", "git+ssh"];
+
+    // Allow-list for the host of an scp-style (`user@host:path`) source: letters, digits, dot, and
+    // hyphen. Anything else (e.g. the '=' in `git@-oProxyCommand=x`) is rejected, and a leading '-'
+    // is blocked separately so the host can never be parsed as a git option.
+    private static readonly SearchValues<char> s_scpHostAllowedChars = SearchValues.Create(
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.-");
+
+    private static void ValidateGitTransport(string input)
+    {
+        var schemeIndex = input.IndexOfOrdinal("://");
+        if (schemeIndex >= 0)
+        {
+            var scheme = input[..schemeIndex];
+            if (!s_allowedGitSchemes.Any(allowed => scheme.EqualsOrdinalIgnoreCase(allowed)))
+            {
+                throw new CliException(
+                    ExitCodeConstants.Failure,
+                    $"Unsupported git transport: \"{scheme}\" is not an allowed scheme.");
+            }
+
+            return;
+        }
+
+        var colonIndex = input.IndexOfOrdinal(':');
+        if (colonIndex >= 0)
+        {
+            var beforeColon = input[..colonIndex];
+            if (beforeColon.ContainsOrdinal('@'))
+            {
+                var atIndex = beforeColon.IndexOfOrdinal('@');
+                var host = beforeColon[(atIndex + 1)..];
+                if (host.Length == 0
+                    || host.StartsWith('-')
+                    || host.AsSpan().ContainsAnyExcept(s_scpHostAllowedChars))
+                {
+                    throw new CliException(
+                        ExitCodeConstants.Failure,
+                        $"Unsupported git transport: \"{input}\" has an invalid host.");
+                }
+
+                return;
+            }
+        }
+
+        throw new CliException(ExitCodeConstants.Failure, $"Unsupported git transport: \"{input}\".");
     }
 
     private static bool IsLocalPath(string input)
@@ -232,8 +299,7 @@ internal sealed partial class SourceParser : ISourceParser
 
     private static bool IsWellKnownUrl(string input)
     {
-        if (!input.StartsWithOrdinal("http://")
-            && !input.StartsWithOrdinal("https://"))
+        if (!input.StartsWithOrdinal("http://") && !input.StartsWithOrdinal("https://"))
         {
             return false;
         }
@@ -310,8 +376,7 @@ internal sealed partial class SourceParser : ISourceParser
             return true;
         }
 
-        if (input.StartsWithOrdinal("http://")
-            || input.StartsWithOrdinal("https://"))
+        if (input.StartsWithOrdinal("http://") || input.StartsWithOrdinal("https://"))
         {
             if (Uri.TryCreate(input, UriKind.Absolute, out var parsed))
             {

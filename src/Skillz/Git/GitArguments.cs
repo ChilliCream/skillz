@@ -1,4 +1,4 @@
-using System.Text.RegularExpressions;
+using System.Buffers;
 
 namespace Skillz.Git;
 
@@ -6,12 +6,11 @@ namespace Skillz.Git;
 /// Builds safe <c>git</c> argument lists for the operations <see cref="GitClient"/>
 /// performs, with the input validation that guards against argument injection.
 /// </summary>
-internal static partial class GitArguments
+internal static class GitArguments
 {
     /// <summary>
-    /// Matches a conservative allow-list for a git ref (branch or tag): one or
-    /// more letters, digits, or the safe punctuation characters <c>.</c>,
-    /// <c>_</c>, <c>/</c>, and <c>-</c>.
+    /// Conservative allow-list for a git ref (branch or tag): letters, digits, and the safe
+    /// punctuation characters <c>.</c>, <c>_</c>, <c>/</c>, and <c>-</c>.
     /// </summary>
     /// <remarks>
     /// The ref is passed to <c>git clone --branch &lt;ref&gt;</c>, so it reaches
@@ -23,8 +22,8 @@ internal static partial class GitArguments
     /// stricter than git's own ref naming rules — ordinary branch and tag names
     /// pass, exotic ones are rejected on purpose.
     /// </remarks>
-    [GeneratedRegex("^[A-Za-z0-9._/-]+$", RegexOptions.CultureInvariant)]
-    private static partial Regex RefRegex();
+    private static readonly SearchValues<char> s_refAllowedChars =
+        SearchValues.Create("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._/-");
 
     /// <summary>
     /// Per-invocation <c>git -c</c> overrides that disable Git LFS during clone.
@@ -119,11 +118,11 @@ internal static partial class GitArguments
         }
     }
 
-    /// <summary>Validates a ref against the conservative <see cref="RefRegex"/> allow-list.</summary>
+    /// <summary>Validates a ref against the conservative <see cref="s_refAllowedChars"/> allow-list.</summary>
     private static void ValidateRef(string value)
     {
         ValidateNonOption(value, "ref");
-        if (!RefRegex().IsMatch(value))
+        if (value.Length == 0 || value.AsSpan().ContainsAnyExcept(s_refAllowedChars))
         {
             throw new ArgumentException("Git ref contains unsupported characters.", "ref");
         }

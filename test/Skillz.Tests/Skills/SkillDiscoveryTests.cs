@@ -209,6 +209,56 @@ public class SkillDiscoveryTests : IDisposable
     }
 
     [Fact]
+    public async Task Skips_Skill_With_Control_Byte_In_Directory_Name()
+    {
+        // Arrange: a skill directory whose name carries an ESC byte must be skipped, not returned —
+        // Skill.Path stays byte-exact for file I/O, so a poisoned path is rejected rather than rewritten.
+        var dir = Path.Combine(_testDir, "skills", "bad\u001bdir");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(
+            Path.Combine(dir, "SKILL.md"),
+            "---\nname: poisoned\ndescription: Has a control byte in its directory name\n---\nBody\n");
+
+        // Act
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
+
+        // Assert
+        Assert.Empty(skills);
+    }
+
+    [Fact]
+    public async Task Skips_Skill_With_Name_That_Is_Only_Escape_Bytes()
+    {
+        // Arrange: a name of pure escape bytes is non-empty in the frontmatter but collapses to ""
+        // once sanitized, so it must be rejected against the sanitized value.
+        var dir = Path.Combine(_testDir, "skills", "ghost");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(
+            Path.Combine(dir, "SKILL.md"),
+            "---\nname: \"\\u001b[31m\\u001b[0m\"\ndescription: Name collapses to empty after sanitization\n---\nBody\n");
+
+        // Act
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
+
+        // Assert
+        Assert.Empty(skills);
+    }
+
+    [Fact]
+    public async Task Discovers_Skill_With_Unicode_Name()
+    {
+        // Arrange: a pure-Unicode name (CJK) survives sanitization unchanged and must still be found.
+        WriteSkill("skills/unicode-skill", "中文", "A skill with a Unicode name");
+
+        // Act
+        var skills = await _discovery.DiscoverAsync(_testDir, subpath: null, options: null, cancellationToken: Token);
+
+        // Assert
+        Assert.Single(skills);
+        Assert.Equal("中文", skills[0].Name);
+    }
+
+    [Fact]
     public async Task Discovers_From_Agent_Specific_Priority_Dirs()
     {
         // Arrange

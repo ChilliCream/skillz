@@ -54,6 +54,32 @@ public class SubpathValidatorTests
     }
 
     [Theory]
+    [InlineData("/etc/passwd")]
+    [InlineData("/skills/my-skill")]
+    [InlineData("\\windows\\system32")]
+    public void ValidateSubpath_Should_Reject_When_SubpathIsAbsolute(string input)
+    {
+        // Act
+        var ex = Assert.Throws<CliException>(() => SubpathValidator.ValidateSubpath(input));
+
+        // Assert
+        Assert.Contains("Unsafe subpath", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("skills/\u001bmy-skill")]
+    [InlineData("skills/my\nskill")]
+    [InlineData("skills/my\tskill")]
+    public void ValidateSubpath_Should_Reject_When_SubpathContainsControlCharacter(string input)
+    {
+        // Act
+        var ex = Assert.Throws<CliException>(() => SubpathValidator.ValidateSubpath(input));
+
+        // Assert
+        Assert.Contains("control character", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
     [InlineData("/tmp/repo", "skills")]
     [InlineData("/tmp/repo", "skills/my-skill")]
     [InlineData("/tmp/repo", "a/b/c")]

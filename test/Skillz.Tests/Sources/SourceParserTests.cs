@@ -943,4 +943,67 @@ public class SourceParserTests
         var github = Assert.IsType<SkillSource.GitHub>(result);
         Assert.Equal("skills/my-skill", github.Subpath);
     }
+
+    [Theory]
+    [InlineData("owner/\u001brepo")]
+    [InlineData("owner/repo\n")]
+    [InlineData("owner/repo\trepo")]
+    public void Parse_Should_Throw_When_SourceContainsControlCharacter(string input)
+    {
+        // Act
+        var ex = Assert.Throws<CliException>(() => new SourceParser().Parse(input));
+
+        // Assert
+        Assert.Contains("control character", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("#main")]
+    [InlineData("#main@skill")]
+    public void Parse_Should_Throw_When_SourceIsOnlyAFragment(string input)
+    {
+        // Act
+        var ex = Assert.Throws<CliException>(() => new SourceParser().Parse(input));
+
+        // Assert
+        Assert.Contains("Missing required argument: source", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("https://host/repo.git")]
+    [InlineData("ssh://git@host/repo")]
+    [InlineData("git://host/repo")]
+    public void Parse_Should_RouteToGit_When_TransportSchemeIsAllowed(string input)
+    {
+        // Act
+        var result = new SourceParser().Parse(input);
+
+        // Assert
+        var git = Assert.IsType<SkillSource.Git>(result);
+        Assert.Equal(input, git.Url);
+    }
+
+    [Fact]
+    public void Parse_Should_RouteToGit_When_ScpStyleHostIsValid()
+    {
+        // Act
+        var result = new SourceParser().Parse("git@github.com:owner/repo.git");
+
+        // Assert
+        Assert.Equal(new SkillSource.Git("git@github.com:owner/repo.git"), result);
+    }
+
+    [Theory]
+    [InlineData("ext::sh -c 'id'")]
+    [InlineData("fd::17/repo")]
+    [InlineData("file:///etc/passwd")]
+    [InlineData("git@-oProxyCommand=x:repo")]
+    public void Parse_Should_Throw_When_TransportIsDisallowed(string input)
+    {
+        // Act
+        var ex = Assert.Throws<CliException>(() => new SourceParser().Parse(input));
+
+        // Assert
+        Assert.Contains("Unsupported git transport", ex.Message, StringComparison.Ordinal);
+    }
 }

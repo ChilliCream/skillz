@@ -7,15 +7,32 @@ namespace Skillz.Skills;
 internal static class SubpathValidator
 {
     /// <summary>
-    /// Validates that <paramref name="subpath"/> contains no <c>..</c> traversal segments,
-    /// returning it unchanged when safe.
+    /// Validates that <paramref name="subpath"/> is a relative path free of <c>..</c> traversal
+    /// segments and control characters, returning it unchanged when safe.
     /// </summary>
     /// <param name="subpath">The relative subpath to check (either slash style is accepted).</param>
-    /// <returns>The original <paramref name="subpath"/> when it is free of <c>..</c> segments.</returns>
-    /// <exception cref="CliException">Thrown when <paramref name="subpath"/> contains a <c>..</c> segment.</exception>
+    /// <returns>The original <paramref name="subpath"/> when it is safe.</returns>
+    /// <exception cref="CliException">
+    /// Thrown when <paramref name="subpath"/> contains a <c>..</c> segment, is absolute, or contains
+    /// a control character.
+    /// </exception>
     public static string ValidateSubpath(string subpath)
     {
+        if (subpath.ContainsControlCharacter())
+        {
+            throw new CliException(
+                ExitCodeConstants.Failure,
+                "Unsafe subpath: contains a disallowed control character.");
+        }
+
         var normalized = subpath.Replace('\\', '/');
+        if (normalized.StartsWith('/'))
+        {
+            throw new CliException(
+                ExitCodeConstants.Failure,
+                $"""Unsafe subpath: "{subpath}" must be relative. Subpaths must not be absolute.""");
+        }
+
         var segments = normalized.Split('/');
         foreach (var segment in segments)
         {
