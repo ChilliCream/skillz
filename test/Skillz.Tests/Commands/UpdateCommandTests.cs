@@ -160,6 +160,87 @@ public class UpdateCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Update_Global_Reports_Timeout_Distinct_From_Missing_When_Fetch_Times_Out()
+    {
+        // Arrange
+        var services = CliTestHelper.CreateServiceProvider();
+        var globalLock = services.GetRequiredService<TestGlobalLockFile>();
+        globalLock.OnRead = () =>
+            new SkillLockFile
+            {
+                Version = 3,
+                Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
+                {
+                    ["my-skill"] = new SkillLockEntry
+                    {
+                        Source = "owner/repo",
+                        SourceType = "github",
+                        SourceUrl = "https://github.com/owner/repo",
+                        SkillFolderHash = "abc123",
+                        SkillPath = "skills/my-skill/SKILL.md"
+                    }
+                }
+            };
+
+        var blob = services.GetRequiredService<TestBlobClient>();
+        blob.OnFetchTree = (_, _, _) => throw new BlobFetchTimeoutException("https://api.github.com/owner/repo");
+        var interaction = services.GetRequiredService<TestInteractionService>();
+
+        // Act
+        var cmd = services.GetRequiredService<UpdateCommand>();
+        var parseResult = cmd.Parse(["-g"]);
+        var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: a timeout is reported as a timeout, not bucketed under the missing/access-error message.
+        Assert.Equal(0, exit);
+        Assert.Contains(interaction.Output, line => line.Contains("timed out", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            interaction.Output,
+            line => line.Contains("network or access error", StringComparison.Ordinal));
+        Assert.Contains(interaction.Output, line => line.Contains("Failed to check 1 skill", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Update_Global_Reports_Missing_When_Fetch_Returns_Null()
+    {
+        // Arrange
+        var services = CliTestHelper.CreateServiceProvider();
+        var globalLock = services.GetRequiredService<TestGlobalLockFile>();
+        globalLock.OnRead = () =>
+            new SkillLockFile
+            {
+                Version = 3,
+                Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
+                {
+                    ["my-skill"] = new SkillLockEntry
+                    {
+                        Source = "owner/repo",
+                        SourceType = "github",
+                        SourceUrl = "https://github.com/owner/repo",
+                        SkillFolderHash = "abc123",
+                        SkillPath = "skills/my-skill/SKILL.md"
+                    }
+                }
+            };
+
+        var blob = services.GetRequiredService<TestBlobClient>();
+        blob.OnFetchTree = (_, _, _) => null;
+        var interaction = services.GetRequiredService<TestInteractionService>();
+
+        // Act
+        var cmd = services.GetRequiredService<UpdateCommand>();
+        var parseResult = cmd.Parse(["-g"]);
+        var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: a missing/unreachable repo uses the network-or-access-error bucket, not the timeout one.
+        Assert.Equal(0, exit);
+        Assert.Contains(
+            interaction.Output,
+            line => line.Contains("network or access error", StringComparison.Ordinal));
+        Assert.DoesNotContain(interaction.Output, line => line.Contains("timed out", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Update_Global_Skips_Skills_Without_Folder_Hash()
     {
         // Arrange

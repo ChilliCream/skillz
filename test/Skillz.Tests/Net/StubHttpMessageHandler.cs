@@ -92,6 +92,98 @@ internal sealed class StubHttpMessageHandler : HttpMessageHandler
         _responses.Enqueue(_ => new HttpResponseMessage(HttpStatusCode.NotFound));
     }
 
+    // Simulates the client's internal fetch timeout: the send aborts with an
+    // OperationCanceledException while the caller's token is NOT cancelled, exactly as a
+    // CancelAfter-driven linked token would.
+    public void EnqueueTimeout()
+    {
+        _responses.Enqueue(_ => throw new TaskCanceledException("Simulated internal fetch timeout."));
+    }
+
+    // A 200 that advertises a Content-Length over the cap (the body itself can be small; the
+    // client must reject based on the declared length before reading).
+    public void EnqueueOversizedOk(long declaredLength)
+    {
+        _responses.Enqueue(_ =>
+        {
+            var content = new StringContent("{}", Encoding.UTF8, "application/json");
+            content.Headers.ContentLength = declaredLength;
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
+        });
+    }
+
+    // A 200 whose body is read as a stream with no declared Content-Length, so the only way to
+    // bound it is by counting bytes mid-read. <paramref name="length"/> bytes are produced.
+    public void EnqueueChunkedOk(long length)
+    {
+        _responses.Enqueue(_ =>
+        {
+            var content = new StreamContent(new EndlessStream(length));
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = content };
+        });
+    }
+
+    private sealed class EndlessStream(long length) : Stream
+    {
+        private long _produced;
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => _produced;
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var remaining = length - _produced;
+            if (remaining <= 0)
+            {
+                return 0;
+            }
+
+            var n = (int)Math.Min(count, remaining);
+            // Whitespace is valid leading JSON, so a deserializer keeps pulling until the cap
+            // aborts the read rather than failing on a malformed token first.
+            Array.Fill(buffer, (byte)' ', offset, n);
+            _produced += n;
+            return n;
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            => Task.FromResult(Read(buffer, offset, count));
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            var remaining = length - _produced;
+            if (remaining <= 0)
+            {
+                return ValueTask.FromResult(0);
+            }
+
+            var n = (int)Math.Min(buffer.Length, remaining);
+            buffer.Span[..n].Fill((byte)' ');
+            _produced += n;
+            return ValueTask.FromResult(n);
+        }
+
+        public override void Flush() => throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
         CancellationToken cancellationToken)

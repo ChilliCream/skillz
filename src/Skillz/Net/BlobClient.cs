@@ -8,6 +8,14 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
 {
     internal const string HttpClientName = "Skillz.GitHub";
 
+    /// <summary>
+    /// Hard cap on a single response body. Skill manifests and tree listings are small; this
+    /// bounds memory against a hostile or runaway endpoint. Applied as
+    /// <c>MaxResponseContentBufferSize</c> on the named client (buffered reads) and enforced
+    /// directly for streamed reads where that limit does not apply.
+    /// </summary>
+    internal const long MaxResponseBytes = 8 * 1024 * 1024;
+
     private static readonly TimeSpan s_fetchTimeout = TimeSpan.FromSeconds(10);
 
     private readonly object _rateLimitLock = new();
@@ -111,14 +119,38 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
                 return null;
             }
 
-            return await response.Content.ReadAsStringAsync(timeoutCts.Token);
+            return await ReadStringCappedAsync(response, timeoutCts.Token);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return null;
+            throw new BlobFetchTimeoutException(url);
         }
         catch (HttpRequestException)
         {
+            return null;
+        }
+    }
+
+    private static async Task<string?> ReadStringCappedAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        if (response.Content.Headers.ContentLength is { } declared && declared > MaxResponseBytes)
+        {
+            return null;
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var bounded = new MaxBytesStream(stream, MaxResponseBytes);
+        using var reader = new StreamReader(bounded);
+
+        try
+        {
+            return await reader.ReadToEndAsync(cancellationToken);
+        }
+        catch (HttpRequestException)
+        {
+            // Body grew past the cap mid-read.
             return null;
         }
     }
@@ -149,9 +181,15 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
             using var response = await client.SendAsync(request, timeoutCts.Token);
             if (response.IsSuccessStatusCode)
             {
+                if (response.Content.Headers.ContentLength is { } declared && declared > MaxResponseBytes)
+                {
+                    return new BranchFetchResult(null, RateLimited: false);
+                }
+
                 await using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
+                await using var bounded = new MaxBytesStream(stream, MaxResponseBytes);
                 var data = await JsonSerializer.DeserializeAsync(
-                    stream,
+                    bounded,
                     JsonSourceGenerationContext.Default.GitHubTreeResponse,
                     timeoutCts.Token);
 
@@ -169,7 +207,7 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new BranchFetchResult(null, RateLimited: false);
+            throw new BlobFetchTimeoutException(url);
         }
         catch (HttpRequestException)
         {

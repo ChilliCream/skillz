@@ -49,8 +49,8 @@ internal static class Program
         builder.Services.AddSingleton<IInteractionService, ConsoleInteractionService>();
         builder.Services.AddSingleton<BannerService>();
 
-        builder.Services.AddHttpClient(BlobClient.HttpClientName);
-        builder.Services.AddHttpClient(WellKnownProvider.HttpClientName);
+        ConfigureHardenedHttpClient(builder.Services.AddHttpClient(BlobClient.HttpClientName));
+        ConfigureHardenedHttpClient(builder.Services.AddHttpClient(WellKnownProvider.HttpClientName));
 
         builder.Services.AddSingleton<IGitClient, GitClient>();
         builder.Services.AddSingleton<IGitHubTokenProvider, GitHubTokenProvider>();
@@ -149,4 +149,16 @@ internal static class Program
     }
 
     internal static string[] StripBareTerminators(string[] args) => args.Where(a => a != "--").ToArray();
+
+    // Harden the named HTTP clients used to fetch remote skill metadata: bound the buffered
+    // response size and refuse to silently follow redirects (closes the SSRF redirect-pivot;
+    // a redirect surfaces as a non-2xx response the callers already handle).
+    private static IHttpClientBuilder ConfigureHardenedHttpClient(IHttpClientBuilder builder)
+    {
+        builder.ConfigureHttpClient(client => client.MaxResponseContentBufferSize = BlobClient.MaxResponseBytes);
+        builder.ConfigurePrimaryHttpMessageHandler(CreateHardenedPrimaryHandler);
+        return builder;
+    }
+
+    internal static HttpClientHandler CreateHardenedPrimaryHandler() => new() { AllowAutoRedirect = false };
 }
