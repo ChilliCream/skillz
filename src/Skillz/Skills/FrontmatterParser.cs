@@ -11,7 +11,10 @@ internal record FrontmatterResult(Dictionary<string, object> Data, string Conten
 /// <summary>Parses YAML frontmatter delimited by <c>---</c> from a raw skill document.</summary>
 internal static partial class FrontmatterParser
 {
-    [GeneratedRegex(@"\A---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)\z")]
+    // Leading \s* tolerates blank lines / spaces before the opening fence (common editor
+    // artifacts) while still requiring '---' to be the document's first non-whitespace content -
+    // a '---' that appears after real content is body text, not an opening fence.
+    [GeneratedRegex(@"\A\s*---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)\z")]
     private static partial Regex FrontmatterRegex();
 
     /// <summary>
