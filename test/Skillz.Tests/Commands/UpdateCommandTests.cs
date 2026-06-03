@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Skillz;
 using Skillz.Commands;
 using Skillz.Locking;
 using Skillz.Net;
@@ -155,7 +154,9 @@ public class UpdateCommandTests : IDisposable
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("Found 1 global update", StringComparison.Ordinal));
         Assert.Contains(interaction.Output, line => line.Contains("Update available", StringComparison.Ordinal));
-        Assert.Contains(interaction.Output, line => line.Contains("Updates available for 1 skill", StringComparison.Ordinal));
+        Assert.Contains(
+            interaction.Output,
+            line => line.Contains("Updates available for 1 skill", StringComparison.Ordinal));
         Assert.DoesNotContain(interaction.Output, line => line.Contains("Updated 1 skill", StringComparison.Ordinal));
     }
 
@@ -295,9 +296,7 @@ public class UpdateCommandTests : IDisposable
 
         // Assert: a missing/unreachable repo uses the network-or-access-error bucket, not the timeout one.
         Assert.Equal(0, exit);
-        Assert.Contains(
-            interaction.Output,
-            line => line.Contains("network or access error", StringComparison.Ordinal));
+        Assert.Contains(interaction.Output, line => line.Contains("network or access error", StringComparison.Ordinal));
         Assert.DoesNotContain(interaction.Output, line => line.Contains("timed out", StringComparison.Ordinal));
     }
 
@@ -392,7 +391,9 @@ public class UpdateCommandTests : IDisposable
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("can be refreshed", StringComparison.Ordinal));
         Assert.Contains(interaction.Output, line => line.Contains("Refresh:", StringComparison.Ordinal));
-        Assert.DoesNotContain(interaction.Output, line => line.Contains("Updates available for", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            interaction.Output,
+            line => line.Contains("Updates available for", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -433,13 +434,20 @@ public class UpdateCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task Update_With_Yes_Flag_Auto_Detects_Scope()
+    public async Task Update_With_Yes_Flag_And_No_Scope_Checks_Both_Scopes()
     {
-        // Arrange
+        // Arrange: -y without -g/-p is non-interactive and ambiguous. The command must not silently
+        // pick one scope (and risk checking the wrong one); it checks BOTH global and project.
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
             new SkillLockFile { Version = 3, Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal) };
+        var projectLock = services.GetRequiredService<TestProjectLockFile>();
+        projectLock.OnRead = _ => new LocalSkillLockFile
+        {
+            Version = 1,
+            Skills = new Dictionary<string, LocalSkillLockEntry>(StringComparer.Ordinal)
+        };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
         // Act
@@ -447,9 +455,10 @@ public class UpdateCommandTests : IDisposable
         var parseResult = cmd.Parse(["-y"]);
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
-        // Assert
+        // Assert: both scopes were checked, so both empty-scope messages appear.
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("No global skills", StringComparison.Ordinal));
+        Assert.Contains(interaction.Output, line => line.Contains("No project skills", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -480,33 +489,80 @@ public class UpdateCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task Update_With_Yes_Flag_Detects_Project_Scope_Via_SystemEnvironment_CurrentDirectory()
+    public async Task Update_With_Yes_Flag_Does_Not_Silently_Skip_Project_Skills()
     {
-        // Arrange: seed the FakeFileStore with a project lock file under the fake env's current directory.
-        // HasProjectSkillsAsync uses ISystemEnvironment.CurrentDirectory (not Directory.GetCurrentDirectory()),
-        // so it must find the file via FakeFileStore regardless of the process cwd.
-        var workspace = "/project-root";
-        var services = CliTestHelper.CreateServiceProvider(workspace: workspace);
-        var fileStore = services.GetRequiredService<FakeFileStore>();
-        fileStore.Files[$"{workspace}/{KnownConfigNames.ProjectLockFileName}"] = "dummy"u8.ToArray();
+        // Arrange: a project whose skills live in agent-specific dirs leaves nothing the command
+        // tracks for a "has project skills?" heuristic to find (no project lock entry would be
+        // detectable up front). The non-interactive default must still check project skills rather
+        // than silently resolving to Global only and missing them. Global has a real update so we
+        // can prove BOTH scopes ran in the same invocation.
+        var services = CliTestHelper.CreateServiceProvider();
+        var globalLock = services.GetRequiredService<TestGlobalLockFile>();
+        globalLock.OnRead = () =>
+            new SkillLockFile
+            {
+                Version = 3,
+                Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
+                {
+                    ["global-skill"] = new SkillLockEntry
+                    {
+                        Source = "owner/repo",
+                        SourceType = "github",
+                        SourceUrl = "https://github.com/owner/repo",
+                        SkillFolderHash = "old",
+                        SkillPath = "skills/global-skill/SKILL.md"
+                    }
+                }
+            };
+        var blob = services.GetRequiredService<TestBlobClient>();
+        blob.OnFetchTree = (_, _, _) =>
+            new RepoTree(
+                "tree-sha",
+                "main",
+                [
+                    new TreeEntry
+                    {
+                        Path = "skills/global-skill",
+                        Type = "tree",
+                        Sha = "new"
+                    }
+                ]);
 
         var projectLock = services.GetRequiredService<TestProjectLockFile>();
         projectLock.OnRead = _ => new LocalSkillLockFile
         {
             Version = 1,
             Skills = new Dictionary<string, LocalSkillLockEntry>(StringComparer.Ordinal)
+            {
+                ["project-skill"] = new LocalSkillLockEntry
+                {
+                    Source = "owner/repo",
+                    SourceType = "github",
+                    Ref = "main",
+                    SkillPath = "skills/project-skill/SKILL.md",
+                    ComputedHash = "hash"
+                }
+            }
         };
         var interaction = services.GetRequiredService<TestInteractionService>();
 
-        // Act
+        // Act: non-interactive, no scope flag.
         var cmd = services.GetRequiredService<UpdateCommand>();
         var parseResult = cmd.Parse(["-y"]);
         var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
-        // Assert: project scope was selected (project message appears, not global)
+        // Assert: project skills were NOT silently skipped, and global was checked too.
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("No project skills", StringComparison.Ordinal));
-        Assert.DoesNotContain(interaction.Output, line => line.Contains("No global skills", StringComparison.Ordinal));
+        Assert.Contains(
+            interaction.Output,
+            line =>
+                line.Contains("Refresh:", StringComparison.Ordinal)
+                && line.Contains("project-skill", StringComparison.Ordinal));
+        Assert.Contains(
+            interaction.Output,
+            line =>
+                line.Contains("Update available:", StringComparison.Ordinal)
+                && line.Contains("global-skill", StringComparison.Ordinal));
     }
 
     [Fact]
