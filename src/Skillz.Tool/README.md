@@ -111,8 +111,9 @@ full history.
 
 Without `--global`, skills are added to the current project (recorded in
 `skills-lock.json` in the working directory). With `--global`, they're installed
-once for your user and recorded in the global lock file under your XDG state dir
-(`$XDG_STATE_HOME/skillz` or `~/.local/state/skillz`).
+once for your user under your XDG data dir (`$XDG_DATA_HOME/skillz` or
+`~/.local/share/skillz`), with the global lock file (`.skill-lock.json`) kept
+alongside the installed skills in that same directory.
 
 ## Agents
 

@@ -513,25 +513,12 @@ public class GlobalLockFileTests : IDisposable
     }
 
     [Fact]
-    public void XdgPaths_Resolves_GlobalLockPath_From_XdgStateHome()
+    public void XdgPaths_Places_GlobalLock_In_Parent_Of_GlobalSkillsDir()
     {
-        // Arrange
-        var stateDir = Path.Combine(_tempDir, "state");
-
-        // Act & Assert
-        Assert.Equal(Path.Combine(stateDir, "skills", ".skill-lock.json"), _xdgPaths.GetGlobalLockPath());
-    }
-
-    [Fact]
-    public void XdgPaths_Falls_Back_To_AgentsDir_When_No_XdgStateHome()
-    {
-        // Arrange
-        var home = Path.Combine(_tempDir, "home");
-        Directory.CreateDirectory(home);
-        var paths = new XdgPaths(new FakeSystemEnvironment { HomeDirectory = home });
-
-        // Act & Assert
-        Assert.Equal(Path.Combine(home, ".agents", ".skill-lock.json"), paths.GetGlobalLockPath());
+        // Act & Assert: the lock that tracks skills sits in the same root as the skills themselves.
+        Assert.Equal(
+            Path.GetDirectoryName(_xdgPaths.GetGlobalSkillsDirectory()),
+            Path.GetDirectoryName(_xdgPaths.GetGlobalLockPath()));
     }
 
     [Fact]

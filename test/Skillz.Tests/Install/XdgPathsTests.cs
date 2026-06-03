@@ -78,24 +78,67 @@ public class XdgPathsTests
     }
 
     [Fact]
-    public void GetGlobalLockPath_UsesXdgStateHomeWhenSet()
-    {
-        // Arrange
-        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["XDG_STATE_HOME"] = "/custom/state" };
-        var paths = Create(env);
-
-        // Act & Assert
-        Assert.Equal(Path.Combine("/custom/state", "skills", ".skill-lock.json"), paths.GetGlobalLockPath());
-    }
-
-    [Fact]
-    public void GetGlobalLockPath_FallsBackToDotAgentsWhenStateHomeNotSet()
+    public void GetGlobalLockPath_SharesDataHomeRoot_When_NoEnv()
     {
         // Arrange
         var paths = Create();
 
         // Act & Assert
-        Assert.Equal(Path.Combine(Home, ".agents", ".skill-lock.json"), paths.GetGlobalLockPath());
+        Assert.Equal(Path.Combine(Home, ".local", "share", "skillz", ".skill-lock.json"), paths.GetGlobalLockPath());
+    }
+
+    [Fact]
+    public void GetGlobalLockPath_SharesDataHomeRoot_When_XdgDataHomeSet()
+    {
+        // Arrange
+        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["XDG_DATA_HOME"] = "/custom/data" };
+        var paths = Create(env);
+
+        // Act & Assert
+        Assert.Equal(Path.Combine("/custom/data", "skillz", ".skill-lock.json"), paths.GetGlobalLockPath());
+    }
+
+    [Fact]
+    public void GetGlobalLockPath_IsSiblingOfGlobalSkillsDir_When_XdgStateHomeSet()
+    {
+        // Arrange
+        var env = new Dictionary<string, string?>(StringComparer.Ordinal) { ["XDG_STATE_HOME"] = "/custom/state" };
+        var paths = Create(env);
+
+        // Act
+        var lockDir = Path.GetDirectoryName(paths.GetGlobalLockPath());
+        var skillsParent = Path.GetDirectoryName(paths.GetGlobalSkillsDirectory());
+
+        // Assert: setting only XDG_STATE_HOME must not split the lock away from the skills root.
+        Assert.Equal(skillsParent, lockDir);
+        Assert.DoesNotContain("/custom/state", paths.GetGlobalLockPath(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void GetGlobalLockPath_IsSiblingOfGlobalSkillsDir_In_AllEnvCombinations()
+    {
+        // Arrange
+        var combos = new[]
+        {
+            new Dictionary<string, string?>(StringComparer.Ordinal),
+            new Dictionary<string, string?>(StringComparer.Ordinal) { ["XDG_DATA_HOME"] = "/custom/data" },
+            new Dictionary<string, string?>(StringComparer.Ordinal) { ["XDG_STATE_HOME"] = "/custom/state" },
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["XDG_DATA_HOME"] = "/custom/data",
+                ["XDG_STATE_HOME"] = "/custom/state"
+            }
+        };
+
+        foreach (var env in combos)
+        {
+            var paths = Create(env);
+
+            // Act & Assert: lock lives in the parent of the skills dir, always the same root.
+            Assert.Equal(
+                Path.GetDirectoryName(paths.GetGlobalSkillsDirectory()),
+                Path.GetDirectoryName(paths.GetGlobalLockPath()));
+        }
     }
 
     [Fact]

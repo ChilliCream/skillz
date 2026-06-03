@@ -22,18 +22,21 @@ internal sealed class XdgPaths(ISystemEnvironment system)
 
     public string GetGlobalSkillsDirectory()
     {
-        return Path.Combine(GetDataHome(), "skillz", "skills");
+        return Path.Combine(GetGlobalRoot(), "skills");
     }
 
+    /// <summary>
+    /// The global lock file lives alongside the global skills directory, under the same
+    /// <c>&lt;data-home&gt;/skillz</c> root, so the lock always describes where skills actually live.
+    /// </summary>
     public string GetGlobalLockPath()
     {
-        var fromEnv = TrimToNull(system.GetEnvironmentVariable("XDG_STATE_HOME"));
-        if (fromEnv is not null)
-        {
-            return Path.Combine(fromEnv, "skills", ".skill-lock.json");
-        }
+        return Path.Combine(GetGlobalRoot(), ".skill-lock.json");
+    }
 
-        return Path.Combine(system.HomeDirectory, ".agents", ".skill-lock.json");
+    private string GetGlobalRoot()
+    {
+        return Path.Combine(GetDataHome(), "skillz");
     }
 
     public string GetConfigDirectory()
