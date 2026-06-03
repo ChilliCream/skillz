@@ -30,11 +30,11 @@ internal static partial class TerminalSanitizer
     [GeneratedRegex(@"[\x80-\x9f]")]
     private static partial Regex C1Regex();
 
-    [GeneratedRegex(@"[\x00-\x06\x07\x08\x0b\x0c\x0d-\x1a\x1c-\x1f\x7f]")]
+    [GeneratedRegex(@"[\x00-\x08\x0b\x0c\x0d-\x1f\x7f]")]
     private static partial Regex ControlRegex();
 
-    [GeneratedRegex(@"[\r\n]+")]
-    private static partial Regex NewlineRegex();
+    [GeneratedRegex(@"[\t\r\n]+")]
+    private static partial Regex WhitespaceRegex();
 
     /// <summary>
     /// Removes all terminal escape sequences and control characters from
@@ -55,12 +55,12 @@ internal static partial class TerminalSanitizer
 
     /// <summary>
     /// Sanitizes a single-line metadata value (such as a skill name or description) by
-    /// stripping terminal escapes and collapsing any newlines into spaces.
+    /// stripping terminal escapes and collapsing any newlines or tabs into spaces.
     /// </summary>
     /// <param name="str">The untrusted metadata value to sanitize.</param>
     /// <returns>A trimmed, single-line, escape-free string safe to print to the terminal.</returns>
     public static string SanitizeMetadata(string str)
     {
-        return NewlineRegex().Replace(StripTerminalEscapes(str), " ").Trim();
+        return WhitespaceRegex().Replace(StripTerminalEscapes(str), " ").Trim();
     }
 }
