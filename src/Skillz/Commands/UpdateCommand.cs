@@ -570,14 +570,20 @@ internal sealed class UpdateCommand(
 
     private static string FormatSourceInput(string sourceUrl, string? @ref)
     {
-        return string.IsNullOrEmpty(@ref) ? sourceUrl : $"{sourceUrl}#{@ref}";
+        var input = string.IsNullOrEmpty(@ref) ? sourceUrl : $"{sourceUrl}#{@ref}";
+        // Display-only: the result is only ever printed via WriteDim, so strip any terminal
+        // escapes (the source can embed an untrusted, caller-derived skill path).
+        return TerminalSanitizer.SanitizeMetadata(input);
     }
 
     private static string BuildInstallSourceFolder(string source, string skillPath, string? @ref)
     {
         var folder = DeriveSkillFolder(skillPath);
         var withFolder = string.IsNullOrEmpty(folder) ? source : $"{source}/{folder}";
-        return string.IsNullOrEmpty(@ref) ? withFolder : $"{withFolder}#{@ref}";
+        var input = string.IsNullOrEmpty(@ref) ? withFolder : $"{withFolder}#{@ref}";
+        // Display-only: the result is only ever printed via WriteDim. skillPath is untrusted
+        // (it round-trips from an on-disk directory name), so strip terminal escapes here.
+        return TerminalSanitizer.SanitizeMetadata(input);
     }
 
     private static string BuildInstallSource(SkillLockEntry entry)

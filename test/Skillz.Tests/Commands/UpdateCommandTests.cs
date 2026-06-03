@@ -155,8 +155,71 @@ public class UpdateCommandTests : IDisposable
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("Found 1 global update", StringComparison.Ordinal));
         Assert.Contains(interaction.Output, line => line.Contains("Update available", StringComparison.Ordinal));
-        Assert.Contains(interaction.Output, line => line.Contains("Updates available for 1 skill", StringComparison.Ordinal));
+        Assert.Contains(
+            interaction.Output,
+            line => line.Contains("Updates available for 1 skill", StringComparison.Ordinal));
         Assert.DoesNotContain(interaction.Output, line => line.Contains("Updated 1 skill", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Update_Global_Sanitizes_Install_Source_When_SkillPath_Contains_Terminal_Escape()
+    {
+        // Arrange: a SkillPath whose directory name contains a raw terminal escape sequence. The
+        // byte-exact folder must still match the tree entry path so an update is reported, while the
+        // printed "Run: skillz add ..." suggestion must be escape-free.
+        const string escapedFolder = "tools/inner\x1b]0;title\x07";
+        var services = CliTestHelper.CreateServiceProvider();
+        var globalLock = services.GetRequiredService<TestGlobalLockFile>();
+        globalLock.OnRead = () =>
+            new SkillLockFile
+            {
+                Version = 3,
+                Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal)
+                {
+                    ["my-skill"] = new SkillLockEntry
+                    {
+                        Source = "owner/repo",
+                        SourceType = "github",
+                        SourceUrl = "https://github.com/owner/repo",
+                        SkillFolderHash = "abc123",
+                        SkillPath = $"{escapedFolder}/SKILL.md"
+                    }
+                }
+            };
+
+        var blob = services.GetRequiredService<TestBlobClient>();
+        blob.OnFetchTree = (_, _, _) =>
+            new RepoTree(
+                "new-tree-sha",
+                "main",
+                [
+                    new TreeEntry
+                    {
+                        // Byte-exact match against the un-sanitized derived folder so the update is detected.
+                        Path = escapedFolder,
+                        Type = "tree",
+                        Sha = "xyz789"
+                    }
+                ]);
+        var interaction = services.GetRequiredService<TestInteractionService>();
+
+        // Act
+        var cmd = services.GetRequiredService<UpdateCommand>();
+        var parseResult = cmd.Parse(["-g"]);
+        var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: the update is still detected (tree matching uses the byte-exact path)...
+        Assert.Equal(0, exit);
+        Assert.Contains(interaction.Output, line => line.Contains("Found 1 global update", StringComparison.Ordinal));
+
+        // ...but no raw ESC (0x1b) byte reaches the terminal output, while the visible
+        // suggestion line is still shown.
+        Assert.All(interaction.Output, line => Assert.DoesNotContain('\x1b', line));
+        Assert.Contains(
+            interaction.Output,
+            line =>
+                line.Contains("Run: skillz add", StringComparison.Ordinal)
+                && line.Contains("owner/repo/tools/inner", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -250,7 +313,9 @@ public class UpdateCommandTests : IDisposable
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("can be refreshed", StringComparison.Ordinal));
         Assert.Contains(interaction.Output, line => line.Contains("Refresh:", StringComparison.Ordinal));
-        Assert.DoesNotContain(interaction.Output, line => line.Contains("Updates available for", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            interaction.Output,
+            line => line.Contains("Updates available for", StringComparison.Ordinal));
     }
 
     [Fact]
