@@ -210,6 +210,84 @@ public class AddCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Add_Should_StripCredentialsFromPersistedSource_When_GitUrlHasMultiAtUserInfo()
+    {
+        // Arrange — a single-segment git URL (no owner/repo) persists its URL into the project
+        // lock's Source. A password containing '@' must have its WHOLE userinfo stripped.
+        LocalSkillLockEntry? captured = null;
+
+        var services = BuildServices(
+            configureParser: p => p.OnParse =
+                _ => new SkillSource.Git("https://user:p@ss@git.example.com/repo.git"),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, $"/installed/{skill.InstallName}"),
+            configureProjectLock: l => l.OnAddEntry = (_, entry, _) => captured = entry);
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(captured);
+        Assert.Equal("https://git.example.com/repo.git", captured!.Source);
+        Assert.DoesNotContain("p@ss", captured.Source);
+        Assert.DoesNotContain("user", captured.Source);
+    }
+
+    [Fact]
+    public async Task Add_Should_StripCredentialsFromPersistedSourceUrl_When_GlobalGitHubUrlHasUserInfo()
+    {
+        // Arrange — global install records the raw URL in SourceUrl, which must not leak credentials.
+        SkillLockEntry? captured = null;
+
+        var services = BuildServices(
+            configureParser: p => p.OnParse =
+                _ => new SkillSource.GitHub("https://token@github.com/owner/repo.git"),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, $"/installed/{skill.InstallName}"),
+            configureGlobalLock: l => l.OnAddEntry = (_, entry) => captured = entry);
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["owner/repo", "--yes", "--agent", "claude-code", "--global"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(captured);
+        Assert.Equal("https://github.com/owner/repo.git", captured!.SourceUrl);
+        Assert.DoesNotContain("token", captured.SourceUrl);
+        Assert.DoesNotContain("@", captured.SourceUrl);
+    }
+
+    [Fact]
+    public async Task Add_Should_RedactCredentialsInSourceLine_When_GitUrlHasUserInfo()
+    {
+        // Arrange
+        var services = BuildServices(
+            configureParser: p => p.OnParse =
+                _ => new SkillSource.Git("https://user:s3cr3t@example.com/owner/repo.git"),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) => new InstallResult(true, $"/installed/{skill.InstallName}"));
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        var interaction = services.GetRequiredService<TestInteractionService>();
+        Assert.Equal(0, exitCode);
+        Assert.DoesNotContain("s3cr3t", interaction.OutputText);
+        Assert.Contains("Source: https://<redacted>@example.com/owner/repo.git", interaction.OutputText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Add_With_List_Flag_Lists_Skills_Without_Installing()
     {
         // Arrange
