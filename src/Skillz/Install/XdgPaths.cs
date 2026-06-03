@@ -20,7 +20,7 @@ internal sealed class XdgPaths(ISystemEnvironment system)
         return fromEnv ?? Path.Combine(system.HomeDirectory, ".local", "state");
     }
 
-    public string GetGlobalSkillsDir()
+    public string GetGlobalSkillsDirectory()
     {
         return Path.Combine(GetDataHome(), "skillz", "skills");
     }
@@ -36,12 +36,12 @@ internal sealed class XdgPaths(ISystemEnvironment system)
         return Path.Combine(system.HomeDirectory, ".agents", ".skill-lock.json");
     }
 
-    public string GetConfigDir()
+    public string GetConfigDirectory()
     {
         return Path.Combine(GetConfigHome(), "skillz");
     }
 
-    public string GetLogDir()
+    public string GetLogDirectory()
     {
         return Path.Combine(GetStateHome(), "skillz", "logs");
     }

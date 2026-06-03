@@ -98,7 +98,7 @@ internal sealed partial class SourceParser : ISourceParser
             return new SkillSource.GitHub(
                 Url: $"https://github.com/{owner}/{repo}.git",
                 Ref: !string.IsNullOrEmpty(refValue) ? refValue : fragmentRef,
-                Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.SanitizeSubpath(subpath) : subpath);
+                Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.ValidateSubpath(subpath) : subpath);
         }
 
         var githubTreeMatch = GitHubTreeRegex().Match(input);
@@ -134,7 +134,7 @@ internal sealed partial class SourceParser : ISourceParser
                 return new SkillSource.GitLab(
                     Url: $"{protocol}://{hostname}/{TrailingGitRegex().Replace(repoPath, string.Empty)}.git",
                     Ref: !string.IsNullOrEmpty(refValue) ? refValue : fragmentRef,
-                    Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.SanitizeSubpath(subpath) : subpath);
+                    Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.ValidateSubpath(subpath) : subpath);
             }
         }
 
@@ -190,7 +190,7 @@ internal sealed partial class SourceParser : ISourceParser
             return new SkillSource.GitHub(
                 Url: $"https://github.com/{owner}/{repo}.git",
                 Ref: fragmentRef,
-                Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.SanitizeSubpath(subpath) : null,
+                Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.ValidateSubpath(subpath) : null,
                 SkillFilter: !string.IsNullOrEmpty(fragmentSkillFilter) ? fragmentSkillFilter : null);
         }
 

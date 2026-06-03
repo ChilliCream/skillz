@@ -57,14 +57,14 @@ public class GitClientTests
     }
 
     [Fact]
-    public async Task GetDefaultBranchAsync_Returns_Null_For_NonExistent_Local_Path()
+    public async Task FindDefaultBranchAsync_Returns_Null_For_NonExistent_Local_Path()
     {
         // Arrange
         var client = new GitClient();
         var fakeRepo = Path.Combine(Path.GetTempPath(), $"skillz-fake-{Guid.NewGuid():N}");
 
         // Act
-        var result = await client.GetDefaultBranchAsync(fakeRepo, TestContext.Current.CancellationToken);
+        var result = await client.FindDefaultBranchAsync(fakeRepo, TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Null(result);
@@ -97,14 +97,14 @@ public class GitClientTests
     }
 
     [Fact]
-    public async Task GetDefaultBranchAsync_Rejects_Option_Like_Url()
+    public async Task FindDefaultBranchAsync_Rejects_Option_Like_Url()
     {
         // Arrange
         var client = new GitClient();
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() =>
-            client.GetDefaultBranchAsync("--upload-pack=sh", TestContext.Current.CancellationToken)
+            client.FindDefaultBranchAsync("--upload-pack=sh", TestContext.Current.CancellationToken)
         );
     }
 }

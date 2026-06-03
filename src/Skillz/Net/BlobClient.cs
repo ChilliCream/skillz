@@ -36,7 +36,7 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
 
         if (rateLimitedAtStart)
         {
-            var token = await tokenProvider.GetTokenAsync(cancellationToken);
+            var token = await tokenProvider.FindTokenAsync(cancellationToken);
             if (token is null)
             {
                 return null;
@@ -76,7 +76,7 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
         }
 
         MarkRateLimited();
-        var fallbackToken = await tokenProvider.GetTokenAsync(cancellationToken);
+        var fallbackToken = await tokenProvider.FindTokenAsync(cancellationToken);
         if (fallbackToken is null)
         {
             return null;

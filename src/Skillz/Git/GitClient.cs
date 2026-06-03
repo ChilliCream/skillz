@@ -19,12 +19,12 @@ public sealed class GitClient : IGitClient
     /// <inheritdoc />
     public async Task<string> CloneAsync(
         string url,
-        string targetDir,
+        string targetDirectory,
         string? @ref,
         CancellationToken cancellationToken)
     {
         // Validates inputs and throws before any process is started.
-        var args = GitArguments.BuildCloneArguments(url, targetDir, @ref);
+        var args = GitArguments.BuildCloneArguments(url, targetDirectory, @ref);
         var timeoutMs = GetCloneTimeoutMs();
 
         var stdErrBuilder = new StringBuilder();
@@ -41,12 +41,12 @@ public sealed class GitClient : IGitClient
                 .WithValidation(CommandResultValidation.ZeroExitCode)
                 .ExecuteAsync(timeoutCts.Token);
 
-            return targetDir;
+            return targetDirectory;
         }
         catch (OperationCanceledException)
             when (!cancellationToken.IsCancellationRequested && timeoutCts.IsCancellationRequested)
         {
-            await SafeCleanupAsync(targetDir);
+            await SafeCleanupAsync(targetDirectory);
 
             var seconds = (int)Math.Round(timeoutMs / 1000.0);
 
@@ -62,14 +62,14 @@ public sealed class GitClient : IGitClient
         }
         catch (CommandExecutionException)
         {
-            await SafeCleanupAsync(targetDir);
+            await SafeCleanupAsync(targetDirectory);
             ThrowMappedError(url, stdErrBuilder.ToString());
             throw;
         }
     }
 
     /// <inheritdoc />
-    public async Task<string?> GetDefaultBranchAsync(string url, CancellationToken cancellationToken)
+    public async Task<string?> FindDefaultBranchAsync(string url, CancellationToken cancellationToken)
     {
         // Validates the URL and throws before the try, so an invalid URL surfaces as an
         // ArgumentException rather than being swallowed into a null result below.

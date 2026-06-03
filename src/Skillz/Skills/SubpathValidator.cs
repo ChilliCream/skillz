@@ -13,7 +13,7 @@ internal static class SubpathValidator
     /// <param name="subpath">The relative subpath to check (either slash style is accepted).</param>
     /// <returns>The original <paramref name="subpath"/> when it is free of <c>..</c> segments.</returns>
     /// <exception cref="CliException">Thrown when <paramref name="subpath"/> contains a <c>..</c> segment.</exception>
-    public static string SanitizeSubpath(string subpath)
+    public static string ValidateSubpath(string subpath)
     {
         var normalized = subpath.Replace('\\', '/');
         var segments = normalized.Split('/');
@@ -35,7 +35,7 @@ internal static class SubpathValidator
     /// <paramref name="basePath"/> (or to <paramref name="basePath"/> itself).
     /// </summary>
     /// <remarks>
-    /// Unlike <see cref="SanitizeSubpath"/>, which only rejects literal <c>..</c> segments,
+    /// Unlike <see cref="ValidateSubpath"/>, which only rejects literal <c>..</c> segments,
     /// this resolves the combined path and verifies containment, catching escapes via
     /// symlinks or absolute components.
     /// </remarks>

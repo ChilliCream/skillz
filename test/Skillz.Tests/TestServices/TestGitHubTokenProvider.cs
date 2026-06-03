@@ -6,7 +6,7 @@ internal sealed class TestGitHubTokenProvider : IGitHubTokenProvider
 {
     public Func<string?>? OnGetToken { get; set; }
 
-    public Task<string?> GetTokenAsync(CancellationToken cancellationToken)
+    public Task<string?> FindTokenAsync(CancellationToken cancellationToken)
     {
         var result = OnGetToken?.Invoke();
         return Task.FromResult(result);

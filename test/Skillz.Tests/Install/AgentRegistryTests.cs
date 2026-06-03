@@ -61,7 +61,7 @@ public class AgentRegistryTests
         // Assert
         Assert.Equal("claude-code", config.Name);
         Assert.Equal("Claude Code", config.DisplayName);
-        Assert.Equal(".claude/skills", config.SkillsDir);
+        Assert.Equal(".claude/skills", config.SkillsDirectory);
     }
 
     [Fact]
@@ -238,7 +238,7 @@ public class AgentRegistryTests
         var config = registry.GetConfig("openclaw");
 
         // Assert
-        Assert.Equal("skills", config.SkillsDir);
+        Assert.Equal("skills", config.SkillsDirectory);
     }
 
     [Fact]
@@ -324,7 +324,7 @@ public class AgentRegistryTests
         var config = registry.GetConfig("claude-code");
 
         // Assert
-        Assert.Equal(Path.Combine("/custom/claude", "skills"), config.GlobalSkillsDir);
+        Assert.Equal(Path.Combine("/custom/claude", "skills"), config.GlobalSkillsDirectory);
     }
 
     [Fact]
@@ -343,7 +343,7 @@ public class AgentRegistryTests
         var config = registry.GetConfig("codex");
 
         // Assert
-        Assert.Equal(Path.Combine("/custom/codex", "skills"), config.GlobalSkillsDir);
+        Assert.Equal(Path.Combine("/custom/codex", "skills"), config.GlobalSkillsDirectory);
     }
 
     [Fact]
@@ -362,6 +362,6 @@ public class AgentRegistryTests
         var config = registry.GetConfig("mistral-vibe");
 
         // Assert
-        Assert.Equal(Path.Combine("/custom/vibe", "skills"), config.GlobalSkillsDir);
+        Assert.Equal(Path.Combine("/custom/vibe", "skills"), config.GlobalSkillsDirectory);
     }
 }

@@ -205,18 +205,18 @@ internal sealed class RemoveCommand(
         var skills = new HashSet<string>(StringComparer.Ordinal);
         var directoriesToScan = new HashSet<string>(PathContainment.Comparer)
         {
-            installer.GetCanonicalSkillsDir(global, cwd)
+            installer.GetCanonicalSkillsDirectory(global, cwd)
         };
 
         foreach (var agentType in registry.AgentTypes)
         {
             var config = registry.GetConfig(agentType);
-            if (global && config.GlobalSkillsDir is null)
+            if (global && config.GlobalSkillsDirectory is null)
             {
                 continue;
             }
 
-            directoriesToScan.Add(installer.GetAgentBaseDir(agentType, global, cwd));
+            directoriesToScan.Add(installer.GetAgentBaseDirectory(agentType, global, cwd));
         }
 
         foreach (var dir in directoriesToScan)

@@ -47,7 +47,7 @@ internal sealed class ListCommand(
         Options.Add(_jsonOption);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken ct)
+    protected override async Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
     {
         var global = parseResult.GetValue(_globalOption);
         var agents = parseResult.GetValue(_agentOption) ?? [];
@@ -68,7 +68,7 @@ internal sealed class ListCommand(
             }
         }
 
-        var skills = CollectInstalledSkills(installer, registry, agents, global, ct);
+        var skills = CollectInstalledSkills(installer, registry, agents, global, cancellationToken);
 
         if (jsonOutput)
         {
@@ -138,7 +138,7 @@ internal sealed class ListCommand(
         var cwd = systemEnvironment.CurrentDirectory;
         var agentFilter = agents.Length > 0 ? [.. agents] : registry.AgentTypes;
         var skills = new Dictionary<string, InstalledSkill>(StringComparer.Ordinal);
-        var canonicalDir = installer.GetCanonicalSkillsDir(global, cwd);
+        var canonicalDir = installer.GetCanonicalSkillsDirectory(global, cwd);
         var canonicalDirFull = Path.GetFullPath(canonicalDir);
 
         if (fileStore.DirectoryExists(canonicalDir))
@@ -171,12 +171,12 @@ internal sealed class ListCommand(
                 continue;
             }
 
-            if (global && config.GlobalSkillsDir is null)
+            if (global && config.GlobalSkillsDirectory is null)
             {
                 continue;
             }
 
-            var agentDir = installer.GetAgentBaseDir(agentType, global, cwd);
+            var agentDir = installer.GetAgentBaseDirectory(agentType, global, cwd);
             var agentDirFull = Path.GetFullPath(agentDir);
 
             // Skip if this agent's dir IS the canonical dir (universal agents)

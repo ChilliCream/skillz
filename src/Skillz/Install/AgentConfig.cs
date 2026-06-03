@@ -3,6 +3,6 @@ namespace Skillz.Install;
 internal sealed record AgentConfig(
     string Name,
     string DisplayName,
-    string SkillsDir,
-    string? GlobalSkillsDir,
+    string SkillsDirectory,
+    string? GlobalSkillsDirectory,
     bool ShowInUniversalList = true);

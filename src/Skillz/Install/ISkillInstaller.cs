@@ -17,11 +17,11 @@ internal interface ISkillInstaller
         InstallOptions options,
         CancellationToken cancellationToken);
 
-    string GetCanonicalSkillsDir(bool global, string? cwd = null);
+    string GetCanonicalSkillsDirectory(bool global, string? workingDirectory = null);
 
-    string GetAgentBaseDir(string agentType, bool global, string? cwd = null);
+    string GetAgentBaseDirectory(string agentType, bool global, string? workingDirectory = null);
 
-    string GetCanonicalPath(string skillName, bool global = false, string? cwd = null);
+    string GetCanonicalPath(string skillName, bool global = false, string? workingDirectory = null);
 
-    string GetInstallPath(string skillName, string agentType, bool global = false, string? cwd = null);
+    string GetInstallPath(string skillName, string agentType, bool global = false, string? workingDirectory = null);
 }

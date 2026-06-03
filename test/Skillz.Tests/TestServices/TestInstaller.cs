@@ -27,12 +27,12 @@ internal sealed class TestInstaller : ISkillInstaller
         return Task.FromResult(result);
     }
 
-    public string GetCanonicalSkillsDir(bool global, string? cwd = null)
+    public string GetCanonicalSkillsDirectory(bool global, string? cwd = null)
     {
         return OnGetCanonicalSkillsDir is not null ? OnGetCanonicalSkillsDir(global, cwd) : string.Empty;
     }
 
-    public string GetAgentBaseDir(string agentType, bool global, string? cwd = null)
+    public string GetAgentBaseDirectory(string agentType, bool global, string? cwd = null)
     {
         return OnGetAgentBaseDir is not null ? OnGetAgentBaseDir(agentType, global, cwd) : string.Empty;
     }

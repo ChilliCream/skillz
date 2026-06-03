@@ -143,9 +143,9 @@ internal sealed class AddCommandExecutor(
         ImmutableArray<ResolvedSkill> skills,
         ImmutableArray<string> skillFilters,
         AddCommandOptions options,
-        CancellationToken ct)
+        CancellationToken cancellationToken)
     {
-        var selectedSkills = await SelectSkillsAsync(skills, skillFilters, options, ct);
+        var selectedSkills = await SelectSkillsAsync(skills, skillFilters, options, cancellationToken);
         if (selectedSkills.Length == 0)
         {
             if (skillFilters.Length > 0)
@@ -164,7 +164,7 @@ internal sealed class AddCommandExecutor(
 
         var nonInteractive = options.Yes || options.All || consoleEnvironment.IsInputRedirected;
 
-        var selectedAgents = await SelectAgentsAsync(options, nonInteractive, ct);
+        var selectedAgents = await SelectAgentsAsync(options, nonInteractive, cancellationToken);
         if (selectedAgents is not { } targetAgents)
         {
             return new CommandResult.Cancelled();
@@ -178,16 +178,16 @@ internal sealed class AddCommandExecutor(
         var installGlobally = options.Global;
         if (!options.Global && !nonInteractive)
         {
-            var supportsGlobal = targetAgents.Any(a => registry.GetConfig(a).GlobalSkillsDir is not null);
+            var supportsGlobal = targetAgents.Any(a => registry.GetConfig(a).GlobalSkillsDirectory is not null);
             if (supportsGlobal)
             {
-                installGlobally = await prompter.SelectGlobalScopeAsync(ct);
+                installGlobally = await prompter.SelectGlobalScopeAsync(cancellationToken);
             }
         }
 
         var installMode = options.Copy ? InstallMode.Copy : InstallMode.Symlink;
         var hasMultipleSkillsDirs = targetAgents
-            .Select(a => registry.GetConfig(a).SkillsDir)
+            .Select(a => registry.GetConfig(a).SkillsDirectory)
             .Distinct(StringComparer.Ordinal)
             .Skip(1)
             .Any();
@@ -198,7 +198,7 @@ internal sealed class AddCommandExecutor(
         }
         else if (!options.Copy && !nonInteractive)
         {
-            installMode = await prompter.SelectInstallModeAsync(ct);
+            installMode = await prompter.SelectInstallModeAsync(cancellationToken);
         }
         // else: non-interactive, multiple distinct skills dirs → keep the symlink default.
 
@@ -206,7 +206,7 @@ internal sealed class AddCommandExecutor(
 
         if (!nonInteractive)
         {
-            var confirmed = await prompter.ConfirmInstallationAsync(selectedSkills, targetAgents, overwriteTargets, ct);
+            var confirmed = await prompter.ConfirmInstallationAsync(selectedSkills, targetAgents, overwriteTargets, cancellationToken);
 
             if (!confirmed)
             {
@@ -215,7 +215,7 @@ internal sealed class AddCommandExecutor(
             }
         }
 
-        var installOptions = new InstallOptions(installGlobally, Cwd: null, installMode);
+        var installOptions = new InstallOptions(installGlobally, WorkingDirectory: null, installMode);
         var existingSkills = overwriteTargets.Select(o => o.SkillName).ToHashSet(StringComparer.Ordinal);
         if (nonInteractive)
         {
@@ -226,14 +226,14 @@ internal sealed class AddCommandExecutor(
             }
         }
 
-        var results = await InstallSkillsAsync(selectedSkills, targetAgents, installOptions, ct);
+        var results = await InstallSkillsAsync(selectedSkills, targetAgents, installOptions, cancellationToken);
 
         var successful = results.Where(r => r.Result.Success).ToImmutableArray();
         var failed = results.Where(r => !r.Result.Success).ToImmutableArray();
 
         if (successful.Length > 0)
         {
-            await UpdateLocksAsync(parsed, successful, installGlobally, ct);
+            await UpdateLocksAsync(parsed, successful, installGlobally, cancellationToken);
         }
 
         RenderInstallationReport(targetAgents, successful, failed, existingSkills, installGlobally, installMode);
@@ -276,7 +276,7 @@ internal sealed class AddCommandExecutor(
         var canonical =
             skillNames.Length == 1
                 ? installer.GetCanonicalPath(skillNames[0], installGlobally)
-                : installer.GetCanonicalSkillsDir(installGlobally);
+                : installer.GetCanonicalSkillsDirectory(installGlobally);
 
         var summary = new StringBuilder();
         summary.AppendLine($"[bold]Canonical:[/] [dim]{Markup.Escape(canonical)}[/]");

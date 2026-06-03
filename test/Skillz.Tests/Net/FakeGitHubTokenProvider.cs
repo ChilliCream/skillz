@@ -13,7 +13,7 @@ internal sealed class FakeGitHubTokenProvider : IGitHubTokenProvider
 
     public int CallCount { get; private set; }
 
-    public Task<string?> GetTokenAsync(CancellationToken cancellationToken)
+    public Task<string?> FindTokenAsync(CancellationToken cancellationToken)
     {
         CallCount++;
         return Task.FromResult(_tokenFactory());

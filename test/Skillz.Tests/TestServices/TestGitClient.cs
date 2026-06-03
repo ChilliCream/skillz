@@ -14,7 +14,7 @@ internal sealed class TestGitClient : IGitClient
         return Task.FromResult(result);
     }
 
-    public Task<string?> GetDefaultBranchAsync(string url, CancellationToken cancellationToken)
+    public Task<string?> FindDefaultBranchAsync(string url, CancellationToken cancellationToken)
     {
         var result = OnGetDefaultBranch is not null ? OnGetDefaultBranch(url) : "main";
         return Task.FromResult(result);

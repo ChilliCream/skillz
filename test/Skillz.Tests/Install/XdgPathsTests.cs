@@ -105,7 +105,7 @@ public class XdgPathsTests
         var paths = Create();
 
         // Act & Assert
-        Assert.Equal(Path.Combine(Home, ".local", "share", "skillz", "skills"), paths.GetGlobalSkillsDir());
+        Assert.Equal(Path.Combine(Home, ".local", "share", "skillz", "skills"), paths.GetGlobalSkillsDirectory());
     }
 
     [Fact]
@@ -115,7 +115,7 @@ public class XdgPathsTests
         var paths = Create();
 
         // Act & Assert
-        Assert.Equal(Path.Combine(Home, ".config", "skillz"), paths.GetConfigDir());
+        Assert.Equal(Path.Combine(Home, ".config", "skillz"), paths.GetConfigDirectory());
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public class XdgPathsTests
         var paths = Create();
 
         // Act & Assert
-        Assert.Equal(Path.Combine(Home, ".local", "state", "skillz", "logs"), paths.GetLogDir());
+        Assert.Equal(Path.Combine(Home, ".local", "state", "skillz", "logs"), paths.GetLogDirectory());
     }
 
     [Fact]
@@ -165,7 +165,7 @@ public class XdgAgentPathsTests
         var config = registry.GetConfig("opencode");
 
         // Assert
-        Assert.Equal(Path.Combine(Home, ".config", "opencode", "skills"), config.GlobalSkillsDir);
+        Assert.Equal(Path.Combine(Home, ".config", "opencode", "skills"), config.GlobalSkillsDirectory);
     }
 
     [Fact]
@@ -175,7 +175,7 @@ public class XdgAgentPathsTests
         var registry = CreateRegistry();
 
         // Act
-        var globalDir = registry.GetConfig("opencode").GlobalSkillsDir!;
+        var globalDir = registry.GetConfig("opencode").GlobalSkillsDirectory!;
 
         // Assert
         Assert.DoesNotContain("Library", globalDir, StringComparison.Ordinal);
@@ -193,7 +193,7 @@ public class XdgAgentPathsTests
         var config = registry.GetConfig("amp");
 
         // Assert
-        Assert.Equal(Path.Combine(Home, ".config", "agents", "skills"), config.GlobalSkillsDir);
+        Assert.Equal(Path.Combine(Home, ".config", "agents", "skills"), config.GlobalSkillsDirectory);
     }
 
     [Fact]
@@ -203,7 +203,7 @@ public class XdgAgentPathsTests
         var registry = CreateRegistry();
 
         // Act
-        var globalDir = registry.GetConfig("amp").GlobalSkillsDir!;
+        var globalDir = registry.GetConfig("amp").GlobalSkillsDirectory!;
 
         // Assert
         Assert.DoesNotContain("Library", globalDir, StringComparison.Ordinal);
@@ -221,7 +221,7 @@ public class XdgAgentPathsTests
         var config = registry.GetConfig("goose");
 
         // Assert
-        Assert.Equal(Path.Combine(Home, ".config", "goose", "skills"), config.GlobalSkillsDir);
+        Assert.Equal(Path.Combine(Home, ".config", "goose", "skills"), config.GlobalSkillsDirectory);
     }
 
     [Fact]
@@ -231,7 +231,7 @@ public class XdgAgentPathsTests
         var registry = CreateRegistry();
 
         // Act
-        var globalDir = registry.GetConfig("goose").GlobalSkillsDir!;
+        var globalDir = registry.GetConfig("goose").GlobalSkillsDirectory!;
 
         // Assert
         Assert.DoesNotContain("Library", globalDir, StringComparison.Ordinal);
@@ -249,7 +249,7 @@ public class XdgAgentPathsTests
         var config = registry.GetConfig("cursor");
 
         // Assert
-        Assert.Equal(Path.Combine(Home, ".cursor", "skills"), config.GlobalSkillsDir);
+        Assert.Equal(Path.Combine(Home, ".cursor", "skills"), config.GlobalSkillsDirectory);
     }
 
     [Fact]
@@ -262,7 +262,7 @@ public class XdgAgentPathsTests
         var config = registry.GetConfig("cline");
 
         // Assert
-        Assert.Equal(Path.Combine(Home, ".agents", "skills"), config.GlobalSkillsDir);
+        Assert.Equal(Path.Combine(Home, ".agents", "skills"), config.GlobalSkillsDirectory);
     }
 
     [Fact]
@@ -278,10 +278,10 @@ public class XdgAgentPathsTests
         // Act & Assert
         Assert.Equal(
             Path.Combine("/custom/xdg-config", "opencode", "skills"),
-            registry.GetConfig("opencode").GlobalSkillsDir);
+            registry.GetConfig("opencode").GlobalSkillsDirectory);
         Assert.Equal(
             Path.Combine("/custom/xdg-config", "goose", "skills"),
-            registry.GetConfig("goose").GlobalSkillsDir);
-        Assert.Equal(Path.Combine("/custom/xdg-config", "agents", "skills"), registry.GetConfig("amp").GlobalSkillsDir);
+            registry.GetConfig("goose").GlobalSkillsDirectory);
+        Assert.Equal(Path.Combine("/custom/xdg-config", "agents", "skills"), registry.GetConfig("amp").GlobalSkillsDirectory);
     }
 }

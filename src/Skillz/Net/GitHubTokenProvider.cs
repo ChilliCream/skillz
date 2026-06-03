@@ -8,7 +8,7 @@ internal sealed class GitHubTokenProvider : IGitHubTokenProvider
     private static readonly object s_warningLock = new();
     private static bool s_warningShown;
 
-    public async Task<string?> GetTokenAsync(CancellationToken cancellationToken)
+    public async Task<string?> FindTokenAsync(CancellationToken cancellationToken)
     {
         var githubToken = Environment.GetEnvironmentVariable("GITHUB_TOKEN");
         if (!string.IsNullOrEmpty(githubToken))

@@ -90,7 +90,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "claude-code",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -114,7 +114,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "claude-code",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -145,7 +145,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "codex",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -180,7 +180,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "codex",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -217,7 +217,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "codex",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -250,7 +250,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "codex",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -276,7 +276,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "codex",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -304,7 +304,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "codex",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -337,7 +337,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "codex",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -362,7 +362,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "github-copilot",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -389,7 +389,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "windsurf",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -430,7 +430,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "amp",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -467,7 +467,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "claude-code",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -500,7 +500,7 @@ public class InstallerTests : IDisposable
         var first = await _installer.InstallAsync(
             skill,
             "claude-code",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
         Assert.True(first.Success);
@@ -509,7 +509,7 @@ public class InstallerTests : IDisposable
         var second = await _installer.InstallAsync(
             skill,
             "claude-code",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -535,7 +535,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "codex",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Copy),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Copy),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -545,40 +545,40 @@ public class InstallerTests : IDisposable
     }
 
     [Fact]
-    public void GetCanonicalSkillsDir_Project_ReturnsAgentsSkillsRelativeToCwd()
+    public void GetCanonicalSkillsDirectory_Project_ReturnsAgentsSkillsRelativeToCwd()
     {
         // Act
-        var result = _installer.GetCanonicalSkillsDir(global: false, cwd: _projectDir);
+        var result = _installer.GetCanonicalSkillsDirectory(global: false, workingDirectory: _projectDir);
 
         // Assert
         Assert.Equal(Path.Combine(_projectDir, ".agents", "skills"), result);
     }
 
     [Fact]
-    public void GetCanonicalSkillsDir_Global_ReturnsAgentsSkillsInHome()
+    public void GetCanonicalSkillsDirectory_Global_ReturnsAgentsSkillsInHome()
     {
         // Act
-        var result = _installer.GetCanonicalSkillsDir(global: true);
+        var result = _installer.GetCanonicalSkillsDirectory(global: true);
 
         // Assert
         Assert.Equal(Path.Combine(_home, ".agents", "skills"), result);
     }
 
     [Fact]
-    public void GetAgentBaseDir_UniversalAgent_ReturnsCanonicalDir()
+    public void GetAgentBaseDirectory_UniversalAgent_ReturnsCanonicalDir()
     {
         // Act
-        var result = _installer.GetAgentBaseDir("codex", global: false, cwd: _projectDir);
+        var result = _installer.GetAgentBaseDirectory("codex", global: false, workingDirectory: _projectDir);
 
         // Assert
         Assert.Equal(Path.Combine(_projectDir, ".agents", "skills"), result);
     }
 
     [Fact]
-    public void GetAgentBaseDir_NonUniversalAgent_Project_ReturnsAgentSpecificDir()
+    public void GetAgentBaseDirectory_NonUniversalAgent_Project_ReturnsAgentSpecificDir()
     {
         // Act
-        var result = _installer.GetAgentBaseDir("claude-code", global: false, cwd: _projectDir);
+        var result = _installer.GetAgentBaseDirectory("claude-code", global: false, workingDirectory: _projectDir);
 
         // Assert
         Assert.Equal(Path.Combine(_projectDir, ".claude", "skills"), result);
@@ -602,7 +602,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             remote,
             "codex",
-            new InstallOptions(Global: false, Cwd: _projectDir, Mode: InstallMode.Symlink),
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -618,9 +618,9 @@ public class InstallerTests : IDisposable
     {
         // Arrange
         // The OpenClaw entry always has a global skills dir, so to test missing-support we
-        // build a registry where no agent has GlobalSkillsDir for a synthetic check.
+        // build a registry where no agent has GlobalSkillsDirectory for a synthetic check.
         // Instead, we use a known agent and verify behavior: all current agents define
-        // GlobalSkillsDir, so we test the universal-global path which is supported.
+        // GlobalSkillsDirectory, so we test the universal-global path which is supported.
         var skillName = "global-skill";
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
@@ -629,7 +629,7 @@ public class InstallerTests : IDisposable
         var result = await _installer.InstallAsync(
             skill,
             "github-copilot",
-            new InstallOptions(Global: true, Cwd: _projectDir, Mode: InstallMode.Symlink),
+            new InstallOptions(Global: true, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
             TestContext.Current.CancellationToken);
 
         // Assert

@@ -9,10 +9,10 @@ public class SubpathValidatorTests
     [InlineData("skills/my-skill")]
     [InlineData("path/to/skill")]
     [InlineData("src")]
-    public void SanitizeSubpath_Allows_Normal_Subpaths(string input)
+    public void ValidateSubpath_Allows_Normal_Subpaths(string input)
     {
         // Act & Assert
-        Assert.Equal(input, SubpathValidator.SanitizeSubpath(input));
+        Assert.Equal(input, SubpathValidator.ValidateSubpath(input));
     }
 
     [Theory]
@@ -20,10 +20,10 @@ public class SubpathValidatorTests
     [InlineData("../../etc/passwd")]
     [InlineData("skills/../../etc")]
     [InlineData("a/b/../../../etc")]
-    public void SanitizeSubpath_Rejects_DotDot_Segments(string input)
+    public void ValidateSubpath_Rejects_DotDot_Segments(string input)
     {
         // Act
-        var ex = Assert.Throws<CliException>(() => SubpathValidator.SanitizeSubpath(input));
+        var ex = Assert.Throws<CliException>(() => SubpathValidator.ValidateSubpath(input));
 
         // Assert
         Assert.Contains("Unsafe subpath", ex.Message, StringComparison.Ordinal);
@@ -32,10 +32,10 @@ public class SubpathValidatorTests
     [Theory]
     [InlineData("..\\etc")]
     [InlineData("..\\..\\secret")]
-    public void SanitizeSubpath_Rejects_Backslash_Traversal(string input)
+    public void ValidateSubpath_Rejects_Backslash_Traversal(string input)
     {
         // Act
-        var ex = Assert.Throws<CliException>(() => SubpathValidator.SanitizeSubpath(input));
+        var ex = Assert.Throws<CliException>(() => SubpathValidator.ValidateSubpath(input));
 
         // Assert
         Assert.Contains("Unsafe subpath", ex.Message, StringComparison.Ordinal);
@@ -47,10 +47,10 @@ public class SubpathValidatorTests
     [InlineData("path/to/.config")]
     [InlineData("..skill")]
     [InlineData("skill..")]
-    public void SanitizeSubpath_Allows_Dots_That_Are_Not_Traversal(string input)
+    public void ValidateSubpath_Allows_Dots_That_Are_Not_Traversal(string input)
     {
         // Act & Assert
-        Assert.Equal(input, SubpathValidator.SanitizeSubpath(input));
+        Assert.Equal(input, SubpathValidator.ValidateSubpath(input));
     }
 
     [Theory]

@@ -10,5 +10,5 @@ internal interface IGitHubTokenProvider
     /// <summary>
     /// Returns a usable token, or <see langword="null"/> when none is configured.
     /// </summary>
-    Task<string?> GetTokenAsync(CancellationToken cancellationToken);
+    Task<string?> FindTokenAsync(CancellationToken cancellationToken);
 }

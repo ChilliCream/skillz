@@ -184,7 +184,7 @@ internal sealed class UpdateCommand(
             return Task.FromResult(true);
         }
 
-        var skillsDir = Path.Combine(cwd, KnownConfigNames.UniversalSkillsDir);
+        var skillsDir = Path.Combine(cwd, KnownConfigNames.UniversalSkillsDirectory);
         try
         {
             if (!fileStore.DirectoryExists(skillsDir))
