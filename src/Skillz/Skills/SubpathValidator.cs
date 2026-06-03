@@ -1,3 +1,5 @@
+using Skillz.Plugins;
+
 namespace Skillz.Skills;
 
 /// <summary>
@@ -36,17 +38,38 @@ internal static class SubpathValidator
     /// </summary>
     /// <remarks>
     /// Unlike <see cref="ValidateSubpath"/>, which only rejects literal <c>..</c> segments,
-    /// this resolves the combined path and verifies containment, catching escapes via
-    /// symlinks or absolute components.
+    /// this follows symlinks on the combined target before checking containment, so a subpath
+    /// that is (or passes through) a symlink pointing outside <paramref name="basePath"/> is
+    /// rejected even though it is lexically clean. Resolution is delegated to
+    /// <see cref="RealPath"/> rather than duplicated here. A subpath that does not exist on
+    /// disk yet is resolved through its nearest existing parent, so the check still works
+    /// before the target is created.
     /// </remarks>
     /// <param name="basePath">The directory the subpath must remain within.</param>
     /// <param name="subpath">The relative subpath to resolve against <paramref name="basePath"/>.</param>
     /// <returns><see langword="true"/> when the resolved path is contained in <paramref name="basePath"/>.</returns>
     public static bool IsSubpathSafe(string basePath, string subpath)
     {
-        var combined = Path.GetFullPath(Path.Combine(basePath, subpath));
-        var normalizedBase = Path.GetFullPath(basePath);
-        return combined.StartsWithOrdinal(normalizedBase + Path.DirectorySeparatorChar)
-            || combined == normalizedBase;
+        // Fast lexical pre-check: a literal ".." segment can never be safe, and rejecting it
+        // here avoids touching the filesystem for the common attack shape.
+        var normalized = subpath.Replace('\\', '/');
+        foreach (var segment in normalized.Split('/'))
+        {
+            if (segment == "..")
+            {
+                return false;
+            }
+        }
+
+        // Authoritative check: resolve the combined target's symlinks (including the leaf,
+        // which discovery would otherwise enumerate into) and the base, then compare real
+        // paths so an escape via a symlink anywhere on the path is caught.
+        var combined = Path.Combine(basePath, subpath);
+        var realCombined = RealPath.ResolveWithNearestExistingParent(combined);
+        var realBase = RealPath.ResolveWithNearestExistingParent(basePath);
+
+        return realCombined is not null
+            && realBase is not null
+            && PathContainment.IsContainedIn(realCombined, realBase);
     }
 }
