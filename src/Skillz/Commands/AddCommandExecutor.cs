@@ -75,7 +75,8 @@ internal sealed class AddCommandExecutor(
 
         var skillFilters = options.SkillFilters.AppendFilter(parsed.GetSkillFilter());
 
-        interaction.WriteDim($"Source: {GitUrl.RedactUrlUserInfo(parsed.DisplayString)}");
+        interaction.WriteDim(
+            $"Source: {TerminalSanitizer.SanitizeMetadata(GitUrl.RedactUrlUserInfo(parsed.DisplayString))}");
 
         // Fetch skills into a temp staging area, and clean it up no matter how we exit below.
         var skills = await FetchSkillsAsync(parsed, options, skillFilters, cancellationToken);
