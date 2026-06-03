@@ -63,6 +63,32 @@ public class FakeFileStoreTests
     }
 
     [Fact]
+    public void IsDirectoryEmpty_Should_Return_True_When_Missing_Or_Empty()
+    {
+        // Arrange
+        var store = new FakeFileStore();
+        store.CreateDirectory("/root/empty");
+
+        // Act & Assert
+        Assert.True(store.IsDirectoryEmpty("/missing"));
+        Assert.True(store.IsDirectoryEmpty("/root/empty"));
+    }
+
+    [Fact]
+    public async Task IsDirectoryEmpty_Should_Return_False_When_Contains_File_Or_Subdirectory()
+    {
+        // Arrange
+        var store = new FakeFileStore();
+        store.CreateDirectory("/with-file");
+        await store.WriteAllTextAsync("/with-file/a.txt", "x", Token);
+        store.CreateDirectory("/with-dir/child");
+
+        // Act & Assert
+        Assert.False(store.IsDirectoryEmpty("/with-file"));
+        Assert.False(store.IsDirectoryEmpty("/with-dir"));
+    }
+
+    [Fact]
     public async Task DeleteDirectory_Should_Remove_Subtree_And_Files_When_Recursive()
     {
         // Arrange

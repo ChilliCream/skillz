@@ -15,6 +15,12 @@ internal interface IFileStore
     bool PathExists(string path);
 
     /// <summary>
+    /// Determines whether the path is itself a symlink (reparse point), without following it.
+    /// Returns <see langword="false"/> for a regular file or directory, or when nothing exists.
+    /// </summary>
+    bool IsSymlink(string path);
+
+    /// <summary>
     /// Determines whether a file exists at the given path.
     /// </summary>
     bool FileExists(string path);
@@ -51,6 +57,12 @@ internal interface IFileStore
     /// Returns the immediate child directories of the given path.
     /// </summary>
     IEnumerable<string> EnumerateDirectories(string path);
+
+    /// <summary>
+    /// Determines whether the directory at the given path contains no entries (no files and
+    /// no subdirectories). A path that does not exist is treated as empty.
+    /// </summary>
+    bool IsDirectoryEmpty(string path);
 
     Task<string> ReadAllTextAsync(string path, CancellationToken cancellationToken);
 

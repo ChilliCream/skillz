@@ -148,6 +148,8 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
                 }
             }
 
+            ClearSkillDestination(agentDirectory, canonicalDirectory);
+
             var symlinkCreated = TryCreateSymlink(canonicalDirectory, agentDirectory);
 
             if (!symlinkCreated)
@@ -195,10 +197,30 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // mkdir below will surface a real problem
+            // A failed clean must fail the install: CreateDirectory below is a silent
+            // no-op on an existing directory, so swallowing this would leave stale files
+            // from a prior skill in place and the materialize step would merge new files
+            // over them, producing a corrupt skill while reporting success.
+            throw new CliException(
+                1,
+                $"Failed to clean install destination '{path}': {ex.Message}",
+                title: "Install destination could not be cleaned",
+                hint: "Remove or fix permissions on the destination directory and try again.");
         }
 
         fileStore.CreateDirectory(path);
+
+        // The destination must be empty before we materialize into it. CreateDirectory is
+        // a no-op when the path already exists, so a successful-looking clean that left
+        // contents behind would otherwise silently merge into the new skill.
+        if (!fileStore.IsDirectoryEmpty(path))
+        {
+            throw new CliException(
+                1,
+                $"Install destination '{path}' is not empty after cleaning",
+                title: "Install destination could not be cleaned",
+                hint: "Remove the destination directory and try again.");
+        }
     }
 
     private static async Task CopyDirectoryAsync(string src, string dest, CancellationToken cancellationToken)
@@ -317,9 +339,12 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
     {
         try
         {
+            // Lexically normalize both paths (collapse "." / ".." segments).
             var resolvedTarget = Path.GetFullPath(target);
             var resolvedLinkPath = Path.GetFullPath(linkPath);
 
+            // Fully resolve symlinks on both. If they already point at the same place, the
+            // link we want effectively exists — nothing to do.
             var realTarget = RealPath.TryGetRealPath(resolvedTarget) ?? resolvedTarget;
             var realLinkPath = RealPath.TryGetRealPath(resolvedLinkPath) ?? resolvedLinkPath;
 
@@ -328,6 +353,8 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
                 return true;
             }
 
+            // Same check, resolving only the nearest existing parents — handles the case where
+            // the leaf (link or target) does not exist on disk yet.
             var realTargetWithParents = RealPath.ResolveWithNearestExistingParent(target) ?? resolvedTarget;
             var realLinkPathWithParents = RealPath.ResolveWithNearestExistingParent(linkPath) ?? resolvedLinkPath;
 
@@ -336,87 +363,108 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
                 return true;
             }
 
-            try
-            {
-                var info = new FileInfo(linkPath);
-                if (info.Exists
-                    || Directory.Exists(linkPath)
-                    || (info.Attributes & FileAttributes.ReparsePoint) != 0)
-                {
-                    if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
-                    {
-                        var existingTarget = info.LinkTarget;
-                        if (existingTarget is not null)
-                        {
-                            var resolvedExisting = RealPath.ResolveSymlinkTarget(linkPath, existingTarget);
-                            if (PathEquals(resolvedExisting, resolvedTarget))
-                            {
-                                return true;
-                            }
-                        }
-
-                        DeleteReparsePoint(linkPath);
-                    }
-                    else if (Directory.Exists(linkPath))
-                    {
-                        Directory.Delete(linkPath, recursive: true);
-                    }
-                    else
-                    {
-                        File.Delete(linkPath);
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                try
-                {
-                    DeleteReparsePoint(linkPath);
-                }
-                catch (Exception inner) when (inner is IOException or UnauthorizedAccessException)
-                {
-                    // If we can't remove it, symlink creation will fail below
-                }
-            }
-
+            // Ensure the link's parent directory exists.
             var linkDir = Path.GetDirectoryName(linkPath);
             if (!string.IsNullOrEmpty(linkDir))
             {
                 Directory.CreateDirectory(linkDir);
             }
 
+            // Resolve both endpoints the same way, then compute the relative target between them.
+            // Mixing a resolved dir with a raw target yields a link that breaks when a parent is
+            // a symlink.
             var realLinkDir =
                 RealPath.ResolveWithNearestExistingParent(linkDir ?? string.Empty)
                 ?? Path.GetFullPath(linkDir ?? string.Empty);
-            var relativePath = Path.GetRelativePath(realLinkDir, target);
+            var realTargetForLink =
+                RealPath.ResolveWithNearestExistingParent(target) ?? Path.GetFullPath(target);
+            var relativePath = Path.GetRelativePath(realLinkDir, realTargetForLink);
 
+            // Create the relative symlink. This is the only filesystem mutation here:
+            // TryCreateSymlink never deletes a symlink, directory, or file. If something
+            // already occupies linkPath, CreateSymbolicLink throws IOException and we return
+            // false below — clearing a prior install is the caller's responsibility
+            // (see ClearSkillDestination).
             Directory.CreateSymbolicLink(linkPath, relativePath);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            // Any failure — including an already-occupied destination — yields false with no
+            // deletion performed.
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Clears a prior install at <paramref name="path"/> so a fresh symlink can be placed
+    /// there. Ownership-guarded (refuses to delete a real directory that is not a
+    /// skillz-managed skill) and self-deletion-safe (refuses to delete when the path already
+    /// resolves to the canonical store it would otherwise serve).
+    /// </summary>
+    private void ClearSkillDestination(string path, string canonicalDirectory)
+    {
+        // Nothing there at all — no file, no directory, no (possibly broken) reparse point.
+        if (!fileStore.PathExists(path))
+        {
+            return;
+        }
+
+        // The destination already resolves to the canonical store (a universal agent whose skills
+        // dir IS the store, or an agent skills dir that is itself a symlink into it). It already
+        // holds the content — leave it untouched; the symlink step is then a no-op.
+        var realPath = RealPath.ResolveWithNearestExistingParent(path);
+        var realCanonical = RealPath.ResolveWithNearestExistingParent(canonicalDirectory);
+        if (realPath is not null && realCanonical is not null && PathEquals(realPath, realCanonical))
+        {
+            return;
+        }
+
+        try
+        {
+            // A symlink: unlink it. DeletePath removes a reparse point as a link without recursing
+            // into its target, so no data is lost.
+            if (fileStore.IsSymlink(path))
+            {
+                fileStore.DeletePath(path);
+                return;
+            }
+
+            // A real directory: only remove it when empty. We never delete directory contents.
+            if (fileStore.DirectoryExists(path))
+            {
+                if (!fileStore.IsDirectoryEmpty(path))
+                {
+                    throw new CliException(
+                        ExitCodeConstants.Failure,
+                        $"Refusing to overwrite '{path}': a non-empty directory already exists there.",
+                        title: "Install destination is not empty",
+                        hint: "Remove the directory yourself, then run the command again.");
+                }
+
+                fileStore.DeleteDirectory(path, recursive: false);
+                return;
+            }
+
+            // A real file: never delete it.
+            throw new CliException(
+                ExitCodeConstants.Failure,
+                $"Refusing to overwrite the existing file at '{path}'.",
+                title: "Install destination already exists",
+                hint: "Remove the file yourself, then run the command again.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new CliException(
+                ExitCodeConstants.Failure,
+                $"Failed to clean install destination '{path}': {ex.Message}",
+                title: "Install destination could not be cleaned",
+                hint: "Remove or fix permissions on the destination and try again.");
         }
     }
 
     private static bool PathEquals(string a, string b)
     {
         return string.Equals(a, b, PathContainment.Comparison);
-    }
-
-    private static void DeleteReparsePoint(string path)
-    {
-        try
-        {
-            File.Delete(path);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            Directory.Delete(path);
-        }
-        catch (IOException)
-        {
-            Directory.Delete(path);
-        }
     }
 }

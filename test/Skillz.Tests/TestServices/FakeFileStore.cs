@@ -14,6 +14,9 @@ internal sealed class FakeFileStore : IFileStore
         return Files.ContainsKey(normalized) || Dirs.Contains(normalized);
     }
 
+    // The in-memory store does not model symlinks.
+    public bool IsSymlink(string path) => false;
+
     public bool FileExists(string path) => Files.ContainsKey(Normalize(path));
 
     public bool DirectoryExists(string path) => Dirs.Contains(Normalize(path));
@@ -67,6 +70,20 @@ internal sealed class FakeFileStore : IFileStore
         return Dirs
             .Where(d => d.StartsWithOrdinal(prefix) && !d[prefix.Length..].Contains('/'))
             .ToList();
+    }
+
+    public bool IsDirectoryEmpty(string path)
+    {
+        var normalized = Normalize(path);
+        if (!Dirs.Contains(normalized))
+        {
+            return true;
+        }
+
+        var prefix = normalized + "/";
+        var hasChildDir = Dirs.Any(d => d.StartsWithOrdinal(prefix));
+        var hasChildFile = Files.Keys.Any(f => f.StartsWithOrdinal(prefix));
+        return !hasChildDir && !hasChildFile;
     }
 
     public Task<string> ReadAllTextAsync(string path, CancellationToken cancellationToken)

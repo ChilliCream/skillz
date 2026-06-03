@@ -20,6 +20,20 @@ internal sealed class SystemFileStore : IFileStore
         }
     }
 
+    public bool IsSymlink(string path)
+    {
+        try
+        {
+            return (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0;
+        }
+        catch (Exception ex)
+            when (ex is FileNotFoundException or DirectoryNotFoundException or IOException
+                or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return false;
+        }
+    }
+
     public bool FileExists(string path) => File.Exists(path);
 
     public bool DirectoryExists(string path) => Directory.Exists(path);
@@ -77,6 +91,16 @@ internal sealed class SystemFileStore : IFileStore
     }
 
     public IEnumerable<string> EnumerateDirectories(string path) => Directory.EnumerateDirectories(path);
+
+    public bool IsDirectoryEmpty(string path)
+    {
+        if (!Directory.Exists(path))
+        {
+            return true;
+        }
+
+        return !Directory.EnumerateFileSystemEntries(path).Any();
+    }
 
     public Task<string> ReadAllTextAsync(string path, CancellationToken cancellationToken)
         => File.ReadAllTextAsync(path, cancellationToken);

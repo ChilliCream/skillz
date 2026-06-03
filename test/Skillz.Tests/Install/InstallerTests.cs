@@ -639,4 +639,310 @@ public class InstallerTests : IDisposable
         var canonical = Path.Combine(_home, ".agents", "skills", skillName);
         Assert.Equal(canonical, result.CanonicalPath);
     }
+
+    [Fact]
+    public async Task InstallAsync_Should_Fail_And_Not_Merge_Stale_Files_When_Clean_Cannot_Delete()
+    {
+        // Arrange
+        // A prior install left an unrelated, stale file behind. The clean step is forced to
+        // fail (delete throws), so the install must surface an error rather than silently
+        // creating the (already existing) directory and merging the new skill over the
+        // stale contents.
+        var skillName = "uncleanable-skill";
+        var sourceDir = CreateSkillSource(skillName);
+        var skill = MakeSkill(skillName, sourceDir);
+
+        var canonicalDir = Path.Combine(_projectDir, ".agents", "skills", skillName);
+        Directory.CreateDirectory(canonicalDir);
+        var staleFile = Path.Combine(canonicalDir, "stale-from-prior-skill.txt");
+        await File.WriteAllTextAsync(staleFile, "stale", TestContext.Current.CancellationToken);
+
+        var system = new FakeSystemEnvironment { HomeDirectory = _home, CurrentDirectory = _projectDir };
+        var registry = new AgentRegistry(system);
+        var failingStore = new DeleteFailingFileStore(canonicalDir);
+        var installer = new SkillInstaller(registry, system, failingStore);
+
+        // Act
+        var result = await installer.InstallAsync(
+            skill,
+            "codex",
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.False(result.Success);
+        Assert.NotNull(result.Error);
+        Assert.Contains("clean", result.Error, StringComparison.OrdinalIgnoreCase);
+
+        // The stale file must still be untouched and no SKILL.md must have been merged in.
+        Assert.True(File.Exists(staleFile));
+        Assert.Equal("stale", await File.ReadAllTextAsync(staleFile, TestContext.Current.CancellationToken));
+        Assert.False(File.Exists(Path.Combine(canonicalDir, "SKILL.md")));
+    }
+
+    [Fact]
+    public async Task InstallAsync_Should_PointRelativeSymlink_AtRealStore_When_CanonicalParent_Is_Symlink()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // symlink creation on Windows requires admin
+        }
+
+        // Arrange
+        // A parent of the canonical directory (.agents) is itself a symlink to a backing
+        // store. The agent symlink's relative target must be computed between consistently
+        // symlink-resolved endpoints, so the link points DIRECTLY at the real backing store
+        // rather than routing through the unrelated .agents symlink. A link that routes
+        // through .agents diverges from the resolved link directory and dangles the moment
+        // the .agents convenience symlink is removed or repointed.
+        var skillName = "canonical-symlinked-parent-skill";
+        var sourceDir = CreateSkillSource(skillName);
+        var skill = MakeSkill(skillName, sourceDir);
+
+        // Backing store that .agents points at; this is where the canonical skill really lives.
+        var backingStore = Path.Combine(_projectDir, "backing", "store");
+        Directory.CreateDirectory(backingStore);
+
+        // .agents is a symlink into the backing store; .claude is a plain directory so the
+        // install reaches the symlink-creation path.
+        Directory.CreateSymbolicLink(Path.Combine(_projectDir, ".agents"), backingStore);
+        Directory.CreateDirectory(Path.Combine(_projectDir, ".claude"));
+
+        // Act
+        var result = await _installer.InstallAsync(
+            skill,
+            "claude-code",
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.False(result.SymlinkFailed);
+
+        var agentDir = Path.Combine(_projectDir, ".claude", "skills", skillName);
+        var agentInfo = new DirectoryInfo(agentDir);
+        Assert.True((agentInfo.Attributes & FileAttributes.ReparsePoint) != 0);
+
+        var linkTarget = agentInfo.LinkTarget;
+        Assert.NotNull(linkTarget);
+        Assert.False(Path.IsPathRooted(linkTarget));
+
+        // The stored relative target must resolve to the REAL backing store, not route back
+        // through the .agents symlink. We assert this by removing the .agents symlink and
+        // confirming the agent link still resolves to the materialized skill: a link that
+        // diverges (routes through .agents) dangles here, while a correctly-resolved link
+        // survives.
+        var realCanonicalSkillDir = Path.Combine(backingStore, "skills", skillName);
+        Assert.True(File.Exists(Path.Combine(realCanonicalSkillDir, "SKILL.md")));
+
+        Directory.Delete(Path.Combine(_projectDir, ".agents"));
+
+        var skillMdThroughLink = Path.Combine(agentDir, "SKILL.md");
+        Assert.True(
+            File.Exists(skillMdThroughLink),
+            $"agent symlink dangled after removing the .agents symlink; stored target='{linkTarget}'");
+        var content = await File.ReadAllTextAsync(skillMdThroughLink, TestContext.Current.CancellationToken);
+        Assert.Contains($"name: {skillName}", content);
+    }
+
+    [Fact]
+    public async Task Reinstall_Should_KeepSymlinkMode_When_AgentPathHoldsManagedSymlink()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // symlink creation on Windows requires admin
+        }
+
+        // Arrange
+        var skillName = "managed-symlink-reinstall";
+        var sourceDir = CreateSkillSource(skillName);
+        var skill = MakeSkill(skillName, sourceDir);
+
+        Directory.CreateDirectory(Path.Combine(_projectDir, ".claude"));
+
+        var first = await _installer.InstallAsync(
+            skill,
+            "claude-code",
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
+            TestContext.Current.CancellationToken);
+        Assert.True(first.Success);
+        Assert.Equal(InstallMode.Symlink, first.Mode);
+
+        var agentDir = Path.Combine(_projectDir, ".claude", "skills", skillName);
+        Assert.True((new DirectoryInfo(agentDir).Attributes & FileAttributes.ReparsePoint) != 0);
+
+        // Act
+        var second = await _installer.InstallAsync(
+            skill,
+            "claude-code",
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
+            TestContext.Current.CancellationToken);
+
+        // Assert: no downgrade to copy/SymlinkFailed; the link still points at the store.
+        Assert.True(second.Success);
+        Assert.Equal(InstallMode.Symlink, second.Mode);
+        Assert.False(second.SymlinkFailed);
+
+        var info = new DirectoryInfo(agentDir);
+        Assert.True((info.Attributes & FileAttributes.ReparsePoint) != 0);
+
+        var canonicalSkillDir = Path.Combine(_projectDir, ".agents", "skills", skillName);
+        Assert.Equal(
+            Path.GetFullPath(canonicalSkillDir),
+            Path.GetFullPath(info.ResolveLinkTarget(returnFinalTarget: true)!.FullName));
+        Assert.True(File.Exists(Path.Combine(agentDir, "SKILL.md")));
+    }
+
+    [Fact]
+    public async Task Install_Should_ReplaceEmptyDirectory_With_Symlink_When_AgentPathHoldsEmptyDir()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // symlink creation on Windows requires admin
+        }
+
+        // Arrange: an EMPTY real directory at the agent path. Removing it loses no data, so the
+        // install proceeds and replaces it with a symlink.
+        var skillName = "empty-dir-reinstall";
+        var sourceDir = CreateSkillSource(skillName);
+        var skill = MakeSkill(skillName, sourceDir);
+
+        var agentDir = Path.Combine(_projectDir, ".claude", "skills", skillName);
+        Directory.CreateDirectory(agentDir);
+        Assert.True((new DirectoryInfo(agentDir).Attributes & FileAttributes.ReparsePoint) == 0);
+
+        // Act
+        var result = await _installer.InstallAsync(
+            skill,
+            "claude-code",
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.Equal(InstallMode.Symlink, result.Mode);
+        Assert.False(result.SymlinkFailed);
+
+        var info = new DirectoryInfo(agentDir);
+        Assert.True((info.Attributes & FileAttributes.ReparsePoint) != 0);
+        Assert.True(File.Exists(Path.Combine(agentDir, "SKILL.md")));
+    }
+
+    [Fact]
+    public async Task Install_Should_Fail_And_LeaveContentsIntact_When_AgentPathHoldsNonEmptyDirectory()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // symlink creation on Windows requires admin
+        }
+
+        // Arrange: a NON-EMPTY real directory occupies the agent path. We never delete directory
+        // contents, so the install must refuse and fail loud, leaving the contents intact.
+        var skillName = "non-empty-dir";
+        var sourceDir = CreateSkillSource(skillName);
+        var skill = MakeSkill(skillName, sourceDir);
+
+        var agentDir = Path.Combine(_projectDir, ".claude", "skills", skillName);
+        Directory.CreateDirectory(agentDir);
+        var preExisting = Path.Combine(agentDir, "important.txt");
+        await File.WriteAllTextAsync(preExisting, "do not delete", TestContext.Current.CancellationToken);
+
+        // Act
+        var result = await _installer.InstallAsync(
+            skill,
+            "claude-code",
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
+            TestContext.Current.CancellationToken);
+
+        // Assert: install fails and the directory's contents are left intact.
+        Assert.False(result.Success);
+        Assert.NotNull(result.Error);
+        Assert.Contains("non-empty directory", result.Error);
+
+        Assert.True((new DirectoryInfo(agentDir).Attributes & FileAttributes.ReparsePoint) == 0);
+        Assert.True(File.Exists(preExisting));
+        Assert.Equal("do not delete", await File.ReadAllTextAsync(preExisting, TestContext.Current.CancellationToken));
+        Assert.False(File.Exists(Path.Combine(agentDir, "SKILL.md")));
+    }
+
+    [Fact]
+    public async Task Install_Should_Fail_And_LeaveFileIntact_When_AgentPathHoldsFile()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return; // symlink creation on Windows requires admin
+        }
+
+        // Arrange: a real file sits exactly where the skill's symlink would go. We never delete
+        // it — the install must refuse and leave the file untouched.
+        var skillName = "file-in-the-way";
+        var sourceDir = CreateSkillSource(skillName);
+        var skill = MakeSkill(skillName, sourceDir);
+
+        var skillsDir = Path.Combine(_projectDir, ".claude", "skills");
+        Directory.CreateDirectory(skillsDir);
+        var agentPath = Path.Combine(skillsDir, skillName);
+        await File.WriteAllTextAsync(agentPath, "do not delete", TestContext.Current.CancellationToken);
+
+        // Act
+        var result = await _installer.InstallAsync(
+            skill,
+            "claude-code",
+            new InstallOptions(Global: false, WorkingDirectory: _projectDir, Mode: InstallMode.Symlink),
+            TestContext.Current.CancellationToken);
+
+        // Assert: install fails and the file is left intact.
+        Assert.False(result.Success);
+        Assert.NotNull(result.Error);
+        Assert.Contains("existing file", result.Error);
+        Assert.True(File.Exists(agentPath));
+        Assert.Equal("do not delete", await File.ReadAllTextAsync(agentPath, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    /// Delegates every operation to a real <see cref="SystemFileStore"/> except
+    /// <see cref="IFileStore.DeletePath"/> for one specific path, which always throws —
+    /// simulating an un-cleanable install destination (locked file, no permission).
+    /// </summary>
+    private sealed class DeleteFailingFileStore(string failForPath) : IFileStore
+    {
+        private readonly SystemFileStore _inner = new();
+
+        public bool PathExists(string path) => _inner.PathExists(path);
+
+        public bool IsSymlink(string path) => _inner.IsSymlink(path);
+
+        public bool FileExists(string path) => _inner.FileExists(path);
+
+        public bool DirectoryExists(string path) => _inner.DirectoryExists(path);
+
+        public void CreateDirectory(string path) => _inner.CreateDirectory(path);
+
+        public void DeleteDirectory(string path, bool recursive) => _inner.DeleteDirectory(path, recursive);
+
+        public void DeleteFile(string path) => _inner.DeleteFile(path);
+
+        public void DeletePath(string path)
+        {
+            if (string.Equals(Path.GetFullPath(path), Path.GetFullPath(failForPath), StringComparison.Ordinal))
+            {
+                throw new UnauthorizedAccessException($"Simulated failure deleting '{path}'");
+            }
+
+            _inner.DeletePath(path);
+        }
+
+        public IEnumerable<string> EnumerateDirectories(string path) => _inner.EnumerateDirectories(path);
+
+        public bool IsDirectoryEmpty(string path) => _inner.IsDirectoryEmpty(path);
+
+        public Task<string> ReadAllTextAsync(string path, CancellationToken cancellationToken)
+            => _inner.ReadAllTextAsync(path, cancellationToken);
+
+        public Task WriteAllTextAsync(string path, string content, CancellationToken cancellationToken)
+            => _inner.WriteAllTextAsync(path, content, cancellationToken);
+
+        public Task WriteAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken)
+            => _inner.WriteAllBytesAsync(path, bytes, cancellationToken);
+    }
 }
