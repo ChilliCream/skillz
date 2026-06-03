@@ -41,7 +41,24 @@ internal static class PathContainment
             return false;
         }
 
-        return path.StartsWithOrdinal("./");
+        return path.StartsWithOrdinal("./") && !ContainsParentTraversalSegment(path);
+    }
+
+    /// <summary>
+    /// Returns whether <paramref name="path"/> contains a literal <c>..</c> segment under either
+    /// slash style. This is a syntactic guard; it does not resolve the path.
+    /// </summary>
+    public static bool ContainsParentTraversalSegment(string path)
+    {
+        foreach (var segment in path.Replace('\\', '/').Split('/'))
+        {
+            if (segment == "..")
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool IsContainedNormalized(string normalizedTarget, string normalizedBase)

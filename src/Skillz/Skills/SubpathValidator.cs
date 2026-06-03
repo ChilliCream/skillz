@@ -17,16 +17,11 @@ internal static class SubpathValidator
     /// <exception cref="CliException">Thrown when <paramref name="subpath"/> contains a <c>..</c> segment.</exception>
     public static string ValidateSubpath(string subpath)
     {
-        var normalized = subpath.Replace('\\', '/');
-        var segments = normalized.Split('/');
-        foreach (var segment in segments)
+        if (PathContainment.ContainsParentTraversalSegment(subpath))
         {
-            if (segment == "..")
-            {
-                throw new CliException(
-                    ExitCodeConstants.Failure,
-                    $"""Unsafe subpath: "{subpath}" contains path traversal segments. Subpaths must not contain ".." components.""");
-            }
+            throw new CliException(
+                ExitCodeConstants.Failure,
+                $"""Unsafe subpath: "{subpath}" contains path traversal segments. Subpaths must not contain ".." components.""");
         }
 
         return subpath;
@@ -52,13 +47,9 @@ internal static class SubpathValidator
         // Reject any ".." segment up front (it is never valid in a skill subpath). We must not let
         // it reach the resolver: ".." is collapsed as text before symlinks are followed, so
         // "link/../x" (link -> outside base) could look contained yet really escape.
-        var normalized = subpath.Replace('\\', '/');
-        foreach (var segment in normalized.Split('/'))
+        if (PathContainment.ContainsParentTraversalSegment(subpath))
         {
-            if (segment == "..")
-            {
-                return false;
-            }
+            return false;
         }
 
         // Authoritative check: resolve the combined target's symlinks (including the leaf,

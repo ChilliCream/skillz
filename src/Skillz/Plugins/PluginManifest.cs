@@ -110,6 +110,11 @@ internal sealed class PluginManifest(IFileStore fileStore)
             }
 
             var pluginBase = Path.Combine(basePath, pluginRoot ?? string.Empty, sourceString ?? string.Empty);
+            if (!PathContainment.IsContainedIn(pluginBase, basePath))
+            {
+                continue;
+            }
+
             var name = plugin.Name is null ? null : TerminalSanitizer.SanitizeMetadata(plugin.Name);
             plugins.Add(new PluginEntry(pluginBase, plugin.Skills, name));
         }
