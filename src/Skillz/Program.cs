@@ -32,13 +32,10 @@ internal static class Program
         };
         Console.CancelKeyPress += cancelKeyHandler;
 
-        EventHandler unloadHandler = (_, _) =>
+        EventHandler unloadHandler = (_, _) => { if (!cts.IsCancellationRequested)
         {
-            if (!cts.IsCancellationRequested)
-            {
-                cts.Cancel();
-            }
-        };
+            cts.Cancel();
+        } };
         AppDomain.CurrentDomain.ProcessExit += unloadHandler;
 
         var builder = Host.CreateEmptyApplicationBuilder(new HostApplicationBuilderSettings { Args = args });
@@ -48,6 +45,12 @@ internal static class Program
         builder.Services.AddSingleton<CliExecutionContext>();
         builder.Services.AddSingleton<IInteractionService, ConsoleInteractionService>();
         builder.Services.AddSingleton<BannerService>();
+
+        builder.Services.ConfigureHttpClientDefaults(http =>
+        {
+            http.ConfigureHttpClient(client => client.MaxResponseContentBufferSize = BlobClient.MaxResponseBytes);
+            http.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        });
 
         builder.Services.AddHttpClient(BlobClient.HttpClientName);
         builder.Services.AddHttpClient(WellKnownProvider.HttpClientName);

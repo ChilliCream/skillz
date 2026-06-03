@@ -232,6 +232,7 @@ internal sealed class UpdateCommand(
         var skipped = new List<SkippedSkill>();
         var updates = new List<(string Name, SkillLockEntry Entry)>();
         var failed = new List<string>();
+        var timedOut = new List<string>();
 
         foreach (var (name, entry) in lockFile.Skills)
         {
@@ -263,19 +264,23 @@ internal sealed class UpdateCommand(
                 interaction.WriteDim(progressText);
             }
 
-            var latestHash = await TryFetchSkillFolderHashAsync(
+            var check = await TryFetchSkillFolderHashAsync(
                 entry.Source,
                 entry.SkillPath!,
                 entry.Ref,
                 cancellationToken);
 
-            if (latestHash is null)
+            switch (check)
             {
-                failed.Add(skillName);
-            }
-            else if (!latestHash.EqualsOrdinal(entry.SkillFolderHash))
-            {
-                updates.Add((skillName, entry));
+                case HashCheck.TimedOut:
+                    timedOut.Add(skillName);
+                    break;
+                case HashCheck.Missing:
+                    failed.Add(skillName);
+                    break;
+                case HashCheck.Found found when !found.Hash.EqualsOrdinal(entry.SkillFolderHash):
+                    updates.Add((skillName, entry));
+                    break;
             }
         }
 
@@ -303,7 +308,7 @@ internal sealed class UpdateCommand(
             return (0, 0, checkedCount);
         }
 
-        if (updates.Count == 0 && failed.Count == 0)
+        if (updates.Count == 0 && failed.Count == 0 && timedOut.Count == 0)
         {
             interaction.WriteSuccess("All global skills are up to date");
             PrintSkippedSkills(skipped);
@@ -324,8 +329,9 @@ internal sealed class UpdateCommand(
 
         PrintSkippedSkills(skipped);
         PrintFailedSkills(failed);
+        PrintTimedOutSkills(timedOut);
 
-        return (updates.Count, failed.Count, checkedCount);
+        return (updates.Count, failed.Count + timedOut.Count, checkedCount);
     }
 
     private async Task<(int FailCount, int CheckedCount)> CheckProjectSkillsAsync(
@@ -384,7 +390,7 @@ internal sealed class UpdateCommand(
         return (0, projectSkills.Count);
     }
 
-    private async Task<string?> TryFetchSkillFolderHashAsync(
+    private async Task<HashCheck> TryFetchSkillFolderHashAsync(
         string ownerRepo,
         string skillPath,
         string? @ref,
@@ -393,7 +399,7 @@ internal sealed class UpdateCommand(
         var slash = ownerRepo.IndexOfOrdinal('/');
         if (slash <= 0 || slash == ownerRepo.Length - 1)
         {
-            return null;
+            return HashCheck.Missing.Instance;
         }
 
         var owner = ownerRepo[..slash];
@@ -404,31 +410,36 @@ internal sealed class UpdateCommand(
             var tree = await blobClient.FetchTreeAsync(owner, repo, @ref, cancellationToken);
             if (tree is null)
             {
-                return null;
+                return HashCheck.Missing.Instance;
             }
 
             var folderPath = DeriveSkillFolder(skillPath);
             if (string.IsNullOrEmpty(folderPath))
             {
-                return tree.Sha;
+                return new HashCheck.Found(tree.Sha);
             }
 
             foreach (var entry in tree.Tree)
             {
                 if (entry.Type.EqualsOrdinal("tree") && entry.Path.EqualsOrdinal(folderPath))
                 {
-                    return entry.Sha;
+                    return new HashCheck.Found(entry.Sha);
                 }
             }
 
-            return null;
+            return HashCheck.Missing.Instance;
+        }
+        catch (BlobFetchTimeoutException)
+        {
+            // A genuine fetch timeout is distinct from "missing/private repo": surface it so
+            // the caller reports a timeout rather than silently bucketing it as not-found.
+            return HashCheck.TimedOut.Instance;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
-            // Honor the Try contract: any fetch failure (network, HTTP, timeout, missing
-            // repo) maps to null so the caller can report "couldn't check". Only a genuine
-            // user cancellation is allowed to propagate.
-            return null;
+            // Other fetch failures (network, HTTP, parse) map to "missing/error". Only a
+            // genuine user cancellation is allowed to propagate.
+            return HashCheck.Missing.Instance;
         }
     }
 
@@ -535,6 +546,21 @@ internal sealed class UpdateCommand(
         }
     }
 
+    private void PrintTimedOutSkills(List<string> timedOut)
+    {
+        if (timedOut.Count == 0)
+        {
+            return;
+        }
+
+        interaction.WriteLine();
+        interaction.WriteDim($"{timedOut.Count} skill(s) timed out before they could be checked:");
+        foreach (var name in timedOut)
+        {
+            interaction.WriteMarkupLine($"  [grey85]*[/] {Markup.Escape(name)}");
+        }
+    }
+
     private void PrintLegacyProjectSkills(IReadOnlyList<(string Name, LocalSkillLockEntry Entry)> legacy)
     {
         if (legacy.Count == 0)
@@ -604,6 +630,21 @@ internal sealed class UpdateCommand(
         }
 
         return BuildInstallSourceFolder(entry.Source, entry.SkillPath, entry.Ref);
+    }
+
+    private abstract record HashCheck
+    {
+        public sealed record Found(string Hash) : HashCheck;
+
+        public sealed record Missing : HashCheck
+        {
+            public static readonly Missing Instance = new();
+        }
+
+        public sealed record TimedOut : HashCheck
+        {
+            public static readonly TimedOut Instance = new();
+        }
     }
 
     private sealed record UpdateCheckOptions(bool Global, bool Project, bool Yes, string[]? Skills);

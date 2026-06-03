@@ -8,6 +8,14 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
 {
     internal const string HttpClientName = "Skillz.GitHub";
 
+    /// <summary>
+    /// Hard cap on a single response body. Skill manifests and tree listings are small; this
+    /// bounds memory against a hostile or runaway endpoint. Applied as
+    /// <c>MaxResponseContentBufferSize</c> on the named client (buffered reads) and enforced
+    /// directly for streamed reads where that limit does not apply.
+    /// </summary>
+    internal const long MaxResponseBytes = 8 * 1024 * 1024;
+
     private static readonly TimeSpan s_fetchTimeout = TimeSpan.FromSeconds(10);
 
     private readonly object _rateLimitLock = new();
@@ -84,45 +92,6 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
         return null;
     }
 
-    public async Task<string?> FetchFileAsync(
-        string owner,
-        string repo,
-        string path,
-        string? @ref,
-        CancellationToken cancellationToken)
-    {
-        // Blobs are fetched unauthenticated from raw.githubusercontent.com by design: skill repos
-        // are public, the raw CDN has generous limits, and it needs no token or User-Agent. This
-        // intentionally differs from the API tree fetch, which falls back to an authenticated retry.
-        var branch = string.IsNullOrEmpty(@ref) ? "HEAD" : @ref;
-        var url = $"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}";
-
-        var client = httpClientFactory.CreateClient(HttpClientName);
-
-        try
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(s_fetchTimeout);
-
-            using var response = await client.SendAsync(request, timeoutCts.Token);
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
-            }
-
-            return await response.Content.ReadAsStringAsync(timeoutCts.Token);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            return null;
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
-    }
-
     private async Task<BranchFetchResult> FetchTreeBranchAsync(
         string ownerRepo,
         string branch,
@@ -149,9 +118,15 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
             using var response = await client.SendAsync(request, timeoutCts.Token);
             if (response.IsSuccessStatusCode)
             {
+                if (response.Content.Headers.ContentLength is { } declared && declared > MaxResponseBytes)
+                {
+                    return new BranchFetchResult(null, RateLimited: false);
+                }
+
                 await using var stream = await response.Content.ReadAsStreamAsync(timeoutCts.Token);
+                await using var bounded = new MaxBytesStream(stream, MaxResponseBytes);
                 var data = await JsonSerializer.DeserializeAsync(
-                    stream,
+                    bounded,
                     JsonSourceGenerationContext.Default.GitHubTreeResponse,
                     timeoutCts.Token);
 
@@ -169,7 +144,7 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            return new BranchFetchResult(null, RateLimited: false);
+            throw new BlobFetchTimeoutException(url);
         }
         catch (HttpRequestException)
         {

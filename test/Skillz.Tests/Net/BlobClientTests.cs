@@ -188,49 +188,63 @@ public class BlobClientTests
     }
 
     [Fact]
-    public async Task FetchFileAsync_Returns_Content_On_Success()
+    public async Task FetchTreeAsync_Returns_Null_When_Declared_ContentLength_Exceeds_Cap()
     {
         // Arrange
         var handler = new StubHttpMessageHandler();
-        handler.EnqueueOk("hello world");
+        handler.EnqueueOversizedOk(BlobClient.MaxResponseBytes + 1);
 
         var tokenProvider = new FakeGitHubTokenProvider(() => null);
         var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
 
         // Act
-        var content = await client.FetchFileAsync(
+        var result = await client.FetchTreeAsync(
             "vercel",
             "skills",
-            "skills/foo/SKILL.md",
             "main",
             TestContext.Current.CancellationToken);
 
         // Assert
-        Assert.Equal("hello world", content);
-        Assert.Equal(
-            "https://raw.githubusercontent.com/vercel/skills/main/skills/foo/SKILL.md",
-            handler.Requests[0].RequestUri!.ToString());
+        Assert.Null(result);
     }
 
     [Fact]
-    public async Task FetchFileAsync_Returns_Null_On_404()
+    public async Task FetchTreeAsync_Returns_Null_When_Stream_Grows_Past_Cap_With_No_ContentLength()
     {
-        // Arrange
+        // Arrange: an unbounded chunked tree body must be aborted, not buffered to exhaustion.
         var handler = new StubHttpMessageHandler();
-        handler.EnqueueNotFound();
+        handler.EnqueueChunkedOk(BlobClient.MaxResponseBytes + (64 * 1024));
 
         var tokenProvider = new FakeGitHubTokenProvider(() => null);
         var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
 
         // Act
-        var content = await client.FetchFileAsync(
+        var result = await client.FetchTreeAsync(
             "vercel",
             "skills",
-            "missing.md",
             "main",
             TestContext.Current.CancellationToken);
 
         // Assert
-        Assert.Null(content);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task FetchTreeAsync_Throws_BlobFetchTimeout_When_Internal_Timeout_Fires()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler();
+        handler.EnqueueTimeout();
+
+        var tokenProvider = new FakeGitHubTokenProvider(() => null);
+        var client = new BlobClient(new FakeHttpClientFactory(handler), tokenProvider);
+
+        // Act + Assert: a timeout must surface distinctly, not be swallowed as a missing repo (null).
+        await Assert.ThrowsAsync<BlobFetchTimeoutException>(
+            () => client.FetchTreeAsync(
+                "vercel",
+                "skills",
+                "main",
+                TestContext.Current.CancellationToken));
     }
 }
