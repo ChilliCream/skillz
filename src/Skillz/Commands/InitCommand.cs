@@ -1,6 +1,8 @@
 using System.CommandLine;
 using Skillz.Install;
 using Skillz.Interaction;
+using Skillz.Plugins;
+using Skillz.Skills;
 using Skillz.Utils;
 using Spectre.Console;
 using static Skillz.KnownConfigNames;
@@ -32,13 +34,28 @@ internal sealed class InitCommand(
 
         var cwd = systemEnvironment.CurrentDirectory;
         var hasName = !string.IsNullOrEmpty(nameArg);
-        var skillName = hasName ? nameArg! : Path.GetFileName(cwd);
+
+        // Sanitize the derived name into a safe single path component. For a provided argument this
+        // also stops a value like "../escape" or "/etc/foo" from redirecting output outside cwd; for
+        // the directory-derived fallback it yields a valid slug and strips odd characters that would
+        // otherwise be written verbatim into SKILL.md.
+        var skillName = SkillNameSanitizer.SanitizeName(hasName ? nameArg! : Path.GetFileName(cwd));
         if (string.IsNullOrEmpty(skillName))
         {
             skillName = "skill";
         }
 
         var skillDir = hasName ? Path.Combine(cwd, skillName) : cwd;
+
+        // the sanitizer already neutralizes traversal, but verify the resolved directory stays
+        // within cwd before writing.
+        if (hasName && !PathContainment.IsContainedInRealPath(skillDir, cwd))
+        {
+            throw new CliException(
+                ExitCodeConstants.Failure,
+                $"Invalid skill name '{nameArg}': the target directory would be outside the current directory.");
+        }
+
         var skillFile = Path.Combine(skillDir, SkillFileName);
         var displayPath = hasName ? $"{skillName}/{SkillFileName}" : SkillFileName;
 
