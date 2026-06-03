@@ -222,19 +222,37 @@ internal sealed class ListCommand(
     }
 
     private string ShortenPath(string path)
+        => ShortenPath(path, systemEnvironment.HomeDirectory, systemEnvironment.CurrentDirectory);
+
+    internal static string ShortenPath(string path, string? home, string? cwd)
     {
-        var home = systemEnvironment.HomeDirectory;
-        if (!string.IsNullOrEmpty(home) && path.StartsWithOrdinal(home))
+        if (!string.IsNullOrEmpty(home) && IsWithinBase(path, home))
         {
             return "~" + path[home.Length..];
         }
-        var cwd = systemEnvironment.CurrentDirectory;
-        if (!string.IsNullOrEmpty(cwd) && path.StartsWithOrdinal(cwd))
+        if (!string.IsNullOrEmpty(cwd) && IsWithinBase(path, cwd))
         {
             var relative = path[cwd.Length..];
             return "." + (relative.Length == 0 ? "" : relative);
         }
         return path;
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> when <paramref name="path"/> is exactly
+    /// <paramref name="basePath"/> or a descendant of it, requiring a directory-separator
+    /// boundary so a sibling whose name merely starts with <paramref name="basePath"/>
+    /// (e.g. <c>/home/bobby</c> against base <c>/home/bob</c>) is not treated as contained.
+    /// </summary>
+    private static bool IsWithinBase(string path, string basePath)
+    {
+        if (!path.StartsWithOrdinal(basePath))
+        {
+            return false;
+        }
+
+        return path.Length == basePath.Length
+            || path[basePath.Length] == Path.DirectorySeparatorChar;
     }
 
     internal sealed record InstalledSkill(string Name, string CanonicalPath, List<string> Agents);

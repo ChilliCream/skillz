@@ -37,7 +37,7 @@ internal sealed partial class SourceParser : ISourceParser
     [GeneratedRegex(@"github\.com/([^/]+)/([^/]+)/tree/([^/]+)$")]
     private static partial Regex GitHubTreeRegex();
 
-    [GeneratedRegex(@"github\.com/([^/]+)/([^/]+)")]
+    [GeneratedRegex(@"(?:^|://|@)github\.com/([^/]+)/([^/]+)")]
     private static partial Regex GitHubRepoRegex();
 
     [GeneratedRegex(@"^(https?)://([^/]+)/(.+?)/-/tree/([^/]+)/(.+)")]
@@ -46,7 +46,7 @@ internal sealed partial class SourceParser : ISourceParser
     [GeneratedRegex(@"^(https?)://([^/]+)/(.+?)/-/tree/([^/]+)$")]
     private static partial Regex GitLabTreeRegex();
 
-    [GeneratedRegex(@"gitlab\.com/(.+?)(?:\.git)?/?$")]
+    [GeneratedRegex(@"(?:^|://|@)gitlab\.com/(.+?)(?:\.git)?/?$")]
     private static partial Regex GitLabRepoRegex();
 
     [GeneratedRegex(@"^([^/]+)/([^/@]+)@(.+)$")]
@@ -92,7 +92,7 @@ internal sealed partial class SourceParser : ISourceParser
         if (githubTreeWithPathMatch.Success)
         {
             var owner = githubTreeWithPathMatch.Groups[1].Value;
-            var repo = githubTreeWithPathMatch.Groups[2].Value;
+            var repo = TrailingGitRegex().Replace(githubTreeWithPathMatch.Groups[2].Value, string.Empty);
             var refValue = githubTreeWithPathMatch.Groups[3].Value;
             var subpath = githubTreeWithPathMatch.Groups[4].Value;
             return new SkillSource.GitHub(
@@ -105,7 +105,7 @@ internal sealed partial class SourceParser : ISourceParser
         if (githubTreeMatch.Success)
         {
             var owner = githubTreeMatch.Groups[1].Value;
-            var repo = githubTreeMatch.Groups[2].Value;
+            var repo = TrailingGitRegex().Replace(githubTreeMatch.Groups[2].Value, string.Empty);
             var refValue = githubTreeMatch.Groups[3].Value;
             return new SkillSource.GitHub(
                 Url: $"https://github.com/{owner}/{repo}.git",

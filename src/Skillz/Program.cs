@@ -92,10 +92,11 @@ internal static class Program
         builder.Services.AddTransient<SkillzRootCommand>();
 
         using var host = builder.Build();
-        await host.StartAsync(cts.Token);
 
         try
         {
+            await host.StartAsync(cts.Token);
+
             var rootCommand = host.Services.GetRequiredService<SkillzRootCommand>();
 
             if (args.Length == 0)
