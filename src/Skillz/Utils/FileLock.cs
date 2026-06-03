@@ -4,11 +4,32 @@ internal static class FileLock
 {
     private const int DefaultRetryDelayMs = 50;
     public const int DefaultTimeoutMs = 10_000;
+    public const int DefaultStaleLockTimeoutMs = 60_000;
 
+    /// <summary>
+    /// Runs <paramref name="action"/> while holding an exclusive on-disk lock for
+    /// <paramref name="targetPath"/>, using the default stale-lock timeout
+    /// (<see cref="DefaultStaleLockTimeoutMs"/>).
+    /// </summary>
+    public static Task<T> WithLockAsync<T>(
+        string targetPath,
+        Func<Task<T>> action,
+        int timeoutMs,
+        CancellationToken cancellationToken)
+    {
+        return WithLockAsync(targetPath, action, timeoutMs, DefaultStaleLockTimeoutMs, cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="action"/> while holding an exclusive on-disk lock for
+    /// <paramref name="targetPath"/>. A lock whose age exceeds
+    /// <paramref name="staleLockTimeoutMs"/> is treated as abandoned and reclaimed.
+    /// </summary>
     public static async Task<T> WithLockAsync<T>(
         string targetPath,
         Func<Task<T>> action,
         int timeoutMs,
+        int staleLockTimeoutMs,
         CancellationToken cancellationToken)
     {
         var lockPath = targetPath + ".lock";
@@ -50,7 +71,7 @@ internal static class FileLock
                 {
                     var info = new FileInfo(lockPath);
                     if (info.Exists
-                        && (DateTime.UtcNow - info.CreationTimeUtc).TotalMilliseconds > timeoutMs)
+                        && (DateTime.UtcNow - info.CreationTimeUtc).TotalMilliseconds > staleLockTimeoutMs)
                     {
                         File.Delete(lockPath);
                         continue;
@@ -64,10 +85,30 @@ internal static class FileLock
         }
     }
 
+    /// <summary>
+    /// Runs <paramref name="action"/> while holding an exclusive on-disk lock for
+    /// <paramref name="targetPath"/>, using the default stale-lock timeout
+    /// (<see cref="DefaultStaleLockTimeoutMs"/>).
+    /// </summary>
     public static Task WithLockAsync(
         string targetPath,
         Func<Task> action,
         int timeoutMs,
+        CancellationToken cancellationToken)
+    {
+        return WithLockAsync(targetPath, action, timeoutMs, DefaultStaleLockTimeoutMs, cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="action"/> while holding an exclusive on-disk lock for
+    /// <paramref name="targetPath"/>. A lock whose age exceeds
+    /// <paramref name="staleLockTimeoutMs"/> is treated as abandoned and reclaimed.
+    /// </summary>
+    public static Task WithLockAsync(
+        string targetPath,
+        Func<Task> action,
+        int timeoutMs,
+        int staleLockTimeoutMs,
         CancellationToken cancellationToken)
     {
         return WithLockAsync<object?>(
@@ -78,6 +119,7 @@ internal static class FileLock
                 return null;
             },
             timeoutMs,
+            staleLockTimeoutMs,
             cancellationToken);
     }
 }
