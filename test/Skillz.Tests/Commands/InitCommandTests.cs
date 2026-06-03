@@ -76,6 +76,47 @@ public class InitCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Init_With_Parent_Traversal_Name_Does_Not_Escape_Cwd()
+    {
+        // Arrange
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
+        var cmd = services.GetRequiredService<InitCommand>();
+        var parentSentinel = Path.Combine(Path.GetDirectoryName(_workspace)!, "escape", "SKILL.md");
+
+        // Act
+        var parseResult = cmd.Parse(["../escape"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(0, exitCode);
+        Assert.False(File.Exists(parentSentinel), "SKILL.md must not be written outside the workspace");
+        // Sanitized to a contained directory: "../escape" -> "escape".
+        Assert.True(File.Exists(Path.Combine(_workspace, "escape", "SKILL.md")));
+    }
+
+    [Fact]
+    public async Task Init_With_Absolute_Path_Name_Does_Not_Escape_Cwd()
+    {
+        // Arrange
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
+        var cmd = services.GetRequiredService<InitCommand>();
+        var absoluteTarget = Path.Combine(Path.GetTempPath(), "skillz-evil-" + Guid.NewGuid().ToString("N"));
+
+        // Act
+        var parseResult = cmd.Parse([absoluteTarget]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Equal(0, exitCode);
+        Assert.False(File.Exists(Path.Combine(absoluteTarget, "SKILL.md")));
+        Assert.False(Directory.Exists(absoluteTarget));
+        // Everything created stays under the workspace.
+        var created = Directory.GetFiles(_workspace, "SKILL.md", SearchOption.AllDirectories);
+        Assert.All(created, path => Assert.StartsWith(_workspace, Path.GetFullPath(path)));
+        Assert.Single(created);
+    }
+
+    [Fact]
     public async Task Init_When_SkillMd_Exists_Leaves_File_Unchanged()
     {
         // Arrange

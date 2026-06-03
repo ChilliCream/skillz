@@ -1,6 +1,8 @@
 using System.CommandLine;
 using Skillz.Install;
 using Skillz.Interaction;
+using Skillz.Plugins;
+using Skillz.Skills;
 using Skillz.Utils;
 using Spectre.Console;
 using static Skillz.KnownConfigNames;
@@ -32,13 +34,26 @@ internal sealed class InitCommand(
 
         var cwd = systemEnvironment.CurrentDirectory;
         var hasName = !string.IsNullOrEmpty(nameArg);
-        var skillName = hasName ? nameArg! : Path.GetFileName(cwd);
+
+        // Sanitize the raw argument into a safe single path component so a value
+        // like "../escape" or "/etc/foo" cannot redirect the output outside cwd.
+        var skillName = hasName ? SkillNameSanitizer.SanitizeName(nameArg!) : Path.GetFileName(cwd);
         if (string.IsNullOrEmpty(skillName))
         {
             skillName = "skill";
         }
 
         var skillDir = hasName ? Path.Combine(cwd, skillName) : cwd;
+
+        // Defense-in-depth: the sanitizer already neutralizes traversal, but
+        // verify the resolved directory stays within cwd before writing.
+        if (hasName && !PathContainment.IsContainedInRealPath(skillDir, cwd))
+        {
+            throw new CliException(
+                ExitCodeConstants.Failure,
+                $"Invalid skill name '{nameArg}': the target directory would be outside the current directory.");
+        }
+
         var skillFile = Path.Combine(skillDir, SkillFileName);
         var displayPath = hasName ? $"{skillName}/{SkillFileName}" : SkillFileName;
 
