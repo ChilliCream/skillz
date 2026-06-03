@@ -40,6 +40,7 @@ internal interface IInteractionService
     Task<ImmutableArray<T>> MultiSelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IEnumerable<T>? preSelected = null)
         where T : notnull;
 }

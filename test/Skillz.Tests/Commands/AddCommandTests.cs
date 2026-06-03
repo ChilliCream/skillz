@@ -273,6 +273,64 @@ public class AddCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Add_Should_OfferEachSkillOnce_When_DuplicateInstallNamesFetched()
+    {
+        // Arrange: the source yields the same skill name twice plus a distinct one.
+        IReadOnlyList<ResolvedSkill>? offered = null;
+
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) =>
+                new[] { CreateSkill("alpha"), CreateSkill("alpha"), CreateSkill("beta") },
+            configurePrompter: p =>
+            {
+                p.OnSelectSkills = skills =>
+                {
+                    offered = skills;
+                    return skills;
+                };
+                p.OnConfirmInstallation = (_, _, _) => true;
+            });
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: the duplicate alpha is collapsed, so only two distinct skills reach the prompt.
+        Assert.Equal(0, exitCode);
+        Assert.NotNull(offered);
+        Assert.Equal(["alpha", "beta"], offered.Select(s => s.InstallName).OrderBy(n => n, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task Add_Should_InstallEachSkillOnce_When_DuplicateInstallNamesFetched()
+    {
+        // Arrange: the same skill name appears twice in the fetched set.
+        var installed = new List<string>();
+
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) =>
+                new[] { CreateSkill("alpha"), CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, _) =>
+                {
+                    installed.Add(skill.InstallName);
+                    return new InstallResult(true, $"/installed/{skill.InstallName}");
+                });
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: dedup means the skill is installed exactly once, not once per duplicate entry.
+        Assert.Equal(0, exitCode);
+        Assert.Equal(["alpha"], installed);
+    }
+
+    [Fact]
     public async Task Add_Interactive_Confirmation_Includes_Existing_Canonical_Path()
     {
         // Arrange

@@ -80,7 +80,8 @@ internal sealed class AddCommandExecutor(
         interaction.WriteDim($"Source: {parsed.DisplayString}");
 
         // Fetch skills into a temp staging area, and clean it up no matter how we exit below.
-        var skills = await FetchSkillsAsync(parsed, options, skillFilters, cancellationToken);
+        var skills = DeduplicateByInstallName(
+            await FetchSkillsAsync(parsed, options, skillFilters, cancellationToken));
         try
         {
             // Turn the fetched skills into the final outcome: fail if none were found, print a
@@ -467,6 +468,48 @@ internal sealed class AddCommandExecutor(
 
         // Zero or several installed in interactive mode: let the user choose.
         return await prompter.SelectAgentsAsync(validAgents, options.Global, cancellationToken);
+    }
+
+    private static ImmutableArray<ResolvedSkill> DeduplicateByInstallName(ImmutableArray<ResolvedSkill> skills)
+    {
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var kept = ImmutableArray.CreateBuilder<ResolvedSkill>(skills.Length);
+        var dropped = new List<ResolvedSkill>();
+
+        // Keep the first skill per InstallName; the same skill listed twice must not be offered or
+        // installed twice. Order is preserved so the prompt and listing stay deterministic.
+        foreach (var skill in skills)
+        {
+            if (seen.Add(skill.InstallName))
+            {
+                kept.Add(skill);
+            }
+            else
+            {
+                dropped.Add(skill);
+            }
+        }
+
+        if (dropped.Count == 0)
+        {
+            return skills;
+        }
+
+        // Reclaim staging dirs of dropped duplicates, unless a kept skill still references the same
+        // path (providers may stage several skills under one root), to avoid leaking temp files.
+        var keptPaths = kept
+            .Where(s => !string.IsNullOrEmpty(s.CleanupPath))
+            .Select(s => s.CleanupPath!)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var skill in dropped)
+        {
+            if (!string.IsNullOrEmpty(skill.CleanupPath) && !keptPaths.Contains(skill.CleanupPath))
+            {
+                TempDirCleanup.SafeDelete(skill.CleanupPath);
+            }
+        }
+
+        return kept.ToImmutable();
     }
 
     private static void CleanupStagingPaths(IEnumerable<ResolvedSkill> skills)

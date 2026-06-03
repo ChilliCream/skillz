@@ -9,6 +9,7 @@
     <PackageReference Include="xunit.runner.visualstudio" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="CookieCrumble.Xunit3" />
+    <PackageReference Include="Spectre.Console.Testing" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../src/Skillz/Skillz.csproj" />

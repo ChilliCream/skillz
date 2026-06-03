@@ -94,7 +94,8 @@ internal sealed class AddCommandPrompter(
         var selected = await interaction.MultiSelectAsync(
             "Which agents do you want to install to?",
             choices,
-            cancellationToken);
+            cancellationToken,
+            preSelected: defaults);
 
         // Save selection for next time
         if (selected.Length > 0)

@@ -38,6 +38,19 @@ internal sealed class TestInteractionService : IInteractionService
 
     public Func<string, IReadOnlyList<string>, IReadOnlyList<string>>? OnMultiSelect { get; set; }
 
+    /// <summary>
+    /// Selection hook keyed by choice index rather than label, so duplicate labels can be
+    /// disambiguated in tests. Takes the message and the choice labels (in presentation order)
+    /// and returns the indices to select. Takes precedence over <see cref="OnMultiSelect"/>.
+    /// </summary>
+    public Func<string, IReadOnlyList<string>, IReadOnlyList<int>>? OnMultiSelectByIndex { get; set; }
+
+    /// <summary>
+    /// Captures the pre-selected values handed to the most recent <see cref="MultiSelectAsync{T}"/>
+    /// call, so tests can assert last-used defaults are passed through to the prompt.
+    /// </summary>
+    public IReadOnlyList<object>? LastPreSelected { get; private set; }
+
     public void WriteLine(string text = "")
     {
         _output.Add(text);
@@ -145,16 +158,27 @@ internal sealed class TestInteractionService : IInteractionService
     public Task<ImmutableArray<T>> MultiSelectAsync<T>(
         string message,
         IEnumerable<(string Label, T Value)> choices,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IEnumerable<T>? preSelected = null)
         where T : notnull
     {
         var pairs = choices.ToList();
+        LastPreSelected = preSelected?.Cast<object>().ToList();
         if (pairs.Count == 0)
         {
             return Task.FromResult<ImmutableArray<T>>([]);
         }
 
         var labels = pairs.Select(c => c.Label).ToList();
+
+        // Index-keyed hook wins so tests can target an exact choice even when two share a label.
+        if (OnMultiSelectByIndex is not null)
+        {
+            var indices = OnMultiSelectByIndex(message, labels);
+            ImmutableArray<T> byIndex = [.. indices.Order().Select(i => pairs[i].Value)];
+            return Task.FromResult(byIndex);
+        }
+
         var selectedLabels = OnMultiSelect is not null ? OnMultiSelect(message, labels) : Array.Empty<string>();
         var selectedSet = new HashSet<string>(selectedLabels, StringComparer.Ordinal);
         ImmutableArray<T> result = [.. pairs.Where(c => selectedSet.Contains(c.Label)).Select(c => c.Value)];
