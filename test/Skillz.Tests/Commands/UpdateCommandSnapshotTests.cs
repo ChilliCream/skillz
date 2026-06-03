@@ -241,12 +241,10 @@ public class UpdateCommandSnapshotTests : IDisposable
 
             Checking for skill updates...
 
-            Found 1 project update(s)
+            1 project skill(s) can be refreshed (re-install to update):
 
-            Update available: my-skill
+            Refresh: my-skill
               Run: skillz add owner/repo/skills/my-skill#main --skill my-skill -y
-
-            Updates available for 1 skill(s); no updates were applied.
             """);
     }
 

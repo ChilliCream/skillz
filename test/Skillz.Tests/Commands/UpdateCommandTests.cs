@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Skillz;
 using Skillz.Commands;
 using Skillz.Locking;
 using Skillz.Net;
@@ -247,7 +248,9 @@ public class UpdateCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("Update available", StringComparison.Ordinal));
+        Assert.Contains(interaction.Output, line => line.Contains("can be refreshed", StringComparison.Ordinal));
+        Assert.Contains(interaction.Output, line => line.Contains("Refresh:", StringComparison.Ordinal));
+        Assert.DoesNotContain(interaction.Output, line => line.Contains("Updates available for", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -332,6 +335,36 @@ public class UpdateCommandTests : IDisposable
         Assert.Equal(0, exit);
         Assert.Contains(interaction.Output, line => line.Contains("Global Skills", StringComparison.Ordinal));
         Assert.Contains(interaction.Output, line => line.Contains("Project Skills", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Update_With_Yes_Flag_Detects_Project_Scope_Via_SystemEnvironment_CurrentDirectory()
+    {
+        // Arrange: seed the FakeFileStore with a project lock file under the fake env's current directory.
+        // HasProjectSkillsAsync uses ISystemEnvironment.CurrentDirectory (not Directory.GetCurrentDirectory()),
+        // so it must find the file via FakeFileStore regardless of the process cwd.
+        var workspace = "/project-root";
+        var services = CliTestHelper.CreateServiceProvider(workspace: workspace);
+        var fileStore = services.GetRequiredService<FakeFileStore>();
+        fileStore.Files[$"{workspace}/{KnownConfigNames.ProjectLockFileName}"] = "dummy"u8.ToArray();
+
+        var projectLock = services.GetRequiredService<TestProjectLockFile>();
+        projectLock.OnRead = _ => new LocalSkillLockFile
+        {
+            Version = 1,
+            Skills = new Dictionary<string, LocalSkillLockEntry>(StringComparer.Ordinal)
+        };
+        var interaction = services.GetRequiredService<TestInteractionService>();
+
+        // Act
+        var cmd = services.GetRequiredService<UpdateCommand>();
+        var parseResult = cmd.Parse(["-y"]);
+        var exit = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: project scope was selected (project message appears, not global)
+        Assert.Equal(0, exit);
+        Assert.Contains(interaction.Output, line => line.Contains("No project skills", StringComparison.Ordinal));
+        Assert.DoesNotContain(interaction.Output, line => line.Contains("No global skills", StringComparison.Ordinal));
     }
 
     [Fact]

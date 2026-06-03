@@ -81,7 +81,7 @@ internal sealed class UpdateCommand(
                 interaction.WriteMarkupLine("[bold]Global Skills[/]");
             }
 
-            var globalResult = await UpdateGlobalSkillsAsync(skillFilter, cancellationToken);
+            var globalResult = await CheckGlobalSkillsAsync(skillFilter, cancellationToken);
             totalUpdatesAvailable += globalResult.UpdatesAvailableCount;
             totalFail += globalResult.FailCount;
             totalFound += globalResult.CheckedCount;
@@ -99,10 +99,9 @@ internal sealed class UpdateCommand(
                 interaction.WriteMarkupLine("[bold]Project Skills[/]");
             }
 
-            var projectResult = await UpdateProjectSkillsAsync(skillFilter, cancellationToken);
-            totalUpdatesAvailable += projectResult.UpdatesAvailableCount;
+            var projectResult = await CheckProjectSkillsAsync(skillFilter, cancellationToken);
             totalFail += projectResult.FailCount;
-            totalFound += projectResult.FoundCount;
+            totalFound += projectResult.CheckedCount;
         }
 
         if (skillFilter is not null && totalFound == 0)
@@ -120,7 +119,7 @@ internal sealed class UpdateCommand(
 
         if (totalFail > 0)
         {
-            interaction.WriteDim($"Failed to update {totalFail} skill(s)");
+            interaction.WriteDim($"Failed to check {totalFail} skill(s)");
         }
 
         interaction.WriteLine();
@@ -179,14 +178,14 @@ internal sealed class UpdateCommand(
     {
         var cwd = system.CurrentDirectory;
 
-        if (fileStore.FileExists(Path.Combine(cwd, KnownConfigNames.ProjectLockFileName)))
-        {
-            return Task.FromResult(true);
-        }
-
         var skillsDir = Path.Combine(cwd, KnownConfigNames.UniversalSkillsDirectory);
         try
         {
+            if (fileStore.FileExists(Path.Combine(cwd, KnownConfigNames.ProjectLockFileName)))
+            {
+                return Task.FromResult(true);
+            }
+
             if (!fileStore.DirectoryExists(skillsDir))
             {
                 return Task.FromResult(false);
@@ -213,7 +212,7 @@ internal sealed class UpdateCommand(
         return Task.FromResult(false);
     }
 
-    private async Task<(int UpdatesAvailableCount, int FailCount, int CheckedCount)> UpdateGlobalSkillsAsync(
+    private async Task<(int UpdatesAvailableCount, int FailCount, int CheckedCount)> CheckGlobalSkillsAsync(
         string[]? skillFilter,
         CancellationToken cancellationToken)
     {
@@ -232,6 +231,7 @@ internal sealed class UpdateCommand(
         var checkable = new List<(string Name, SkillLockEntry Entry)>();
         var skipped = new List<SkippedSkill>();
         var updates = new List<(string Name, SkillLockEntry Entry)>();
+        var failed = new List<string>();
 
         foreach (var (name, entry) in lockFile.Skills)
         {
@@ -268,7 +268,12 @@ internal sealed class UpdateCommand(
                 entry.SkillPath!,
                 entry.Ref,
                 cancellationToken);
-            if (latestHash?.EqualsOrdinal(entry.SkillFolderHash) == false)
+
+            if (latestHash is null)
+            {
+                failed.Add(skillName);
+            }
+            else if (!latestHash.EqualsOrdinal(entry.SkillFolderHash))
             {
                 updates.Add((skillName, entry));
             }
@@ -298,29 +303,32 @@ internal sealed class UpdateCommand(
             return (0, 0, checkedCount);
         }
 
-        if (updates.Count == 0)
+        if (updates.Count == 0 && failed.Count == 0)
         {
             interaction.WriteSuccess("All global skills are up to date");
+            PrintSkippedSkills(skipped);
             return (0, 0, checkedCount);
         }
 
-        interaction.WriteMarkupLine($"Found {updates.Count} global update(s)");
-        interaction.WriteLine();
-
-        var updatesAvailableCount = 0;
-
-        foreach (var (name, _) in updates)
+        if (updates.Count > 0)
         {
-            interaction.WriteMarkupLine($"[grey85]Update available:[/] {Markup.Escape(name)}");
-            interaction.WriteDim($"  Run: skillz add {BuildInstallSource(lockFile.Skills[name])} -g -y");
-            updatesAvailableCount++;
+            interaction.WriteMarkupLine($"Found {updates.Count} global update(s)");
+            interaction.WriteLine();
+
+            foreach (var (name, _) in updates)
+            {
+                interaction.WriteMarkupLine($"[grey85]Update available:[/] {Markup.Escape(name)}");
+                interaction.WriteDim($"  Run: skillz add {BuildInstallSource(lockFile.Skills[name])} -g -y");
+            }
         }
 
         PrintSkippedSkills(skipped);
-        return (updatesAvailableCount, 0, checkedCount);
+        PrintFailedSkills(failed);
+
+        return (updates.Count, failed.Count, checkedCount);
     }
 
-    private async Task<(int UpdatesAvailableCount, int FailCount, int FoundCount)> UpdateProjectSkillsAsync(
+    private async Task<(int FailCount, int CheckedCount)> CheckProjectSkillsAsync(
         string[]? skillFilter,
         CancellationToken cancellationToken)
     {
@@ -348,7 +356,7 @@ internal sealed class UpdateCommand(
                 interaction.WriteDim("No project skills to update.");
                 interaction.WriteDim("Install project skills with: skillz add <package>");
             }
-            return (0, 0, 0);
+            return (0, 0);
         }
 
         var updatable = projectSkills.Where(s => !string.IsNullOrEmpty(s.Entry.SkillPath)).ToList();
@@ -358,26 +366,22 @@ internal sealed class UpdateCommand(
         {
             interaction.WriteDim("No project skills can be updated in place.");
             PrintLegacyProjectSkills(legacy);
-            return (0, 0, projectSkills.Count);
+            return (0, projectSkills.Count);
         }
 
-        interaction.WriteMarkupLine($"Found {updatable.Count} project update(s)");
+        interaction.WriteDim($"{updatable.Count} project skill(s) can be refreshed (re-install to update):");
         interaction.WriteLine();
-
-        var updatesAvailableCount = 0;
 
         foreach (var (name, entry) in updatable)
         {
             var installUrl = BuildLocalInstallSource(entry);
-            interaction.WriteMarkupLine($"[grey85]Update available:[/] {Markup.Escape(name)}");
+            interaction.WriteMarkupLine($"[grey85]Refresh:[/] {Markup.Escape(name)}");
             interaction.WriteDim($"  Run: skillz add {installUrl} --skill {name} -y");
-            updatesAvailableCount++;
         }
 
         PrintLegacyProjectSkills(legacy);
-        await Task.CompletedTask;
 
-        return (updatesAvailableCount, 0, projectSkills.Count);
+        return (0, projectSkills.Count);
     }
 
     private async Task<string?> TryFetchSkillFolderHashAsync(
@@ -419,22 +423,28 @@ internal sealed class UpdateCommand(
 
             return null;
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
+            // Honor the Try contract: any fetch failure (network, HTTP, timeout, missing
+            // repo) maps to null so the caller can report "couldn't check". Only a genuine
+            // user cancellation is allowed to propagate.
             return null;
         }
     }
 
     private static string DeriveSkillFolder(string skillPath)
     {
+        const string withSlashSkillMd = "/" + KnownConfigNames.SkillFileName;
+        const string skillMd = KnownConfigNames.SkillFileName;
+
         var folder = skillPath.Replace('\\', '/');
-        if (folder.EndsWithOrdinalIgnoreCase("/SKILL.md"))
+        if (folder.EndsWithOrdinalIgnoreCase(withSlashSkillMd))
         {
-            folder = folder[..^9];
+            folder = folder[..^withSlashSkillMd.Length];
         }
-        else if (folder.EndsWithOrdinalIgnoreCase("SKILL.md"))
+        else if (folder.EndsWithOrdinalIgnoreCase(skillMd))
         {
-            folder = folder[..^8];
+            folder = folder[..^skillMd.Length];
         }
 
         if (folder.EndsWith('/'))
@@ -510,6 +520,21 @@ internal sealed class UpdateCommand(
         }
     }
 
+    private void PrintFailedSkills(IReadOnlyList<string> failed)
+    {
+        if (failed.Count == 0)
+        {
+            return;
+        }
+
+        interaction.WriteLine();
+        interaction.WriteDim($"{failed.Count} skill(s) could not be checked (network or access error):");
+        foreach (var name in failed)
+        {
+            interaction.WriteMarkupLine($"  [grey85]*[/] {Markup.Escape(name)}");
+        }
+    }
+
     private void PrintLegacyProjectSkills(IReadOnlyList<(string Name, LocalSkillLockEntry Entry)> legacy)
     {
         if (legacy.Count == 0)
@@ -548,6 +573,13 @@ internal sealed class UpdateCommand(
         return string.IsNullOrEmpty(@ref) ? sourceUrl : $"{sourceUrl}#{@ref}";
     }
 
+    private static string BuildInstallSourceFolder(string source, string skillPath, string? @ref)
+    {
+        var folder = DeriveSkillFolder(skillPath);
+        var withFolder = string.IsNullOrEmpty(folder) ? source : $"{source}/{folder}";
+        return string.IsNullOrEmpty(@ref) ? withFolder : $"{withFolder}#{@ref}";
+    }
+
     private static string BuildInstallSource(SkillLockEntry entry)
     {
         if (string.IsNullOrEmpty(entry.SkillPath))
@@ -555,9 +587,7 @@ internal sealed class UpdateCommand(
             return FormatSourceInput(entry.SourceUrl, entry.Ref);
         }
 
-        var folder = DeriveSkillFolder(entry.SkillPath);
-        var withFolder = string.IsNullOrEmpty(folder) ? entry.Source : $"{entry.Source}/{folder}";
-        return string.IsNullOrEmpty(entry.Ref) ? withFolder : $"{withFolder}#{entry.Ref}";
+        return BuildInstallSourceFolder(entry.Source, entry.SkillPath, entry.Ref);
     }
 
     private static string BuildLocalInstallSource(LocalSkillLockEntry entry)
@@ -567,9 +597,7 @@ internal sealed class UpdateCommand(
             return FormatSourceInput(entry.Source, entry.Ref);
         }
 
-        var folder = DeriveSkillFolder(entry.SkillPath);
-        var withFolder = string.IsNullOrEmpty(folder) ? entry.Source : $"{entry.Source}/{folder}";
-        return string.IsNullOrEmpty(entry.Ref) ? withFolder : $"{withFolder}#{entry.Ref}";
+        return BuildInstallSourceFolder(entry.Source, entry.SkillPath, entry.Ref);
     }
 
     private sealed record UpdateCheckOptions(bool Global, bool Project, bool Yes, string[]? Skills);
