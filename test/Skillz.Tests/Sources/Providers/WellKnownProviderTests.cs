@@ -329,6 +329,48 @@ public class WellKnownProviderTests
     }
 
     [Fact]
+    public async Task Keeps_Valid_Legacy_Entries_When_Index_Mixes_Valid_And_Invalid()
+    {
+        // Arrange: one valid v1 entry plus one invalid (unsafe file path) entry.
+        var handler = new StubHttpMessageHandler();
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            """
+            {
+              "skills": [
+                {
+                  "name": "bad-skill",
+                  "description": "Bad skill.",
+                  "files": ["SKILL.md", "../escape.md"]
+                },
+                {
+                  "name": "legacy-skill",
+                  "description": "Legacy skill.",
+                  "files": ["SKILL.md"]
+                }
+              ]
+            }
+            """);
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/legacy-skill/SKILL.md",
+            LegacySkillMd,
+            contentType: "text/markdown");
+
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
+
+        // Act
+        var skills = await provider.FetchSkillsAsync(
+            new SkillSource.WellKnown("https://example.com"),
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: the valid entry survives even though an earlier entry was invalid.
+        var skill = Assert.Single(skills);
+        Assert.Equal("legacy-skill", skill.InstallName);
+        Assert.Equal("Legacy skill.", skill.Description);
+    }
+
+    [Fact]
     public async Task Skips_V2_Entry_With_Non_Http_Artifact_Url_And_Keeps_Https_Sibling()
     {
         // Arrange: a file:// artifact URL must be skipped while a normal https entry survives.

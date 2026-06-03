@@ -202,7 +202,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
         {
             if (!IsValidSkillEntryV1(entry))
             {
-                return null;
+                continue;
             }
 
             legacyEntries.Add(
@@ -216,6 +216,11 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
                     Files: entry.Files,
                     BaseUrl: legacyBaseUrl,
                     WellKnownPath: wellKnownPath));
+        }
+
+        if (legacyEntries.Count == 0)
+        {
+            return null;
         }
 
         return new IndexCandidate(legacyEntries, resolvedBaseUrl, wellKnownPath);

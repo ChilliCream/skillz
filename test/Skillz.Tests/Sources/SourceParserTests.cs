@@ -1006,4 +1006,51 @@ public class SourceParserTests
         // Assert
         Assert.Contains("Unsupported git transport", ex.Message, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void GitHub_TreeUrl_Should_StripTrailingDotGit_When_RepoHasDotGitSuffix()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://github.com/owner/repo.git/tree/main");
+
+        // Assert
+        var github = Assert.IsType<SkillSource.GitHub>(result);
+        Assert.Equal("https://github.com/owner/repo.git", github.Url);
+        Assert.Equal("main", github.Ref);
+    }
+
+    [Fact]
+    public void GitHub_TreeWithPathUrl_Should_StripTrailingDotGit_When_RepoHasDotGitSuffix()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://github.com/owner/repo.git/tree/main/skills/my-skill");
+
+        // Assert
+        var github = Assert.IsType<SkillSource.GitHub>(result);
+        Assert.Equal("https://github.com/owner/repo.git", github.Url);
+        Assert.Equal("main", github.Ref);
+        Assert.Equal("skills/my-skill", github.Subpath);
+    }
+
+    [Fact]
+    public void Parse_Should_PreserveHost_When_GitHubComAppearsAsPathSegment()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://internal.example.com/github.com/owner/repo");
+
+        // Assert: the embedded github.com must NOT hijack the user's host (no rewrite to github.com).
+        var wellKnown = Assert.IsType<SkillSource.WellKnown>(result);
+        Assert.Equal("https://internal.example.com/github.com/owner/repo", wellKnown.Url);
+    }
+
+    [Fact]
+    public void Parse_Should_PreserveHost_When_GitLabComAppearsAsPathSegment()
+    {
+        // Act
+        var result = new SourceParser().Parse("https://internal.example.com/gitlab.com/owner/repo.git");
+
+        // Assert: the embedded gitlab.com must NOT hijack the user's host.
+        var git = Assert.IsType<SkillSource.Git>(result);
+        Assert.Equal("https://internal.example.com/gitlab.com/owner/repo.git", git.Url);
+    }
 }

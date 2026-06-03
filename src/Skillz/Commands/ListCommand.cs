@@ -47,7 +47,9 @@ internal sealed class ListCommand(
         Options.Add(_jsonOption);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken)
+    protected override async Task<CommandResult> ExecuteAsync(
+        ParseResult parseResult,
+        CancellationToken cancellationToken)
     {
         var global = parseResult.GetValue(_globalOption);
         var agents = parseResult.GetValue(_agentOption) ?? [];
@@ -119,7 +121,7 @@ internal sealed class ListCommand(
 
             grid.AddRow(
                 $"[cyan]{Markup.Escape(skill.Name)}[/]",
-                $"[dim]{Markup.Escape(ShortenPath(skill.CanonicalPath))}[/]",
+                $"[dim]{Markup.Escape(PathUtils.Shorten(skill.CanonicalPath, systemEnvironment.HomeDirectory, systemEnvironment.CurrentDirectory))}[/]",
                 agentCell);
         }
 
@@ -219,22 +221,6 @@ internal sealed class ListCommand(
         }
 
         return [.. skills.Values];
-    }
-
-    private string ShortenPath(string path)
-    {
-        var home = systemEnvironment.HomeDirectory;
-        if (!string.IsNullOrEmpty(home) && path.StartsWithOrdinal(home))
-        {
-            return "~" + path[home.Length..];
-        }
-        var cwd = systemEnvironment.CurrentDirectory;
-        if (!string.IsNullOrEmpty(cwd) && path.StartsWithOrdinal(cwd))
-        {
-            var relative = path[cwd.Length..];
-            return "." + (relative.Length == 0 ? "" : relative);
-        }
-        return path;
     }
 
     internal sealed record InstalledSkill(string Name, string CanonicalPath, List<string> Agents);

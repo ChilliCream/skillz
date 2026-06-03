@@ -3,6 +3,7 @@ using Skillz.Commands;
 using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Locking;
+using Skillz.Skills;
 using Skillz.Tests.TestServices;
 using Skillz.Tests.Utils;
 using Xunit;
@@ -131,6 +132,40 @@ public class RemoveCommandTests : IDisposable
         Assert.Equal(0, exitCode);
         Assert.False(Directory.Exists(Path.Combine(canonical, "alpha")));
         Assert.False(Directory.Exists(Path.Combine(canonical, "beta")));
+    }
+
+    [Fact]
+    public async Task Remove_Reports_Failure_When_OnDiskFolder_Does_Not_Map_To_Sanitized_Path()
+    {
+        // Arrange: an externally-created, unsanitized folder ("My Skill") is on disk. The
+        // installer resolves install/canonical paths from the SANITIZED name ("my-skill"),
+        // which does not exist — so nothing is actually deleted. The command must not claim
+        // success when nothing was removed.
+        var canonical = Path.Combine(_workspace, ".agents", "skills");
+        Directory.CreateDirectory(canonical);
+        var onDiskFolder = Path.Combine(canonical, "My Skill");
+        CreateSkill(canonical, "My Skill");
+
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
+        var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
+        installer.OnGetCanonicalSkillsDir = (_, cwd) => Path.Combine(cwd ?? _workspace, ".agents", "skills");
+        installer.OnGetAgentBaseDir = (_, _, cwd) => Path.Combine(cwd ?? _workspace, ".agents", "skills");
+        installer.OnGetCanonicalPath = (name, _, cwd) =>
+            Path.Combine(cwd ?? _workspace, ".agents", "skills", SkillNameSanitizer.SanitizeName(name));
+        installer.OnGetInstallPath = (name, _, _, cwd) =>
+            Path.Combine(cwd ?? _workspace, ".agents", "skills", SkillNameSanitizer.SanitizeName(name));
+
+        // Act
+        var cmd = services.GetRequiredService<RemoveCommand>();
+        var parseResult = cmd.Parse(["--all"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: nothing was deleted and the command reported a failure (did not claim success).
+        Assert.NotEqual(0, exitCode);
+        Assert.True(Directory.Exists(onDiskFolder));
+        var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
+        Assert.DoesNotContain(interaction.Output, o => o.Contains("Successfully removed", StringComparison.Ordinal));
+        Assert.Contains(interaction.Output, o => o.Contains("Failed to remove", StringComparison.Ordinal));
     }
 
     [Fact]

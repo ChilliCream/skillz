@@ -143,6 +143,7 @@ internal sealed class RemoveCommand(
                 {
                     var canonicalPath = installer.GetCanonicalPath(skillName, global, cwd);
 
+                    var deletedAnything = false;
                     foreach (var agentType in targetAgents)
                     {
                         var installPath = installer.GetInstallPath(skillName, agentType, global, cwd);
@@ -151,24 +152,29 @@ internal sealed class RemoveCommand(
                             continue;
                         }
 
-                        TryDeletePath(installPath);
+                        deletedAnything |= TryDeletePath(installPath);
                     }
 
                     if (!IsCanonicalStillUsed(installer, registry, skillName, global, cwd, targetAgents))
                     {
-                        TryDeletePath(canonicalPath);
+                        deletedAnything |= TryDeletePath(canonicalPath);
                     }
 
-                    if (global)
+                    var lockEntryRemoved = global
+                        ? await globalLock.RemoveEntryAsync(skillName, cancellationToken)
+                        : await projectLock.RemoveEntryAsync(skillName, cwd, cancellationToken);
+
+                    // The discovered name may be an unsanitized on-disk folder that does not map to
+                    // the sanitized install/canonical paths, so nothing on disk or in the lock was
+                    // actually removed. Report that accurately instead of claiming success.
+                    if (deletedAnything || lockEntryRemoved)
                     {
-                        await globalLock.RemoveEntryAsync(skillName, cancellationToken);
+                        removed++;
                     }
                     else
                     {
-                        await projectLock.RemoveEntryAsync(skillName, cwd, cancellationToken);
+                        failures.Add((skillName, "Nothing was removed (no matching files or lock entry found)."));
                     }
-
-                    removed++;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -265,15 +271,27 @@ internal sealed class RemoveCommand(
         return false;
     }
 
-    private void TryDeletePath(string path)
+    /// <summary>
+    /// Deletes the path when it exists and reports whether something was actually removed.
+    /// Returns <see langword="false"/> when nothing existed at <paramref name="path"/> or the
+    /// best-effort deletion failed, so callers can report removal accurately.
+    /// </summary>
+    private bool TryDeletePath(string path)
     {
+        if (!fileStore.PathExists(path))
+        {
+            return false;
+        }
+
         try
         {
             fileStore.DeletePath(path);
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Best-effort
+            return false;
         }
     }
 }
