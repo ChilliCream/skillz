@@ -2,6 +2,7 @@ using System.Text;
 using CliWrap;
 using CliWrap.Buffered;
 using CliWrap.Exceptions;
+using Skillz.Skills;
 
 namespace Skillz.Git;
 
@@ -118,12 +119,15 @@ public sealed class GitClient : IGitClient
     /// <summary>
     /// Maps a failed <c>git clone</c> to a user-facing <see cref="GitCloneException"/>,
     /// distinguishing authentication failures from other errors and redacting any
-    /// credentials in the URL or git's error output. Always throws.
+    /// credentials in the URL or git's error output. Git's stderr is influenced by the
+    /// remote (echoed back as <c>remote: ...</c>), so it is also run through
+    /// <see cref="TerminalSanitizer.StripTerminalEscapes"/> to remove terminal escape
+    /// sequences before it is embedded in the message. Always throws.
     /// </summary>
     private static void ThrowMappedError(string url, string errorMessage)
     {
         var redactedUrl = GitUrl.RedactUrlUserInfo(url);
-        var redactedError = GitUrl.RedactUrlUserInfo(errorMessage);
+        var redactedError = TerminalSanitizer.StripTerminalEscapes(GitUrl.RedactUrlUserInfo(errorMessage));
         var isAuthError =
             errorMessage.ContainsOrdinal("Authentication failed")
             || errorMessage.ContainsOrdinal("could not read Username")

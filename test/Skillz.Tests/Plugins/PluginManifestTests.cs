@@ -405,6 +405,50 @@ public class PluginManifestTests : IDisposable
     }
 
     [Fact]
+    public async Task ReadPlugins_Should_RejectMarketplaceEntry_When_PluginBaseResolvesOutsideBaseViaSymlink()
+    {
+        // Arrange
+        // 'linkdir' under the base is a symlink to a directory outside the base, so the
+        // constructed pluginBase ('linkdir/plugin') is lexically contained but resolves
+        // outside the base once the symlinked parent is followed.
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var outsideDir = Path.Combine(Path.GetTempPath(), $"skillz-outside-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(outsideDir);
+        try
+        {
+            var linkPath = Path.Combine(_testDir, "linkdir");
+            Directory.CreateSymbolicLink(linkPath, outsideDir);
+
+            WriteManifest(
+                ".claude-plugin/marketplace.json",
+                """
+                {
+                  "plugins": [
+                    { "name": "escaping-plugin", "source": "./linkdir/plugin", "skills": ["./skills/skill"] }
+                  ]
+                }
+                """);
+
+            // Act
+            var plugins = await PluginManifest.ReadPluginsAsync(
+                new SystemFileStore(),
+                _testDir,
+                TestContext.Current.CancellationToken);
+
+            // Assert
+            Assert.Empty(plugins);
+        }
+        finally
+        {
+            Directory.Delete(outsideDir, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ReadPlugins_Should_StripTerminalEscapesFromName_When_PluginJsonNameContainsEscapes()
     {
         // Arrange

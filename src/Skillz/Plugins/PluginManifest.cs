@@ -110,7 +110,11 @@ internal sealed class PluginManifest(IFileStore fileStore)
             }
 
             var pluginBase = Path.Combine(basePath, pluginRoot ?? string.Empty, sourceString ?? string.Empty);
-            if (!PathContainment.IsContainedIn(pluginBase, basePath))
+
+            // Validate with the symlink-aware containment check (the same one downstream
+            // consumers use) so the containment invariant holds where the entry is produced,
+            // even if pluginBase resolves outside basePath through a symlinked parent.
+            if (!PathContainment.IsContainedInRealPath(pluginBase, basePath))
             {
                 continue;
             }
