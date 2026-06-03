@@ -118,7 +118,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
             {
                 continue;
             }
-            catch (TaskCanceledException)
+            catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
                 continue;
             }
@@ -339,7 +339,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
             TempDirCleanup.SafeDelete(stagingRoot);
             return null;
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             TempDirCleanup.SafeDelete(stagingRoot);
             return null;
@@ -393,7 +393,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
         {
             return null;
         }
-        catch (TaskCanceledException)
+        catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
             return null;
         }

@@ -540,273 +540,273 @@ public class SourceParserTests
     }
 
     [Fact]
-    public void GetOwnerRepo_GitHubUrl()
+    public void FindOwnerRepo_GitHubUrl()
     {
         // Arrange
         var parsed = new SourceParser().Parse("https://github.com/owner/repo");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitHubUrlWithDotGit()
+    public void FindOwnerRepo_GitHubUrlWithDotGit()
     {
         // Arrange
         var parsed = new SourceParser().Parse("https://github.com/owner/repo.git");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitHubUrlWithTreeBranchPath()
+    public void FindOwnerRepo_GitHubUrlWithTreeBranchPath()
     {
         // Arrange
         var parsed = new SourceParser().Parse("https://github.com/owner/repo/tree/main/skills/my-skill");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitHubShorthand()
+    public void FindOwnerRepo_GitHubShorthand()
     {
         // Arrange
         var parsed = new SourceParser().Parse("owner/repo");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitHubShorthandWithSubpath()
+    public void FindOwnerRepo_GitHubShorthandWithSubpath()
     {
         // Arrange
         var parsed = new SourceParser().Parse("owner/repo/skills/my-skill");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitLabUrl()
+    public void FindOwnerRepo_GitLabUrl()
     {
         // Arrange
         var parsed = new SourceParser().Parse("https://gitlab.com/owner/repo");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitLabUrlWithTree()
+    public void FindOwnerRepo_GitLabUrlWithTree()
     {
         // Arrange
         var parsed = new SourceParser().Parse("https://gitlab.com/owner/repo/-/tree/main/skills");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitLabUrlWithSubgroup()
+    public void FindOwnerRepo_GitLabUrlWithSubgroup()
     {
         // Arrange
         var parsed = new SourceParser().Parse("https://gitlab.com/coresofthq/ai/agent-skills");
 
         // Act & Assert
-        Assert.Equal("coresofthq/ai/agent-skills", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("coresofthq/ai/agent-skills", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_LocalPathReturnsNull()
+    public void FindOwnerRepo_LocalPathReturnsNull()
     {
         // Arrange
         var parsed = new SourceParser().Parse("./my-skills");
 
         // Act & Assert
-        Assert.Null(OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Null(OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_AbsoluteLocalPathReturnsNull()
+    public void FindOwnerRepo_AbsoluteLocalPathReturnsNull()
     {
         // Arrange
         var parsed = new SourceParser().Parse("/home/user/skills");
 
         // Act & Assert
-        Assert.Null(OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Null(OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_CustomGitHost()
+    public void FindOwnerRepo_CustomGitHost()
     {
         // Arrange
         var parsed = new SourceParser().Parse("https://git.example.com/owner/repo.git");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_SshFormat()
+    public void FindOwnerRepo_SshFormat()
     {
         // Arrange
         var parsed = new SourceParser().Parse("git@github.com:owner/repo.git");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_PrivateGitLabInstance()
+    public void FindOwnerRepo_PrivateGitLabInstance()
     {
         // Arrange
         var parsed = new SourceParser().Parse("https://gitlab.company.com/team/repo");
 
         // Act & Assert
-        Assert.Equal("team/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("team/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_SelfHostedGitWithDotGitSuffix()
+    public void FindOwnerRepo_SelfHostedGitWithDotGitSuffix()
     {
         // Arrange
         var parsed = new SourceParser().Parse("https://git.internal.io/myteam/skills.git");
 
         // Act & Assert
-        Assert.Equal("myteam/skills", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("myteam/skills", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitUrlWithQueryString()
+    public void FindOwnerRepo_GitUrlWithQueryString()
     {
         // Arrange
         var parsed = new SkillSource.Git("https://git.example.com/owner/repo?ref=main");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitUrlWithFragment()
+    public void FindOwnerRepo_GitUrlWithFragment()
     {
         // Arrange
         var parsed = new SkillSource.Git("https://git.example.com/owner/repo#readme");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitUrlWithDotGitAndQueryString()
+    public void FindOwnerRepo_GitUrlWithDotGitAndQueryString()
     {
         // Arrange
         var parsed = new SkillSource.Git("https://git.example.com/owner/repo.git?ref=main");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitLabSubgroup2Levels()
+    public void FindOwnerRepo_GitLabSubgroup2Levels()
     {
         // Arrange
         var parsed = new SkillSource.Git("https://gitlab.com/group/subgroup/repo");
 
         // Act & Assert
-        Assert.Equal("group/subgroup/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("group/subgroup/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitLabSubgroup3Levels()
+    public void FindOwnerRepo_GitLabSubgroup3Levels()
     {
         // Arrange
         var parsed = new SkillSource.Git("https://gitlab.com/org/team/project/repo.git");
 
         // Act & Assert
-        Assert.Equal("org/team/project/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("org/team/project/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_GitLabSubgroupWithQueryString()
+    public void FindOwnerRepo_GitLabSubgroupWithQueryString()
     {
         // Arrange
         var parsed = new SkillSource.Git("https://gitlab.com/group/subgroup/repo?ref=main");
 
         // Act & Assert
-        Assert.Equal("group/subgroup/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("group/subgroup/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_SelfHostedGitLabWithSubgroups()
+    public void FindOwnerRepo_SelfHostedGitLabWithSubgroups()
     {
         // Arrange
         var parsed = new SkillSource.Git("https://gitlab.company.com/division/team/repo.git");
 
         // Act & Assert
-        Assert.Equal("division/team/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("division/team/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_SshUrlGitHub()
+    public void FindOwnerRepo_SshUrlGitHub()
     {
         // Arrange
         var parsed = new SkillSource.Git("git@github.com:owner/repo.git");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_SshUrlGitLab()
+    public void FindOwnerRepo_SshUrlGitLab()
     {
         // Arrange
         var parsed = new SkillSource.Git("git@gitlab.com:owner/repo.git");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_SshUrlWithSubgroupsGitLab()
+    public void FindOwnerRepo_SshUrlWithSubgroupsGitLab()
     {
         // Arrange
         var parsed = new SkillSource.Git("git@gitlab.com:group/subgroup/project/repo.git");
 
         // Act & Assert
-        Assert.Equal("group/subgroup/project/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("group/subgroup/project/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_SshUrlWithoutDotGitSuffix()
+    public void FindOwnerRepo_SshUrlWithoutDotGitSuffix()
     {
         // Arrange
         var parsed = new SkillSource.Git("git@github.com:owner/repo");
 
         // Act & Assert
-        Assert.Equal("owner/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("owner/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_SshUrlCustomHost()
+    public void FindOwnerRepo_SshUrlCustomHost()
     {
         // Arrange
         var parsed = new SkillSource.Git("git@git.company.com:org/team/repo.git");
 
         // Act & Assert
-        Assert.Equal("org/team/repo", OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Equal("org/team/repo", OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]
-    public void GetOwnerRepo_SshUrlWithoutPathReturnsNull()
+    public void FindOwnerRepo_SshUrlWithoutPathReturnsNull()
     {
         // Arrange
         var parsed = new SkillSource.Git("git@github.com:repo.git");
 
         // Act & Assert
-        Assert.Null(OwnerRepoParser.GetOwnerRepo(parsed));
+        Assert.Null(OwnerRepoParser.FindOwnerRepo(parsed));
     }
 
     [Fact]

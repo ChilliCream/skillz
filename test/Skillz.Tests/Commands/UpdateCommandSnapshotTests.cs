@@ -55,13 +55,16 @@ public class UpdateCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Update_Global_With_No_Skills()
     {
+        // Arrange
         var services = BuildServices();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
             new SkillLockFile { Version = 3, Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal) };
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "update", "-g");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz update -g
@@ -76,6 +79,7 @@ public class UpdateCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Update_Global_Up_To_Date()
     {
+        // Arrange
         var services = BuildServices();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
@@ -91,8 +95,10 @@ public class UpdateCommandSnapshotTests : IDisposable
         blob.OnFetchTree = (_, _, _, _) =>
             new RepoTree("tree-sha", "main", [new TreeEntry { Path = "skills/my-skill", Type = "tree", Sha = "abc123" }]);
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "update", "-g");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz update -g
@@ -107,6 +113,7 @@ public class UpdateCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Update_Global_Update_Available()
     {
+        // Arrange
         var services = BuildServices();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
@@ -122,8 +129,10 @@ public class UpdateCommandSnapshotTests : IDisposable
         blob.OnFetchTree = (_, _, _, _) =>
             new RepoTree("new-sha", "main", [new TreeEntry { Path = "skills/my-skill", Type = "tree", Sha = "xyz789" }]);
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "update", "-g");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz update -g
@@ -143,6 +152,7 @@ public class UpdateCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Update_Global_Skips_Skill_Without_Folder_Hash()
     {
+        // Arrange
         var services = BuildServices();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
@@ -155,8 +165,10 @@ public class UpdateCommandSnapshotTests : IDisposable
                 }
             };
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "update", "-g");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz update -g
@@ -173,6 +185,7 @@ public class UpdateCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Update_Project_With_No_Skills()
     {
+        // Arrange
         var services = BuildServices();
         var projectLock = services.GetRequiredService<TestProjectLockFile>();
         projectLock.OnRead = _ => new LocalSkillLockFile
@@ -181,8 +194,10 @@ public class UpdateCommandSnapshotTests : IDisposable
             Skills = new Dictionary<string, LocalSkillLockEntry>(StringComparer.Ordinal)
         };
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "update", "-p");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz update -p
@@ -197,6 +212,7 @@ public class UpdateCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Update_Project_Update_Available()
     {
+        // Arrange
         var services = BuildServices();
         var projectLock = services.GetRequiredService<TestProjectLockFile>();
         projectLock.OnRead = _ => new LocalSkillLockFile
@@ -215,8 +231,10 @@ public class UpdateCommandSnapshotTests : IDisposable
             }
         };
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "update", "-p");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz update -p
@@ -235,6 +253,7 @@ public class UpdateCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Update_Both_Scopes_Show_Headers()
     {
+        // Arrange
         var services = BuildServices();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
@@ -246,8 +265,10 @@ public class UpdateCommandSnapshotTests : IDisposable
             Skills = new Dictionary<string, LocalSkillLockEntry>(StringComparer.Ordinal)
         };
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "update", "-g", "-p");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz update -g -p

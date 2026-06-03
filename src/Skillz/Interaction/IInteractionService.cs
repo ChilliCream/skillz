@@ -3,6 +3,10 @@ using Spectre.Console.Rendering;
 
 namespace Skillz.Interaction;
 
+/// <summary>
+/// The single seam for all console output and interactive prompts, so commands never write to
+/// the terminal directly. This keeps rendering consistent and lets tests capture or stub interaction.
+/// </summary>
 internal interface IInteractionService
 {
     void WriteLine(string text = "");

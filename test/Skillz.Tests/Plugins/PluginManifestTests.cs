@@ -56,7 +56,7 @@ public class PluginManifestTests : IDisposable
     }
 
     [Fact]
-    public async Task RespectsMetadataPluginRoot()
+    public async Task GetPluginSkillPaths_Should_ResolveSourceUnderPluginRoot_When_MetadataSpecifiesPluginRoot()
     {
         // Arrange
         WriteManifest(
@@ -104,7 +104,7 @@ public class PluginManifestTests : IDisposable
     }
 
     [Fact]
-    public async Task SkipsRemoteSourceObjects()
+    public async Task GetPluginSkillPaths_Should_ReturnEmpty_When_SourceIsRemoteObject()
     {
         // Arrange
         WriteManifest(
@@ -152,7 +152,7 @@ public class PluginManifestTests : IDisposable
     }
 
     [Fact]
-    public async Task RejectsTraversalViaSource()
+    public async Task GetPluginSkillPaths_Should_ContainAllResultsWithinBase_When_SourceAttemptsTraversal()
     {
         // Arrange
         WriteManifest(
@@ -173,7 +173,7 @@ public class PluginManifestTests : IDisposable
     }
 
     [Fact]
-    public async Task RejectsTraversalViaSkillPath()
+    public async Task GetPluginSkillPaths_Should_ContainAllResultsWithinBase_When_SkillPathAttemptsTraversal()
     {
         // Arrange
         WriteManifest(
@@ -194,7 +194,7 @@ public class PluginManifestTests : IDisposable
     }
 
     [Fact]
-    public async Task RejectsAbsolutePathsInSkills()
+    public async Task GetPluginSkillPaths_Should_IgnoreAbsolutePathsAndFallBackToConventionalDir_When_SkillsAreAbsolute()
     {
         // Arrange
         WriteManifest(
@@ -215,7 +215,7 @@ public class PluginManifestTests : IDisposable
     }
 
     [Fact]
-    public async Task RejectsSourceWithoutDotSlashPrefix()
+    public async Task GetPluginSkillPaths_Should_IgnoreSource_When_SourceLacksDotSlashPrefix()
     {
         // Arrange
         WriteManifest(
@@ -241,7 +241,7 @@ public class PluginManifestTests : IDisposable
     }
 
     [Fact]
-    public async Task RejectsPluginRootWithoutDotSlashPrefix()
+    public async Task GetPluginSkillPaths_Should_ReturnEmpty_When_PluginRootLacksDotSlashPrefix()
     {
         // Arrange
         WriteManifest(
@@ -263,7 +263,7 @@ public class PluginManifestTests : IDisposable
     }
 
     [Fact]
-    public async Task RejectsSkillPathWithoutDotSlashPrefix()
+    public async Task GetPluginSkillPaths_Should_IgnoreSkillPath_When_SkillPathLacksDotSlashPrefix()
     {
         // Arrange
         WriteManifest(

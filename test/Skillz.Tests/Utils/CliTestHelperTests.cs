@@ -53,9 +53,9 @@ public class CliTestHelperTests
         var provider = CliTestHelper.CreateServiceProvider();
 
         // Assert
-        Assert.NotNull(provider.GetRequiredService<ConsoleEnvironment>());
-        Assert.NotNull(provider.GetRequiredService<CliExecutionContext>());
-        Assert.NotNull(provider.GetRequiredService<AgentRegistry>());
+        Assert.IsType<TestConsoleEnvironment>(provider.GetRequiredService<ConsoleEnvironment>());
+        Assert.IsType<CliExecutionContext>(provider.GetRequiredService<CliExecutionContext>());
+        Assert.IsType<AgentRegistry>(provider.GetRequiredService<AgentRegistry>());
     }
 
     [Fact]

@@ -77,7 +77,7 @@ internal sealed class AddCommandPrompter(
                 }
             }
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             // Swallow - best effort
         }
@@ -103,7 +103,7 @@ internal sealed class AddCommandPrompter(
             {
                 await globalLock.SaveLastSelectedAgentsAsync(selected, cancellationToken);
             }
-            catch
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 // Swallow - best effort
             }

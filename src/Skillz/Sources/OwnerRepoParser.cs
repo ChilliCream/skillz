@@ -13,7 +13,7 @@ internal static partial class OwnerRepoParser
     [GeneratedRegex(@"^([^/]+)/([^/]+)$")]
     private static partial Regex OwnerRepoRegex();
 
-    public static string? GetOwnerRepo(SkillSource parsed)
+    public static string? FindOwnerRepo(SkillSource parsed)
     {
         if (parsed is SkillSource.Local)
         {
@@ -55,9 +55,16 @@ internal static partial class OwnerRepoParser
         return pathname.ContainsOrdinal('/') ? pathname : null;
     }
 
-    public static (string Owner, string Repo)? ParseOwnerRepo(string ownerRepo)
+    public static bool TryParseOwnerRepo(string ownerRepo, out (string Owner, string Repo) result)
     {
         var match = OwnerRepoRegex().Match(ownerRepo);
-        return match.Success ? (match.Groups[1].Value, match.Groups[2].Value) : null;
+        if (match.Success)
+        {
+            result = (match.Groups[1].Value, match.Groups[2].Value);
+            return true;
+        }
+
+        result = default;
+        return false;
     }
 }

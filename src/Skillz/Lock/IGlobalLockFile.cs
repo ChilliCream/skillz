@@ -33,7 +33,7 @@ internal interface IGlobalLockFile
     /// <summary>
     /// Returns the lock entry for <paramref name="skillName"/>, or <see langword="null"/> if not found.
     /// </summary>
-    Task<SkillLockEntry?> GetEntryAsync(string skillName, CancellationToken cancellationToken);
+    Task<SkillLockEntry?> FindEntryAsync(string skillName, CancellationToken cancellationToken);
 
     /// <summary>
     /// Returns the agents selected during the last install, or <see langword="null"/> if none have been saved.

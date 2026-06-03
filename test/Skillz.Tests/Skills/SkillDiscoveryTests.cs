@@ -1,5 +1,6 @@
 using Skillz.Plugins;
 using Skillz.Skills;
+using Skillz.Tests.TestServices;
 using Skillz.Utils;
 using Xunit;
 
@@ -14,7 +15,11 @@ public class SkillDiscoveryTests : IDisposable
     {
         _testDir = Path.Combine(Path.GetTempPath(), $"skillz-discovery-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_testDir);
-        _discovery = new SkillDiscovery(new PluginManifest(), new PluginGrouping(), new SystemFileStore());
+        _discovery = new SkillDiscovery(
+            new PluginManifest(),
+            new PluginGrouping(),
+            new SystemFileStore(),
+            new FakeSystemEnvironment());
     }
 
     public void Dispose()

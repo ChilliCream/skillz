@@ -4,13 +4,11 @@ using Skillz.Install;
 
 namespace Skillz.Locking;
 
-internal sealed class GlobalLockFile(XdgPaths xdgPaths, Func<DateTime> utcNow)
+internal sealed class GlobalLockFile(XdgPaths xdgPaths, TimeProvider timeProvider)
     : JsonLockFile<SkillLockFile>
     , IGlobalLockFile
 {
     public const int CurrentVersion = 3;
-
-    public GlobalLockFile(XdgPaths xdgPaths) : this(xdgPaths, () => DateTime.UtcNow) { }
 
     protected override int LatestVersion => CurrentVersion;
 
@@ -52,7 +50,7 @@ internal sealed class GlobalLockFile(XdgPaths xdgPaths, Func<DateTime> utcNow)
             xdgPaths.GetGlobalLockPath(),
             lockFile =>
             {
-                var now = utcNow().ToString("o");
+                var now = timeProvider.GetUtcNow().UtcDateTime.ToString("o");
                 entry.InstalledAt = lockFile.Skills.TryGetValue(skillName, out var existing)
                     ? existing.InstalledAt
                     : now;
@@ -72,7 +70,7 @@ internal sealed class GlobalLockFile(XdgPaths xdgPaths, Func<DateTime> utcNow)
         return removed;
     }
 
-    public async Task<SkillLockEntry?> GetEntryAsync(string skillName, CancellationToken cancellationToken)
+    public async Task<SkillLockEntry?> FindEntryAsync(string skillName, CancellationToken cancellationToken)
     {
         var lockFile = await ReadAsync(cancellationToken);
         return lockFile.Skills.TryGetValue(skillName, out var entry) ? entry : null;
@@ -85,7 +83,7 @@ internal sealed class GlobalLockFile(XdgPaths xdgPaths, Func<DateTime> utcNow)
             var lockFile = await ReadAsync(cancellationToken);
             return lockFile.LastSelectedAgents is { Count: > 0 } agents ? [.. agents] : null;
         }
-        catch
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return null;
         }

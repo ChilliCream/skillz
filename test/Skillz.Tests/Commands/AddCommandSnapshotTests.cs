@@ -83,10 +83,13 @@ public class AddCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Add_Without_Source()
     {
+        // Arrange
         var services = BuildServices();
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "add");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz add
@@ -100,12 +103,15 @@ public class AddCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Add_With_No_Skills_Discovered()
     {
+        // Arrange
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => LocalSource(),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => Array.Empty<Skill>());
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "add", "./local-path", "--yes", "--agent", "claude-code");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz add ./local-path --yes --agent claude-code
@@ -119,12 +125,15 @@ public class AddCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Add_With_Invalid_Agent()
     {
+        // Arrange
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => LocalSource(),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") });
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "add", "./local-path", "--yes", "--agent", "bogus");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz add ./local-path --yes --agent bogus
@@ -151,6 +160,7 @@ public class AddCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Add_List_Flag_Lists_Skills()
     {
+        // Arrange
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => LocalSource(),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[]
@@ -159,8 +169,10 @@ public class AddCommandSnapshotTests : IDisposable
                 CreateSkill("beta", "the beta skill")
             });
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "add", "./local-path", "--list");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz add ./local-path --list
@@ -181,10 +193,12 @@ public class AddCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Add_With_Skill_Filter_No_Match()
     {
+        // Arrange
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => LocalSource(),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha"), CreateSkill("beta") });
 
+        // Act
         var output = await CommandSnapshot.RunAsync(
             services,
             "add",
@@ -195,6 +209,7 @@ public class AddCommandSnapshotTests : IDisposable
             "--skill",
             "nope");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz add ./local-path --yes --agent claude-code --skill nope
@@ -212,6 +227,7 @@ public class AddCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Add_Yes_Mode_Installs_Skill_Shows_Summary()
     {
+        // Arrange
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => LocalSource(),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
@@ -221,8 +237,10 @@ public class AddCommandSnapshotTests : IDisposable
                 i.OnInstallRemoteSkill = (_, _, _) => new InstallResult(true, InstallPath);
             });
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "add", "./local-path", "--yes", "--agent", "claude-code");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz add ./local-path --yes --agent claude-code
@@ -246,6 +264,7 @@ public class AddCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Add_Install_Failure_Shows_Failure_Panel()
     {
+        // Arrange
         var services = BuildServices(
             configureParser: p => p.OnParse = _ => LocalSource(),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
@@ -255,8 +274,10 @@ public class AddCommandSnapshotTests : IDisposable
                 i.OnInstallRemoteSkill = (_, _, _) => new InstallResult(false, string.Empty, Error: "disk is full");
             });
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "add", "./local-path", "--yes", "--agent", "claude-code");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz add ./local-path --yes --agent claude-code

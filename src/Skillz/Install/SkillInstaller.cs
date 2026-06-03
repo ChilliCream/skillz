@@ -160,7 +160,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
 
             return new InstallResult(true, agentDir, canonicalDir, InstallMode.Symlink);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return new InstallResult(false, agentDir, Mode: installMode, Error: ex.Message);
         }
@@ -193,7 +193,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
             // destination can never touch whatever it points at.
             fileStore.DeletePath(path);
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // mkdir below will surface a real problem
         }
@@ -367,13 +367,13 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
                     }
                 }
             }
-            catch
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 try
                 {
                     DeleteReparsePoint(linkPath);
                 }
-                catch
+                catch (Exception inner) when (inner is IOException or UnauthorizedAccessException)
                 {
                     // If we can't remove it, symlink creation will fail below
                 }
@@ -393,7 +393,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
             Directory.CreateSymbolicLink(linkPath, relativePath);
             return true;
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return false;
         }

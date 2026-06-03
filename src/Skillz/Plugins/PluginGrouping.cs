@@ -13,7 +13,7 @@ internal sealed class PluginGrouping : IPluginGrouping
         string basePath,
         CancellationToken cancellationToken)
     {
-        var groupings = new Dictionary<string, string>();
+        var groupings = new Dictionary<string, string>(StringComparer.Ordinal);
 
         await PluginManifest.TryReadMarketplaceAsync(
             basePath,

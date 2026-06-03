@@ -30,7 +30,7 @@ public class PluginGroupingTests : IDisposable
     }
 
     [Fact]
-    public async Task MapsSkillPathsToPluginNames()
+    public async Task GetPluginGroupings_Should_MapEachSkillPathToItsPluginName_When_MarketplaceListsPlugins()
     {
         // Arrange
         WriteManifest(
@@ -66,7 +66,7 @@ public class PluginGroupingTests : IDisposable
     }
 
     [Fact]
-    public async Task HandlesNestedPluginSources()
+    public async Task GetPluginGroupings_Should_ResolveSkillPathRelativeToSource_When_SourceIsNested()
     {
         // Arrange
         WriteManifest(
@@ -92,7 +92,7 @@ public class PluginGroupingTests : IDisposable
     }
 
     [Fact]
-    public async Task MapsSkillsFromPluginJson()
+    public async Task GetPluginGroupings_Should_MapSkillsToPluginName_When_DefinedInPluginJson()
     {
         // Arrange
         WriteManifest(
@@ -116,7 +116,7 @@ public class PluginGroupingTests : IDisposable
     }
 
     [Fact]
-    public async Task SkipsPluginsWithoutName()
+    public async Task GetPluginGroupings_Should_SkipPlugin_When_NameIsMissing()
     {
         // Arrange
         WriteManifest(
@@ -137,7 +137,7 @@ public class PluginGroupingTests : IDisposable
     }
 
     [Fact]
-    public async Task SkipsTraversalAttempts()
+    public async Task GetPluginGroupings_Should_ReturnNoGroupings_When_SkillPathEscapesBaseDirectory()
     {
         // Arrange
         WriteManifest(

@@ -535,7 +535,7 @@ internal sealed class AddCommandExecutor(
         var sourceUrl = parsed.Url;
         var sourceType = parsed.SourceType;
         var refValue = parsed.Ref;
-        var ownerRepo = OwnerRepoParser.GetOwnerRepo(parsed);
+        var ownerRepo = OwnerRepoParser.FindOwnerRepo(parsed);
         var source = ownerRepo ?? sourceUrl;
 
         var bySkill = successful
@@ -607,7 +607,7 @@ internal sealed class AddCommandExecutor(
     {
         try
         {
-            if (!string.IsNullOrEmpty(path) && Directory.Exists(path))
+            if (!string.IsNullOrEmpty(path) && fileStore.DirectoryExists(path))
             {
                 return await projectLock.ComputeSkillFolderHashAsync(path, cancellationToken);
             }

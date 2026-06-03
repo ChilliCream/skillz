@@ -4,6 +4,11 @@ using Skillz.Skills;
 
 namespace Skillz.Commands;
 
+/// <summary>
+/// Drives the interactive prompts for the <c>add</c> command (which skills, which agents,
+/// scope, install mode, and final confirmation), isolating console interaction so the
+/// executor's flow can be tested without a TTY.
+/// </summary>
 internal interface IAddCommandPrompter
 {
     Task<ImmutableArray<ResolvedSkill>> SelectSkillsAsync(

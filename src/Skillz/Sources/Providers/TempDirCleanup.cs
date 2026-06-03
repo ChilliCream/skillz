@@ -11,6 +11,6 @@ internal static class TempDirCleanup
                 Directory.Delete(dir, recursive: true);
             }
         }
-        catch { }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 }

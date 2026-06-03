@@ -170,7 +170,7 @@ internal sealed class RemoveCommand(
 
                     removed++;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     failures.Add((skillName, ex.Message));
                 }
@@ -271,7 +271,7 @@ internal sealed class RemoveCommand(
         {
             fileStore.DeletePath(path);
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // Best-effort
         }

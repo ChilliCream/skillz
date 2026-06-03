@@ -16,6 +16,7 @@ internal sealed class UpdateCommand(
     IProjectLockFile projectLockFile,
     IBlobClient blobClient,
     IFileStore fileStore,
+    ISystemEnvironment system,
     ConsoleEnvironment consoleEnvironment) : BaseCommand("update", "Check for skill updates.")
 {
     private readonly Argument<string[]> _skillsArgument = new("skills")
@@ -176,7 +177,7 @@ internal sealed class UpdateCommand(
 
     private Task<bool> HasProjectSkillsAsync(CancellationToken cancellationToken)
     {
-        var cwd = Directory.GetCurrentDirectory();
+        var cwd = system.CurrentDirectory;
 
         if (fileStore.FileExists(Path.Combine(cwd, KnownConfigNames.ProjectLockFileName)))
         {

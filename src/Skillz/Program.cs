@@ -76,6 +76,7 @@ internal static class Program
         builder.Services.AddSingleton<IProvider, WellKnownProvider>();
         builder.Services.AddSingleton<ProviderRegistry>();
 
+        builder.Services.AddSingleton(TimeProvider.System);
         builder.Services.AddSingleton<IProjectLockFile, ProjectLockFile>();
         builder.Services.AddSingleton<IGlobalLockFile, GlobalLockFile>();
 

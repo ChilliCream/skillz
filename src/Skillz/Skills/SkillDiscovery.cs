@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
+using Skillz.Install;
 using Skillz.Plugins;
 using Skillz.Utils;
 
@@ -21,7 +22,8 @@ namespace Skillz.Skills;
 internal sealed class SkillDiscovery(
     IPluginManifest pluginManifest,
     IPluginGrouping pluginGrouping,
-    IFileStore fileStore) : ISkillDiscovery
+    IFileStore fileStore,
+    ISystemEnvironment system) : ISkillDiscovery
 {
     /// <summary>
     /// Maximum directory depth walked by the recursive fallback crawl.
@@ -114,7 +116,7 @@ internal sealed class SkillDiscovery(
 
             if (skill.IsInternal
                 && !options.IncludeInternal
-                && Environment.GetEnvironmentVariable("INSTALL_INTERNAL_SKILLS") is not "1" and not "true")
+                && system.GetEnvironmentVariable("INSTALL_INTERNAL_SKILLS") is not "1" and not "true")
             {
                 return;
             }
@@ -179,7 +181,7 @@ internal sealed class SkillDiscovery(
             {
                 entries = fileStore.EnumerateDirectories(priorityRoot);
             }
-            catch
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
             {
                 // Missing or inaccessible directory - nothing to scan here.
                 continue;
@@ -211,7 +213,7 @@ internal sealed class SkillDiscovery(
         {
             subDirs = fileStore.EnumerateDirectories(dir).ToArray();
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
         {
             subDirs = [];
         }
@@ -247,7 +249,7 @@ internal sealed class SkillDiscovery(
         {
             content = await fileStore.ReadAllTextAsync(skillMdPath, cancellationToken);
         }
-        catch
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return null;
         }

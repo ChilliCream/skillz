@@ -3,6 +3,7 @@ using System.CommandLine;
 using System.Text.Json;
 using Skillz.Install;
 using Skillz.Interaction;
+using Skillz.Plugins;
 using Skillz.Skills;
 using Skillz.Utils;
 using Spectre.Console;
@@ -161,8 +162,6 @@ internal sealed class ListCommand(
             }
         }
 
-        var pathComparison = OperatingSystem.IsLinux() ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-
         foreach (var agentType in agentFilter)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -181,7 +180,7 @@ internal sealed class ListCommand(
             var agentDirFull = Path.GetFullPath(agentDir);
 
             // Skip if this agent's dir IS the canonical dir (universal agents)
-            if (string.Equals(agentDirFull, canonicalDirFull, pathComparison))
+            if (string.Equals(agentDirFull, canonicalDirFull, PathContainment.Comparison))
             {
                 continue;
             }

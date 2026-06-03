@@ -37,10 +37,13 @@ public class InitCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Init_With_Name_Creates_Skill()
     {
+        // Arrange
         var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "init", "my-skill");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz init my-skill
@@ -63,6 +66,7 @@ public class InitCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Init_When_Skill_Already_Exists_Warns()
     {
+        // Arrange
         var skillDir = Path.Combine(_workspace, "my-skill");
         Directory.CreateDirectory(skillDir);
         await File.WriteAllTextAsync(
@@ -71,8 +75,10 @@ public class InitCommandSnapshotTests : IDisposable
             TestContext.Current.CancellationToken);
         var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "init", "my-skill");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz init my-skill

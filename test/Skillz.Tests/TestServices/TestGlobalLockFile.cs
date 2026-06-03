@@ -39,7 +39,7 @@ internal sealed class TestGlobalLockFile : IGlobalLockFile
         return Task.FromResult(result);
     }
 
-    public Task<SkillLockEntry?> GetEntryAsync(string skillName, CancellationToken cancellationToken)
+    public Task<SkillLockEntry?> FindEntryAsync(string skillName, CancellationToken cancellationToken)
     {
         var result = OnGetEntry?.Invoke(skillName);
         return Task.FromResult(result);

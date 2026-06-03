@@ -45,7 +45,7 @@ internal static partial class FrontmatterParser
             return [];
         }
 
-        var result = new Dictionary<string, object>();
+        var result = new Dictionary<string, object>(StringComparer.Ordinal);
         foreach (var entry in root.Children)
         {
             // Non-scalar keys (sequences, mappings) require the explicit `?` block syntax

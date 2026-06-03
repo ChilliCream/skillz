@@ -63,10 +63,13 @@ public class RemoveCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Remove_With_No_Skills()
     {
+        // Arrange
         var services = BuildServices();
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "remove", "--yes");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz remove --yes
@@ -78,6 +81,7 @@ public class RemoveCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Remove_Named_Skill()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
@@ -85,8 +89,10 @@ public class RemoveCommandSnapshotTests : IDisposable
         var projectLock = (TestProjectLockFile)services.GetRequiredService<IProjectLockFile>();
         projectLock.OnRemoveEntry = (_, _) => true;
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "remove", "alpha", "--yes");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz remove alpha --yes
@@ -98,13 +104,16 @@ public class RemoveCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Remove_Named_Skill_No_Match()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
         var services = BuildServices();
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "remove", "nope", "--yes");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz remove nope --yes
@@ -116,6 +125,7 @@ public class RemoveCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Remove_All()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
@@ -123,8 +133,10 @@ public class RemoveCommandSnapshotTests : IDisposable
         var projectLock = (TestProjectLockFile)services.GetRequiredService<IProjectLockFile>();
         projectLock.OnRemoveEntry = (_, _) => true;
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "remove", "--all");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz remove --all
@@ -136,10 +148,13 @@ public class RemoveCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Remove_With_Invalid_Agent_Fails()
     {
+        // Arrange
         var services = BuildServices();
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "remove", "alpha", "--agent", "bogus");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz remove alpha --agent bogus
@@ -152,13 +167,16 @@ public class RemoveCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Remove_No_Names_Non_Interactive_Reports_Nothing_Specified()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
         var services = BuildServices();
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "remove", "--yes");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz remove --yes
@@ -170,6 +188,7 @@ public class RemoveCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Remove_Interactive_Decline_Confirmation_Cancels()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
@@ -177,8 +196,10 @@ public class RemoveCommandSnapshotTests : IDisposable
         var prompter = services.GetRequiredService<TestRemoveCommandPrompter>();
         prompter.OnConfirmRemoval = _ => false;
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "remove", "alpha");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz remove alpha
@@ -191,6 +212,7 @@ public class RemoveCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Remove_Reports_Failure_When_Lock_Update_Throws()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
@@ -198,8 +220,10 @@ public class RemoveCommandSnapshotTests : IDisposable
         var projectLock = (TestProjectLockFile)services.GetRequiredService<IProjectLockFile>();
         projectLock.OnRemoveEntry = (_, _) => throw new InvalidOperationException("lock file is read-only");
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "remove", "alpha", "--yes");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz remove alpha --yes

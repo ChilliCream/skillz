@@ -58,10 +58,13 @@ public class ListCommandSnapshotTests : IDisposable
     [Fact]
     public async Task List_With_No_Skills()
     {
+        // Arrange
         var services = BuildServices();
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "list");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz list
@@ -74,13 +77,16 @@ public class ListCommandSnapshotTests : IDisposable
     [Fact]
     public async Task List_With_Installed_Skill()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
         var services = BuildServices();
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "list");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz list
@@ -95,13 +101,16 @@ public class ListCommandSnapshotTests : IDisposable
     [Fact]
     public async Task List_As_Json()
     {
+        // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
         var services = BuildServices();
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "list", "--json");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz list --json
@@ -120,10 +129,13 @@ public class ListCommandSnapshotTests : IDisposable
     [Fact]
     public async Task List_With_Invalid_Agent_Fails()
     {
+        // Arrange
         var services = BuildServices();
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "list", "--agent", "bogus");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz list --agent bogus
@@ -136,10 +148,13 @@ public class ListCommandSnapshotTests : IDisposable
     [Fact]
     public async Task List_Global_With_No_Skills()
     {
+        // Arrange
         var services = BuildServices();
 
+        // Act
         var output = await CommandSnapshot.RunAsync(services, "list", "--global");
 
+        // Assert
         output.MatchInlineSnapshot(
             """
             $ skillz list --global
