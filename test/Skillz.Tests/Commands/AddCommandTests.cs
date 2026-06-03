@@ -609,6 +609,68 @@ public class AddCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task RunAsync_Should_NotReportCanonical_When_SingleExplicitAgentCopiesWithoutCanonicalStore()
+    {
+        // A single explicit non-universal agent forces Copy mode, which writes only the agent
+        // directory and leaves CanonicalPath unset. The summary must not advertise a canonical
+        // store that was never written to disk.
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+            {
+                i.OnGetCanonicalPath = (skill, _, _) => $"/canonical/{skill}";
+                i.OnInstallRemoteSkill = (skill, agent, _) =>
+                    new InstallResult(true, $"/installed/{agent}/{skill.InstallName}");
+            });
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        var interaction = services.GetRequiredService<TestInteractionService>();
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Copied:", interaction.OutputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Canonical:", interaction.OutputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("/canonical/alpha", interaction.OutputText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunAsync_Should_ReportCanonical_When_SymlinkInstallWritesCanonicalStore()
+    {
+        // Two distinct skills dirs install via symlink, so the installer materializes the canonical
+        // store and reports CanonicalPath. The summary should advertise it. This mirrors the auto
+        // path: canonical is shown exactly when it is actually populated, regardless of how agents
+        // were selected.
+        // A short, non-wrapping canonical path so the substring assertion is not defeated by the
+        // Spectre panel wrapping a long temp path across lines.
+        const string canonicalPath = "/canon/alpha";
+        var services = BuildServices(
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+            {
+                i.OnGetCanonicalPath = (_, _, _) => canonicalPath;
+                i.OnInstallRemoteSkill = (skill, agent, _) =>
+                    new InstallResult(true, $"/installed/{agent}/{skill.InstallName}", canonicalPath);
+            });
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var parseResult = cmd.Parse(["./local-path", "--yes", "--agent", "claude-code", "--agent", "augment"]);
+        var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        var interaction = services.GetRequiredService<TestInteractionService>();
+        Assert.Equal(0, exitCode);
+        Assert.Contains("Symlinked:", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("Canonical:", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains(canonicalPath, interaction.OutputText, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task RunAsync_Should_SucceedAndWarn_When_LockWriteThrows()
     {
         // Arrange
