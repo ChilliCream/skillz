@@ -1,3 +1,5 @@
+using Skillz.Plugins;
+
 namespace Skillz.Skills;
 
 /// <summary>
@@ -48,22 +50,43 @@ internal static class SubpathValidator
     }
 
     /// <summary>
-    /// Returns whether <paramref name="subpath"/> resolves to a location inside
-    /// <paramref name="basePath"/> (or to <paramref name="basePath"/> itself).
+    /// Checks that <paramref name="subpath"/>, resolved under <paramref name="basePath"/>, stays
+    /// inside <paramref name="basePath"/> (or is <paramref name="basePath"/> itself) — so a
+    /// source's subpath cannot make discovery read files outside the directory it came from.
     /// </summary>
     /// <remarks>
-    /// Unlike <see cref="ValidateSubpath"/>, which only rejects literal <c>..</c> segments,
-    /// this resolves the combined path and verifies containment, catching escapes via
-    /// symlinks or absolute components.
+    /// Symlinks are followed on the real filesystem before the containment check, so a subpath
+    /// that points outside <paramref name="basePath"/> through a symlink is rejected even though
+    /// it reads as a clean relative path. A target that does not exist yet is resolved through its
+    /// nearest existing parent, so the check works before the directory is created. Symlink
+    /// resolution is delegated to <see cref="RealPath"/>.
     /// </remarks>
-    /// <param name="basePath">The directory the subpath must remain within.</param>
-    /// <param name="subpath">The relative subpath to resolve against <paramref name="basePath"/>.</param>
-    /// <returns><see langword="true"/> when the resolved path is contained in <paramref name="basePath"/>.</returns>
+    /// <param name="basePath">The directory the subpath must stay within.</param>
+    /// <param name="subpath">The relative subpath to resolve under <paramref name="basePath"/>.</param>
+    /// <returns><see langword="true"/> when the resolved path is inside <paramref name="basePath"/>.</returns>
     public static bool IsSubpathSafe(string basePath, string subpath)
     {
-        var combined = Path.GetFullPath(Path.Combine(basePath, subpath));
-        var normalizedBase = Path.GetFullPath(basePath);
-        return combined.StartsWithOrdinal(normalizedBase + Path.DirectorySeparatorChar)
-            || combined == normalizedBase;
+        // Reject any ".." segment up front (it is never valid in a skill subpath). We must not let
+        // it reach the resolver: ".." is collapsed as text before symlinks are followed, so
+        // "link/../x" (link -> outside base) could look contained yet really escape.
+        var normalized = subpath.Replace('\\', '/');
+        foreach (var segment in normalized.Split('/'))
+        {
+            if (segment == "..")
+            {
+                return false;
+            }
+        }
+
+        // Authoritative check: resolve the combined target's symlinks (including the leaf,
+        // which discovery would otherwise enumerate into) and the base, then compare real
+        // paths so an escape via a symlink anywhere on the path is caught.
+        var combined = Path.Combine(basePath, subpath);
+        var realCombined = RealPath.ResolveWithNearestExistingParent(combined);
+        var realBase = RealPath.ResolveWithNearestExistingParent(basePath);
+
+        return realCombined is not null
+            && realBase is not null
+            && PathContainment.IsContainedIn(realCombined, realBase);
     }
 }
