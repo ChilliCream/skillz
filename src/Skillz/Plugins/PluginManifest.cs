@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using Skillz.Skills;
 using Skillz.Utils;
 
 namespace Skillz.Plugins;
@@ -109,7 +110,8 @@ internal sealed class PluginManifest(IFileStore fileStore)
             }
 
             var pluginBase = Path.Combine(basePath, pluginRoot ?? string.Empty, sourceString ?? string.Empty);
-            plugins.Add(new PluginEntry(pluginBase, plugin.Skills, plugin.Name));
+            var name = plugin.Name is null ? null : TerminalSanitizer.SanitizeMetadata(plugin.Name);
+            plugins.Add(new PluginEntry(pluginBase, plugin.Skills, name));
         }
     }
 
@@ -127,7 +129,8 @@ internal sealed class PluginManifest(IFileStore fileStore)
 
         if (manifest is not null)
         {
-            plugins.Add(new PluginEntry(basePath, manifest.Skills, manifest.Name));
+            var name = manifest.Name is null ? null : TerminalSanitizer.SanitizeMetadata(manifest.Name);
+            plugins.Add(new PluginEntry(basePath, manifest.Skills, name));
         }
     }
 

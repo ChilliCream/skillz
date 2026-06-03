@@ -327,4 +327,60 @@ public class PluginManifestTests : IDisposable
         var expected = Path.Combine(_testDir, "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));
     }
+
+    [Fact]
+    public async Task ReadPlugins_Should_StripTerminalEscapesFromName_When_MarketplaceNameContainsEscapes()
+    {
+        // Arrange
+        // Terminal escape sequences embedded around the benign visible text.
+        WriteManifest(
+            ".claude-plugin/marketplace.json",
+            """
+            {
+              "plugins": [
+                {
+                  "name": "\u001b]0;title\u0007Real\u001b[2J Name",
+                  "source": "./",
+                  "skills": ["./skills/skill"]
+                }
+              ]
+            }
+            """);
+
+        // Act
+        var plugins = await PluginManifest.ReadPluginsAsync(
+            new SystemFileStore(),
+            _testDir,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        var plugin = Assert.Single(plugins);
+        Assert.DoesNotContain('\u001b', plugin.Name!);
+        Assert.Equal("Real Name", plugin.Name);
+    }
+
+    [Fact]
+    public async Task ReadPlugins_Should_StripTerminalEscapesFromName_When_PluginJsonNameContainsEscapes()
+    {
+        // Arrange
+        WriteManifest(
+            ".claude-plugin/plugin.json",
+            """
+            {
+              "name": "\u001b]0;title\u0007Real\u001b[2J Name",
+              "skills": ["./skills/skill"]
+            }
+            """);
+
+        // Act
+        var plugins = await PluginManifest.ReadPluginsAsync(
+            new SystemFileStore(),
+            _testDir,
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        var plugin = Assert.Single(plugins);
+        Assert.DoesNotContain('\u001b', plugin.Name!);
+        Assert.Equal("Real Name", plugin.Name);
+    }
 }
