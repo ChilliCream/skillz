@@ -357,25 +357,134 @@ public class GlobalLockFileTests : IDisposable
     }
 
     [Fact]
-    public void XdgPaths_Resolves_GlobalLockPath_From_XdgStateHome()
+    public void XdgPaths_Places_GlobalLock_In_Parent_Of_GlobalSkillsDir()
     {
-        // Arrange
-        var stateDir = Path.Combine(_tempDir, "state");
-
-        // Act & Assert
-        Assert.Equal(Path.Combine(stateDir, "skills", ".skill-lock.json"), _xdgPaths.GetGlobalLockPath());
+        // Act & Assert: the lock that tracks skills sits in the same root as the skills themselves.
+        Assert.Equal(
+            Path.GetDirectoryName(_xdgPaths.GetGlobalSkillsDirectory()),
+            Path.GetDirectoryName(_xdgPaths.GetGlobalLockPath()));
     }
 
     [Fact]
-    public void XdgPaths_Falls_Back_To_AgentsDir_When_No_XdgStateHome()
+    public async Task ReadAsync_Migrates_From_Legacy_DotAgents_Lock_When_Current_Missing()
     {
-        // Arrange
-        var home = Path.Combine(_tempDir, "home");
-        Directory.CreateDirectory(home);
+        // Arrange: only a legacy ~/.agents lock exists (no XDG_STATE_HOME set).
+        var home = Path.Combine(_tempDir, "migrate-home", Guid.NewGuid().ToString("N"));
         var paths = new XdgPaths(new FakeSystemEnvironment { HomeDirectory = home });
+        await WriteLegacyLockAsync(
+            Path.Combine(home, ".agents", ".skill-lock.json"),
+            "legacy-skill",
+            TestContext.Current.CancellationToken);
 
-        // Act & Assert
-        Assert.Equal(Path.Combine(home, ".agents", ".skill-lock.json"), paths.GetGlobalLockPath());
+        var lockFile = new GlobalLockFile(paths, new FakeTimeProvider(FixedNow));
+
+        // Act
+        var entry = await lockFile.FindEntryAsync("legacy-skill", TestContext.Current.CancellationToken);
+
+        // Assert: the legacy data is now readable, and it has been copied to the current path.
+        Assert.NotNull(entry);
+        Assert.Equal("org/repo", entry!.Source);
+        Assert.True(File.Exists(paths.GetGlobalLockPath()));
+    }
+
+    [Fact]
+    public async Task ReadAsync_Migrates_From_Legacy_XdgStateHome_Lock_When_Current_Missing()
+    {
+        // Arrange: a legacy XDG_STATE_HOME/skills lock exists, current data-home lock does not.
+        var home = Path.Combine(_tempDir, "state-home", Guid.NewGuid().ToString("N"));
+        var stateDir = Path.Combine(home, "state");
+        var paths = new XdgPaths(new FakeSystemEnvironment
+        {
+            HomeDirectory = home,
+            Env = { ["XDG_STATE_HOME"] = stateDir }
+        });
+        await WriteLegacyLockAsync(
+            Path.Combine(stateDir, "skills", ".skill-lock.json"),
+            "state-skill",
+            TestContext.Current.CancellationToken);
+
+        var lockFile = new GlobalLockFile(paths, new FakeTimeProvider(FixedNow));
+
+        // Act
+        var entry = await lockFile.FindEntryAsync("state-skill", TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.NotNull(entry);
+        Assert.True(File.Exists(paths.GetGlobalLockPath()));
+    }
+
+    [Fact]
+    public async Task ReadAsync_Prefers_Current_Lock_Over_Legacy_When_Both_Exist()
+    {
+        // Arrange: both a legacy and a current lock already exist on disk. Write the current lock
+        // directly so migration does not run, mimicking a user who already has a current-layout lock.
+        var home = Path.Combine(_tempDir, "both-home", Guid.NewGuid().ToString("N"));
+        var paths = new XdgPaths(new FakeSystemEnvironment { HomeDirectory = home });
+        await WriteLegacyLockAsync(
+            Path.Combine(home, ".agents", ".skill-lock.json"),
+            "legacy-skill",
+            TestContext.Current.CancellationToken);
+        await WriteLegacyLockAsync(
+            paths.GetGlobalLockPath(),
+            "current-skill",
+            TestContext.Current.CancellationToken);
+
+        var lockFile = new GlobalLockFile(paths, new FakeTimeProvider(FixedNow));
+
+        // Act
+        var result = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
+
+        // Assert: only the current lock's data is present; legacy entry was not merged in.
+        Assert.Contains("current-skill", result.Skills.Keys);
+        Assert.DoesNotContain("legacy-skill", result.Skills.Keys);
+    }
+
+    [Fact]
+    public async Task AddEntryAsync_Preserves_Legacy_Entries_When_Migrating()
+    {
+        // Arrange: a legacy lock exists; adding a new skill should keep the migrated entries.
+        var home = Path.Combine(_tempDir, "preserve-home", Guid.NewGuid().ToString("N"));
+        var paths = new XdgPaths(new FakeSystemEnvironment { HomeDirectory = home });
+        await WriteLegacyLockAsync(
+            Path.Combine(home, ".agents", ".skill-lock.json"),
+            "legacy-skill",
+            TestContext.Current.CancellationToken);
+
+        var lockFile = new GlobalLockFile(paths, new FakeTimeProvider(FixedNow));
+
+        // Act
+        await lockFile.AddEntryAsync(
+            "current-skill",
+            new SkillLockEntry { Source = "org/current", SourceType = "github", SourceUrl = "u", SkillFolderHash = "c" },
+            TestContext.Current.CancellationToken);
+
+        // Assert: the migrated legacy entry survives alongside the newly added one.
+        var result = await lockFile.ReadAsync(TestContext.Current.CancellationToken);
+        Assert.Contains("legacy-skill", result.Skills.Keys);
+        Assert.Contains("current-skill", result.Skills.Keys);
+    }
+
+    private static async Task WriteLegacyLockAsync(string legacyPath, string skillName, CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(legacyPath)!);
+        await File.WriteAllTextAsync(
+            legacyPath,
+            $$"""
+            {
+              "version": {{GlobalLockFile.CurrentVersion}},
+              "skills": {
+                "{{skillName}}": {
+                  "source": "org/repo",
+                  "sourceType": "github",
+                  "sourceUrl": "https://github.com/org/repo.git",
+                  "skillFolderHash": "h",
+                  "installedAt": "2024-01-01T00:00:00Z",
+                  "updatedAt": "2024-01-01T00:00:00Z"
+                }
+              }
+            }
+            """,
+            cancellationToken);
     }
 
     [Fact]

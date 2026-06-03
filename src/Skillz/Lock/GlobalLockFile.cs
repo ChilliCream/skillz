@@ -39,14 +39,22 @@ internal sealed class GlobalLockFile(XdgPaths xdgPaths, TimeProvider timeProvide
         return file;
     }
 
-    public Task<SkillLockFile> ReadAsync(CancellationToken cancellationToken)
-        => ReadFileAsync(xdgPaths.GetGlobalLockPath(), cancellationToken);
+    public async Task<SkillLockFile> ReadAsync(CancellationToken cancellationToken)
+    {
+        MigrateLegacyLock();
+        return await ReadFileAsync(xdgPaths.GetGlobalLockPath(), cancellationToken);
+    }
 
     public Task WriteAsync(SkillLockFile lockFile, CancellationToken cancellationToken)
-        => ReplaceAsync(xdgPaths.GetGlobalLockPath(), lockFile, cancellationToken);
+    {
+        MigrateLegacyLock();
+        return ReplaceAsync(xdgPaths.GetGlobalLockPath(), lockFile, cancellationToken);
+    }
 
     public Task AddEntryAsync(string skillName, SkillLockEntry entry, CancellationToken cancellationToken)
-        => MutateAsync(
+    {
+        MigrateLegacyLock();
+        return MutateAsync(
             xdgPaths.GetGlobalLockPath(),
             lockFile =>
             {
@@ -59,9 +67,11 @@ internal sealed class GlobalLockFile(XdgPaths xdgPaths, TimeProvider timeProvide
                 return true;
             },
             cancellationToken);
+    }
 
     public async Task<bool> RemoveEntryAsync(string skillName, CancellationToken cancellationToken)
     {
+        MigrateLegacyLock();
         var removed = false;
         await MutateAsync(
             xdgPaths.GetGlobalLockPath(),
@@ -90,7 +100,9 @@ internal sealed class GlobalLockFile(XdgPaths xdgPaths, TimeProvider timeProvide
     }
 
     public Task SaveLastSelectedAgentsAsync(ImmutableArray<string> agents, CancellationToken cancellationToken)
-        => MutateAsync(
+    {
+        MigrateLegacyLock();
+        return MutateAsync(
             xdgPaths.GetGlobalLockPath(),
             lockFile =>
             {
@@ -98,4 +110,47 @@ internal sealed class GlobalLockFile(XdgPaths xdgPaths, TimeProvider timeProvide
                 return true;
             },
             cancellationToken);
+    }
+
+    /// <summary>
+    /// One-time, best-effort migration: when the current lock is absent but a lock from an earlier
+    /// layout exists, copy it to the current path so subsequent reads and mutations find the data
+    /// where skills now live. Failures are swallowed; a missing copy simply means a fresh lock is
+    /// created on first write.
+    /// </summary>
+    private void MigrateLegacyLock()
+    {
+        var currentPath = xdgPaths.GetGlobalLockPath();
+        if (File.Exists(currentPath))
+        {
+            return;
+        }
+
+        foreach (var legacyPath in xdgPaths.GetLegacyGlobalLockPaths())
+        {
+            if (!File.Exists(legacyPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                var directory = Path.GetDirectoryName(currentPath);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.Copy(legacyPath, currentPath, overwrite: false);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+
+            return;
+        }
+    }
 }
