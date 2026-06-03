@@ -275,13 +275,21 @@ internal sealed class AddCommandExecutor(
         var overwrites = skillNames.Where(existingSkills.Contains).ToList();
         var linkedLabel = installMode == InstallMode.Copy ? "Copied:" : "Symlinked:";
 
-        var canonical =
-            skillNames.Length == 1
-                ? installer.GetCanonicalPath(skillNames[0], installGlobally)
-                : installer.GetCanonicalSkillsDirectory(installGlobally);
+        // The canonical store is only materialized when skills are symlinked back to it; Copy mode
+        // writes each agent directory directly and never touches it. Drive the report off the paths
+        // the installer actually wrote (CanonicalPath is populated only when the store was created)
+        // so we never advertise a "Canonical:" location that does not exist on disk.
+        var canonicalWritten = successful.Any(r => !string.IsNullOrEmpty(r.Result.CanonicalPath));
 
         var summary = new StringBuilder();
-        summary.AppendLine($"[bold]Canonical:[/] [dim]{Markup.Escape(canonical)}[/]");
+        if (canonicalWritten)
+        {
+            var canonical =
+                skillNames.Length == 1
+                    ? installer.GetCanonicalPath(skillNames[0], installGlobally)
+                    : installer.GetCanonicalSkillsDirectory(installGlobally);
+            summary.AppendLine($"[bold]Canonical:[/] [dim]{Markup.Escape(canonical)}[/]");
+        }
         if (universals.Count > 0)
         {
             summary.AppendLine($"[bold]Universal:[/]  {Markup.Escape(universals.Select(GetAgentDisplay).Join(", "))}");
