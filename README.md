@@ -1,6 +1,6 @@
 # Skillz
 
-A CLI for managing AI agent skills — markdown `SKILL.md` files with YAML
+A CLI for managing AI agent skills - markdown `SKILL.md` files with YAML
 frontmatter that teach AI coding agents how to do specific tasks.
 
 ```bash
@@ -11,7 +11,7 @@ dotnet tool install -g skillz
 dnx skillz add anthropics/skills --agent claude-code
 ```
 
-End-user documentation — including the full `dnx` reference — lives in
+End-user documentation - including the full `dnx` reference - lives in
 [`src/Skillz.Tool/README.md`](src/Skillz.Tool/README.md) and is what ships on
 NuGet.
 
@@ -19,7 +19,7 @@ NuGet.
 
 - Installs skills from GitHub, GitLab, generic Git repos, or local paths
 - Targets 55+ AI coding agents (Claude Code, Cursor, Copilot, Codex, Continue,
-  Gemini CLI, …) — auto-detected on your machine
+  Gemini CLI, …) - auto-detected on your machine
 - Symlinks by default from one canonical location so all agents stay in sync;
   `--copy` for agents that don't follow symlinks
 - Two scopes: project (`skills-lock.json` in cwd) and global (XDG state dir)

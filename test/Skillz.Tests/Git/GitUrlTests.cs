@@ -19,7 +19,7 @@ public class GitUrlTests
     [Fact]
     public void RedactUrlUserInfo_Should_Redact_Whole_Userinfo_When_Password_Contains_At()
     {
-        // Arrange — a password that itself contains '@' must not leak the trailing fragment.
+        // Arrange - a password that itself contains '@' must not leak the trailing fragment.
         var url = "https://user:p@ss@host.com/owner/repo.git";
 
         // Act
@@ -47,7 +47,7 @@ public class GitUrlTests
     [Fact]
     public void RedactUrlUserInfo_Should_Not_Redact_When_At_Is_In_Path()
     {
-        // Arrange — '@' after the first '/' is part of the path, not credentials.
+        // Arrange - '@' after the first '/' is part of the path, not credentials.
         var url = "https://host.com/p@th/repo.git";
 
         // Act

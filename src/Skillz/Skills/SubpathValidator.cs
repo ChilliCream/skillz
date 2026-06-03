@@ -29,7 +29,7 @@ internal static class SubpathValidator
 
     /// <summary>
     /// Checks that <paramref name="subpath"/>, resolved under <paramref name="basePath"/>, stays
-    /// inside <paramref name="basePath"/> (or is <paramref name="basePath"/> itself) — so a
+    /// inside <paramref name="basePath"/> (or is <paramref name="basePath"/> itself) - so a
     /// source's subpath cannot make discovery read files outside the directory it came from.
     /// </summary>
     /// <remarks>

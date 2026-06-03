@@ -4,7 +4,7 @@ A CLI for managing AI agent skills.
 
 Skills are markdown files (`SKILL.md`) with YAML frontmatter that teach AI coding
 agents how to do something. `skillz` installs them from GitHub, GitLab, generic Git
-repos, or local paths — into whichever agents you have on your machine.
+repos, or local paths - into whichever agents you have on your machine.
 
 ## Install
 
@@ -16,7 +16,7 @@ Requires the .NET SDK (8.0 or newer). After install, `skillz` is on your `PATH`.
 
 ### Run without installing (`dnx`)
 
-If you have the **.NET 10 SDK** (or newer), `dnx` runs the tool one-shot — no
+If you have the **.NET 10 SDK** (or newer), `dnx` runs the tool one-shot - no
 `PATH` shim, no global state:
 
 ```bash
@@ -60,7 +60,7 @@ dnx --source https://my.feed/v3/index.json skillz add ...
 ```
 
 If a `.config/dotnet-tools.json` manifest is in scope, `dnx` uses the version
-pinned there instead of the latest — handy for repo-local tool versions.
+pinned there instead of the latest - handy for repo-local tool versions.
 
 `dnx skillz` and `dotnet tool exec skillz` are equivalent; `dnx` is just the
 shorter form.
@@ -117,13 +117,13 @@ alongside the installed skills in that same directory.
 
 ## Agents
 
-`skillz` supports 55+ AI coding agents — Claude Code, Cursor, GitHub Copilot,
+`skillz` supports 55+ AI coding agents - Claude Code, Cursor, GitHub Copilot,
 Codex, Continue, Gemini CLI, and many more. Detection is automatic; the
 `--agent <name>` flag (repeatable) targets specific ones. Run `skillz list` after
 install to see which agents on your machine were updated.
 
 By default skills are **symlinked** from a canonical location so editing one place
-updates every agent. Pass `--copy` to copy files instead — useful for sandboxed
+updates every agent. Pass `--copy` to copy files instead - useful for sandboxed
 agents that don't follow symlinks.
 
 ## Authoring a skill
@@ -169,4 +169,4 @@ Common flags: `--global / -g`, `--agent / -a <name>`, `--skill / -s <name>`,
 
 ## License
 
-MIT — see [LICENSE](https://github.com/PascalSenn/skillz/blob/main/LICENSE).
+MIT - see [LICENSE](https://github.com/PascalSenn/skillz/blob/main/LICENSE).

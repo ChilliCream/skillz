@@ -20,9 +20,9 @@ internal static partial class GitUrl
     /// password. Named groups:
     /// </para>
     /// <list type="bullet">
-    /// <item><description><c>scheme</c> — e.g. <c>https://</c> or
+    /// <item><description><c>scheme</c> - e.g. <c>https://</c> or
     /// <c>git+ssh://</c>; preserved as-is.</description></item>
-    /// <item><description><c>userinfo</c> — everything up to and including the
+    /// <item><description><c>userinfo</c> - everything up to and including the
     /// <c>@</c>; this is the part that gets hidden.</description></item>
     /// </list>
     /// <para>

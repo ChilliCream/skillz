@@ -212,7 +212,7 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_Should_StripCredentialsFromPersistedSource_When_GitUrlHasMultiAtUserInfo()
     {
-        // Arrange — a single-segment git URL (no owner/repo) persists its URL into the project
+        // Arrange - a single-segment git URL (no owner/repo) persists its URL into the project
         // lock's Source. A password containing '@' must have its WHOLE userinfo stripped.
         LocalSkillLockEntry? captured = null;
 
@@ -239,7 +239,7 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_Should_StripCredentialsFromPersistedSourceUrl_When_GlobalGitHubUrlHasUserInfo()
     {
-        // Arrange — global install records the raw URL in SourceUrl, which must not leak credentials.
+        // Arrange - global install records the raw URL in SourceUrl, which must not leak credentials.
         SkillLockEntry? captured = null;
 
         var services = BuildServices(

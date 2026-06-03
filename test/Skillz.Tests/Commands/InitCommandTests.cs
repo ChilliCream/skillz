@@ -59,7 +59,7 @@ public class InitCommandTests : IDisposable
     [Fact]
     public async Task Init_Without_Name_Sanitizes_Directory_Derived_Skill_Name()
     {
-        // Arrange — a working directory whose name is not a valid slug (spaces + uppercase).
+        // Arrange - a working directory whose name is not a valid slug (spaces + uppercase).
         var messyDir = Path.Combine(_workspace, "My Skill Dir");
         Directory.CreateDirectory(messyDir);
         var services = CliTestHelper.CreateServiceProvider(workspace: messyDir, useRealFileStore: true);
@@ -69,7 +69,7 @@ public class InitCommandTests : IDisposable
         var parseResult = cmd.Parse(Array.Empty<string>());
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
-        // Assert — the scaffolded name is the sanitized slug, not the raw directory name.
+        // Assert - the scaffolded name is the sanitized slug, not the raw directory name.
         Assert.Equal(0, exitCode);
         var content = await File.ReadAllTextAsync(
             Path.Combine(messyDir, "SKILL.md"),

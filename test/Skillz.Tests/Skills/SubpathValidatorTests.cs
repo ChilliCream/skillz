@@ -128,7 +128,7 @@ public class SubpathValidatorTests : IDisposable
         var outside = Path.Combine(_root, "outside");
         Directory.CreateDirectory(baseDir);
         Directory.CreateDirectory(outside);
-        // /repo/link -> /outside (outside the base) — discovery must not follow it.
+        // /repo/link -> /outside (outside the base) - discovery must not follow it.
         Directory.CreateSymbolicLink(Path.Combine(baseDir, "link"), outside);
 
         // Act & Assert

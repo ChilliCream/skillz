@@ -71,7 +71,7 @@ public class HttpClientDefaultsTests
         // Act
         using var response = await client.GetAsync(prefix + "start", TestContext.Current.CancellationToken);
 
-        // Assert — the 302 is surfaced, and the pivot target was never requested.
+        // Assert - the 302 is surfaced, and the pivot target was never requested.
         Assert.Equal(HttpStatusCode.Found, response.StatusCode);
         lock (requestedPaths)
         {

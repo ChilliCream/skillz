@@ -6,7 +6,7 @@ namespace Skillz.Sources;
 /// Works out the short <c>owner/repo</c> name of a repository from its URL.
 /// </summary>
 /// <remarks>
-/// A repo can be written many ways — <c>https://github.com/owner/repo</c>,
+/// A repo can be written many ways - <c>https://github.com/owner/repo</c>,
 /// <c>git@github.com:owner/repo.git</c>, or just <c>owner/repo</c>. This boils all of them
 /// down to the same plain <c>owner/repo</c>, which is what we save in the lock file and pass
 /// to the GitHub/GitLab APIs when checking a skill for updates.
@@ -33,7 +33,7 @@ internal static partial class OwnerRepoParser
     /// </summary>
     /// <param name="parsed">The source to read the URL from.</param>
     /// <returns>
-    /// The <c>owner/repo</c> name, or <see langword="null"/> when there is no repo to find — a
+    /// The <c>owner/repo</c> name, or <see langword="null"/> when there is no repo to find - a
     /// local folder, or a URL that isn't a GitHub/GitLab-style HTTP or SSH link. GitLab subgroups
     /// can make the result longer than two parts, e.g. <c>group/team/repo</c>.
     /// </returns>

@@ -139,7 +139,7 @@ public class RemoveCommandTests : IDisposable
     {
         // Arrange: an externally-created, unsanitized folder ("My Skill") is on disk. The
         // installer resolves install/canonical paths from the SANITIZED name ("my-skill"),
-        // which does not exist — so nothing is actually deleted. The command must not claim
+        // which does not exist - so nothing is actually deleted. The command must not claim
         // success when nothing was removed.
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);

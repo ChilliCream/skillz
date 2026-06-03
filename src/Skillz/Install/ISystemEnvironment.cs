@@ -1,8 +1,8 @@
 namespace Skillz.Install;
 
 /// <summary>
-/// Abstracts the ambient operating-system state the install layer depends on —
-/// environment variables, directory existence, and well-known directories — so that
+/// Abstracts the ambient operating-system state the install layer depends on -
+/// environment variables, directory existence, and well-known directories - so that
 /// it can be substituted in tests instead of touching the real process and filesystem.
 /// </summary>
 internal interface ISystemEnvironment

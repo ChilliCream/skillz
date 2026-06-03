@@ -21,7 +21,7 @@ public class UpdateCommandProgressTests
     {
         // Arrange: a TTY (not redirected) global check with a checkable skill, so the command draws
         // the in-place "\r\x1b[K{progress}" line. The fetch cancels and throws partway through, which
-        // must still leave a cleared line — not a stale partial progress line — on the terminal.
+        // must still leave a cleared line - not a stale partial progress line - on the terminal.
         var services = CliTestHelper.CreateServiceProvider();
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
@@ -69,7 +69,7 @@ public class UpdateCommandProgressTests
         }
 
         // Assert: the progress line was drawn and then cleared despite the mid-loop cancellation, so
-        // the last thing written to the terminal is the clear sequence — no stale partial line remains.
+        // the last thing written to the terminal is the clear sequence - no stale partial line remains.
         var written = stdout.ToString();
         Assert.Contains("Checking global skill 1/1", written, StringComparison.Ordinal);
         Assert.EndsWith(ClearLine, written, StringComparison.Ordinal);

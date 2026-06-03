@@ -114,7 +114,7 @@ public class FrontmatterParserTests
         // Act
         var result = FrontmatterParser.Parse(raw);
 
-        // Assert — the exact shape SkillDiscovery pattern-matches; boolean stays the
+        // Assert - the exact shape SkillDiscovery pattern-matches; boolean stays the
         // string "true" because the internal-skill gate compares against "true".
         var metadata = Assert.IsType<Dictionary<object, object>>(result.Data["metadata"]);
         Assert.Equal("tool", metadata["type"]);
@@ -138,7 +138,7 @@ public class FrontmatterParserTests
     [Fact]
     public void Returns_Empty_Data_When_Frontmatter_Is_Not_A_Mapping()
     {
-        // Arrange — a sequence where a mapping is expected
+        // Arrange - a sequence where a mapping is expected
         var raw = "---\n- just\n- a\n- list\n---\nBody";
 
         // Act
@@ -152,7 +152,7 @@ public class FrontmatterParserTests
     [Fact]
     public void Parses_Frontmatter_When_Preceded_By_Leading_Blank_Line()
     {
-        // Arrange — editor artifact: a blank line before the opening fence
+        // Arrange - editor artifact: a blank line before the opening fence
         var raw = "\n---\nname: my-skill\ndescription: A test skill\n---\nBody";
 
         // Act
@@ -167,7 +167,7 @@ public class FrontmatterParserTests
     [Fact]
     public void Parses_Frontmatter_When_Preceded_By_Leading_Spaces()
     {
-        // Arrange — editor artifact: spaces before the opening fence
+        // Arrange - editor artifact: spaces before the opening fence
         var raw = "   ---\nname: my-skill\ndescription: A test skill\n---\nBody";
 
         // Act
@@ -182,7 +182,7 @@ public class FrontmatterParserTests
     [Fact]
     public void Parses_Frontmatter_When_Preceded_By_Mixed_Leading_Whitespace_With_Crlf()
     {
-        // Arrange — several blank CRLF lines and spaces before the opening fence
+        // Arrange - several blank CRLF lines and spaces before the opening fence
         var raw = "\r\n\r\n  ---\r\nname: my-skill\r\ndescription: A test\r\n---\r\nBody";
 
         // Act
@@ -197,7 +197,7 @@ public class FrontmatterParserTests
     [Fact]
     public void Returns_Empty_Data_When_Triple_Dash_Appears_Only_In_Body()
     {
-        // Arrange — no opening fence; '---' is real content mid-document and must NOT be
+        // Arrange - no opening fence; '---' is real content mid-document and must NOT be
         // mistaken for frontmatter (the text before it is not whitespace).
         var raw = "Some intro text.\n---\nname: not-frontmatter\n---\nMore body";
 

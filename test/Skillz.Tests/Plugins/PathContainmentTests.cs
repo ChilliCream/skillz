@@ -276,7 +276,7 @@ public class PathContainmentTests : IDisposable
 
         // The leaf is a symlink escaping the base, but it lives directly inside
         // the base. Because we only resolve the parent chain (not the leaf), it
-        // is reported as contained — the caller replaces the link safely. This
+        // is reported as contained - the caller replaces the link safely. This
         // is what makes idempotent reinstall of a skillz-managed agent->canonical
         // symlink work.
         var baseDir = Path.Combine(_root, "base");
@@ -295,7 +295,7 @@ public class PathContainmentTests : IDisposable
         // Arrange
         // Regression for the FileInfo.Attributes == -1 bug: a non-existent
         // nested target must resolve to its nearest existing parent (with
-        // symlinks followed) plus the missing segments — never null.
+        // symlinks followed) plus the missing segments - never null.
         var realBase = Path.Combine(_root, "real-base");
         Directory.CreateDirectory(realBase);
 

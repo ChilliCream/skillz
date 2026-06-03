@@ -9,7 +9,7 @@ namespace Skillz.Tests.Utils;
 
 /// <summary>
 /// Runs a Skillz command end-to-end through the root command and captures everything a user would
-/// see — the rendered console output, raw stdout, stderr, and a non-zero exit code — as a single
+/// see - the rendered console output, raw stdout, stderr, and a non-zero exit code - as a single
 /// deterministic block suitable for inline snapshotting. The first line echoes the invoked command
 /// so a snapshot reads like a terminal session:
 /// <code>

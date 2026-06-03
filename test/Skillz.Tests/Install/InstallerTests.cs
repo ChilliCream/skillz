@@ -874,7 +874,7 @@ public class InstallerTests : IDisposable
         }
 
         // Arrange: a real file sits exactly where the skill's symlink would go. We never delete
-        // it — the install must refuse and leave the file untouched.
+        // it - the install must refuse and leave the file untouched.
         var skillName = "file-in-the-way";
         var sourceDir = CreateSkillSource(skillName);
         var skill = MakeSkill(skillName, sourceDir);
@@ -901,7 +901,7 @@ public class InstallerTests : IDisposable
 
     /// <summary>
     /// Delegates every operation to a real <see cref="SystemFileStore"/> except
-    /// <see cref="IFileStore.DeletePath"/> for one specific path, which always throws —
+    /// <see cref="IFileStore.DeletePath"/> for one specific path, which always throws -
     /// simulating an un-cleanable install destination (locked file, no permission).
     /// </summary>
     private sealed class DeleteFailingFileStore(string failForPath) : IFileStore

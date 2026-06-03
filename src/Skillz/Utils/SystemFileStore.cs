@@ -59,7 +59,7 @@ internal sealed class SystemFileStore : IFileStore
 
         if ((attributes & FileAttributes.ReparsePoint) != 0)
         {
-            // Delete the symlink as a link — never recurse through it, so the
+            // Delete the symlink as a link - never recurse through it, so the
             // link target's contents are left untouched. This holds whether the
             // target is a directory, a file, or gone (a broken symlink).
             DeleteReparsePoint(path);

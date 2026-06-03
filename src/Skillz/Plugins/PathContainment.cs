@@ -19,7 +19,7 @@ internal static class PathContainment
     public static bool IsContainedInRealPath(string targetPath, string basePath)
     {
         // Resolve the base fully (it is an existing directory we compare
-        // against) but only resolve the target's parent chain — the target's
+        // against) but only resolve the target's parent chain - the target's
         // leaf is treated literally. A leaf that is itself a symlink (e.g. a
         // skillz-managed agent->canonical link, or a stale self-loop) must not
         // be read as "escaping"; we only defend against a symlinked *parent*

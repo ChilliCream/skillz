@@ -191,7 +191,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
         try
         {
             // Delete whatever is there first. A reparse point (symlink / self-loop) is
-            // removed as a link, never recursing through it — so replacing a symlinked
+            // removed as a link, never recursing through it - so replacing a symlinked
             // destination can never touch whatever it points at.
             fileStore.DeletePath(path);
         }
@@ -351,7 +351,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
             var resolvedLinkPath = Path.GetFullPath(linkPath);
 
             // Fully resolve symlinks on both. If they already point at the same place, the
-            // link we want effectively exists — nothing to do.
+            // link we want effectively exists - nothing to do.
             var realTarget = RealPath.TryGetRealPath(resolvedTarget) ?? resolvedTarget;
             var realLinkPath = RealPath.TryGetRealPath(resolvedLinkPath) ?? resolvedLinkPath;
 
@@ -360,7 +360,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
                 return true;
             }
 
-            // Same check, resolving only the nearest existing parents — handles the case where
+            // Same check, resolving only the nearest existing parents - handles the case where
             // the leaf (link or target) does not exist on disk yet.
             var realTargetWithParents = RealPath.ResolveWithNearestExistingParent(target) ?? resolvedTarget;
             var realLinkPathWithParents = RealPath.ResolveWithNearestExistingParent(linkPath) ?? resolvedLinkPath;
@@ -390,14 +390,14 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
             // Create the relative symlink. This is the only filesystem mutation here:
             // TryCreateSymlink never deletes a symlink, directory, or file. If something
             // already occupies linkPath, CreateSymbolicLink throws IOException and we return
-            // false below — clearing a prior install is the caller's responsibility
+            // false below - clearing a prior install is the caller's responsibility
             // (see ClearSkillDestination).
             Directory.CreateSymbolicLink(linkPath, relativePath);
             return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Any failure — including an already-occupied destination — yields false with no
+            // Any failure - including an already-occupied destination - yields false with no
             // deletion performed.
             return false;
         }
@@ -411,7 +411,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
     /// </summary>
     private void ClearSkillDestination(string path, string canonicalDirectory)
     {
-        // Nothing there at all — no file, no directory, no (possibly broken) reparse point.
+        // Nothing there at all - no file, no directory, no (possibly broken) reparse point.
         if (!fileStore.PathExists(path))
         {
             return;
@@ -419,7 +419,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
 
         // The destination already resolves to the canonical store (a universal agent whose skills
         // dir IS the store, or an agent skills dir that is itself a symlink into it). It already
-        // holds the content — leave it untouched; the symlink step is then a no-op.
+        // holds the content - leave it untouched; the symlink step is then a no-op.
         var realPath = RealPath.ResolveWithNearestExistingParent(path);
         var realCanonical = RealPath.ResolveWithNearestExistingParent(canonicalDirectory);
         if (realPath is not null && realCanonical is not null && PathEquals(realPath, realCanonical))

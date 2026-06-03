@@ -17,7 +17,7 @@ public class AddCommandSnapshotTests : IDisposable
     private const string LocalDisplaySource = "/skillz-test/local";
 
     // Fixed, short install paths kept well under the panel width so the Spectre summary box cannot
-    // wrap nondeterministically and needs no scrubbing — identical box geometry on every machine.
+    // wrap nondeterministically and needs no scrubbing - identical box geometry on every machine.
     private const string CanonicalPath = "/skillz-test/.agents/skills/alpha";
     private const string InstallPath = "/skillz-test/.claude/skills/alpha";
 

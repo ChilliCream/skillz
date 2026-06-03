@@ -209,8 +209,8 @@ internal sealed class UpdateCommand(
         }
 
         // Whether progress is drawn as an in-place TTY line (\r) rather than plain log lines.
-        // When true, the line MUST be cleared once checking ends — including on cancellation or
-        // an unexpected exception mid-loop — so no stale partial progress text is left behind.
+        // When true, the line MUST be cleared once checking ends - including on cancellation or
+        // an unexpected exception mid-loop - so no stale partial progress text is left behind.
         var inlineProgress = !consoleEnvironment.IsInputRedirected
             && consoleEnvironment.IsTty
             && checkable.Count > 0;

@@ -26,7 +26,7 @@ internal static class RealPath
     /// not exist or cannot be resolved.
     /// </summary>
     /// <param name="path">
-    /// The path to resolve. Can be relative — it will be combined with the
+    /// The path to resolve. Can be relative - it will be combined with the
     /// current working directory.
     /// </param>
     /// <returns>
@@ -52,7 +52,7 @@ internal static class RealPath
         }
         catch
         {
-            // Anything went wrong (no permission, weird path, IO error) —
+            // Anything went wrong (no permission, weird path, IO error) -
             // pretend we could not resolve it so the caller refuses to trust
             // it. Better safe than sorry.
             return null;
@@ -74,7 +74,7 @@ internal static class RealPath
     /// <para>
     /// This is the important one for security checks. Picture installing
     /// a skill to <c>~/.agents/skills/my-skill/</c>. That folder does not
-    /// exist yet — we are about to create it. So calling
+    /// exist yet - we are about to create it. So calling
     /// <see cref="TryGetRealPath(string)"/> on it returns <see langword="null"/>
     /// and the safety check silently passes. An attacker could then put a
     /// symlink somewhere up the chain (say <c>~/.agents</c> points at
@@ -94,7 +94,7 @@ internal static class RealPath
 
         // Each time we step up one folder, we remember the name we just
         // stepped past so we can put it back later. It is a stack because
-        // the last name we step past is the deepest one — we put it back
+        // the last name we step past is the deepest one - we put it back
         // first.
         var remaining = new Stack<string>();
 
@@ -127,7 +127,7 @@ internal static class RealPath
             {
                 // We walked all the way up to the drive root or "/" without
                 // finding anything that exists. Just return the path as it
-                // is — there are no symlinks to worry about.
+                // is - there are no symlinks to worry about.
                 return Path.GetFullPath(current);
             }
 
@@ -140,7 +140,7 @@ internal static class RealPath
 
     /// <summary>
     /// Resolves every symlink on the path's <i>parent</i> chain but leaves the
-    /// final component (the leaf) exactly as written — it is <b>not</b>
+    /// final component (the leaf) exactly as written - it is <b>not</b>
     /// followed even if it is itself a symlink.
     /// </summary>
     /// <param name="path">The path whose parent chain we want resolved.</param>
@@ -152,7 +152,7 @@ internal static class RealPath
     /// <para>
     /// This is the right primitive for "where will this destination live?"
     /// containment checks. We care that the <i>location</i> we are about to
-    /// write to (or replace) sits inside a safe base — not where a leaf
+    /// write to (or replace) sits inside a safe base - not where a leaf
     /// symlink currently happens to point.
     /// </para>
     /// <para>
@@ -185,7 +185,7 @@ internal static class RealPath
 
     /// <summary>
     /// Takes the text stored inside a symlink and turns it into a full
-    /// absolute path. Does <i>not</i> follow the symlink — just builds the
+    /// absolute path. Does <i>not</i> follow the symlink - just builds the
     /// path string.
     /// </summary>
     /// <param name="linkPath">Where the symlink itself lives.</param>
@@ -264,13 +264,13 @@ internal static class RealPath
     }
 
     /// <summary>
-    /// Checks whether anything is at the given path — a real file, a real
+    /// Checks whether anything is at the given path - a real file, a real
     /// folder, or even a broken symlink whose target is gone.
     /// </summary>
     /// <remarks>
     /// A broken symlink (the link exists but what it points at is deleted)
     /// fools both <see cref="Directory.Exists(string)"/> and
-    /// <see cref="File.Exists(string)"/> — they both return <c>false</c>.
+    /// <see cref="File.Exists(string)"/> - they both return <c>false</c>.
     /// But the symlink itself is still there on disk. To catch that case we
     /// also peek at the path's attributes; if the "this is a symlink" flag
     /// is set, we treat the path as present.

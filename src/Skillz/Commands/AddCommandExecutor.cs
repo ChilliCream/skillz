@@ -68,7 +68,7 @@ internal sealed class AddCommandExecutor(
             }
 
             interaction.WriteMarkupLine(
-                $"[on cyan] {Markup.Escape(agentName)} [/] Agent detected — installing non-interactively");
+                $"[on cyan] {Markup.Escape(agentName)} [/] Agent detected - installing non-interactively");
 
             options = options with { Yes = true, Agents = agents };
         }

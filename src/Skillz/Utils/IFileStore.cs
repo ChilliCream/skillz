@@ -2,8 +2,8 @@ namespace Skillz.Utils;
 
 /// <summary>
 /// Abstracts the filesystem content and structure operations that command and discovery
-/// logic depend on — reading and writing files, and creating, enumerating, and deleting
-/// directories — so that logic can be substituted with an in-memory store in tests instead
+/// logic depend on - reading and writing files, and creating, enumerating, and deleting
+/// directories - so that logic can be substituted with an in-memory store in tests instead
 /// of touching the real filesystem.
 /// </summary>
 internal interface IFileStore

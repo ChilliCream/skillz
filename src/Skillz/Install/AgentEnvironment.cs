@@ -114,7 +114,7 @@ internal sealed class AgentEnvironment(AgentRegistry registry, ISystemEnvironmen
 
     private string? DetectAgentNameFromEnvironment()
     {
-        // 1. Generic AI_AGENT — raw agent name from the environment, checked first
+        // 1. Generic AI_AGENT - raw agent name from the environment, checked first
         var aiAgent = ResolveEnv("AI_AGENT");
         if (!string.IsNullOrEmpty(aiAgent))
         {
@@ -223,7 +223,7 @@ internal sealed class AgentEnvironment(AgentRegistry registry, ISystemEnvironmen
             }
         }
 
-        // Return raw value — FindAgentType will handle mapping or null
+        // Return raw value - FindAgentType will handle mapping or null
         return value;
     }
 

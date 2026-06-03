@@ -105,7 +105,7 @@ public sealed class FileLockTests : IDisposable
                 FileLock.DefaultTimeoutMs,
                 Ct));
 
-        // Assert — the lock was released, so the file is gone and a new acquisition succeeds.
+        // Assert - the lock was released, so the file is gone and a new acquisition succeeds.
         Assert.False(File.Exists(LockPath));
         var result = await FileLock.WithLockAsync(_target, () => Task.FromResult(7), FileLock.DefaultTimeoutMs, Ct);
         Assert.Equal(7, result);
@@ -114,7 +114,7 @@ public sealed class FileLockTests : IDisposable
     [Fact]
     public async Task WithLockAsync_Serializes_Concurrent_Holders()
     {
-        // Arrange — A acquires the lock and holds it until released.
+        // Arrange - A acquires the lock and holds it until released.
         var aEntered = new TaskCompletionSource();
         var releaseA = new TaskCompletionSource();
         var bRan = false;
@@ -132,7 +132,7 @@ public sealed class FileLockTests : IDisposable
 
         await aEntered.Task;
 
-        // Act — B tries to acquire the same lock while A holds it.
+        // Act - B tries to acquire the same lock while A holds it.
         var taskB = FileLock.WithLockAsync(
             _target,
             () =>
@@ -145,7 +145,7 @@ public sealed class FileLockTests : IDisposable
 
         await Task.Delay(150, Ct);
 
-        // Assert — B is blocked (its action has not run) for as long as A holds the lock.
+        // Assert - B is blocked (its action has not run) for as long as A holds the lock.
         Assert.False(taskB.IsCompleted);
         Assert.False(bRan);
 
@@ -160,10 +160,10 @@ public sealed class FileLockTests : IDisposable
     [Fact]
     public async Task WithLockAsync_Throws_TimeoutException_When_Lock_Unavailable()
     {
-        // Arrange — occupy the lock so the file cannot be created.
+        // Arrange - occupy the lock so the file cannot be created.
         await File.WriteAllTextAsync(LockPath, "", Ct);
 
-        // Act / Assert — a zero timeout gives up on the first failed attempt, before the staleness check.
+        // Act / Assert - a zero timeout gives up on the first failed attempt, before the staleness check.
         var ex = await Assert.ThrowsAsync<TimeoutException>(
             () => FileLock.WithLockAsync(_target, () => Task.FromResult(0), timeoutMs: 0, Ct));
 
@@ -174,7 +174,7 @@ public sealed class FileLockTests : IDisposable
     [Fact]
     public async Task WithLockAsync_Throws_When_Cancelled_While_Waiting()
     {
-        // Arrange — occupy the lock (fresh, so it is not treated as stale during the wait).
+        // Arrange - occupy the lock (fresh, so it is not treated as stale during the wait).
         await File.WriteAllTextAsync(LockPath, "", Ct);
         using var cts = new CancellationTokenSource();
 
@@ -189,11 +189,11 @@ public sealed class FileLockTests : IDisposable
     [Fact]
     public async Task WithLockAsync_Takes_Over_Stale_Lock()
     {
-        // Arrange — a lock left behind and older than the stale-lock timeout is considered abandoned.
+        // Arrange - a lock left behind and older than the stale-lock timeout is considered abandoned.
         await File.WriteAllTextAsync(LockPath, "", Ct);
         await Task.Delay(250, Ct);
 
-        // Act — the lock's age (~250ms) exceeds staleLockTimeoutMs (50ms), so it is reclaimed.
+        // Act - the lock's age (~250ms) exceeds staleLockTimeoutMs (50ms), so it is reclaimed.
         var result = await FileLock.WithLockAsync(
             _target,
             () => Task.FromResult("recovered"),
@@ -209,10 +209,10 @@ public sealed class FileLockTests : IDisposable
     [Fact]
     public async Task WithLockAsync_Does_Not_Reclaim_Fresh_Lock_Before_Stale_Threshold()
     {
-        // Arrange — a fresh lock file (just created, age well under 60s).
+        // Arrange - a fresh lock file (just created, age well under 60s).
         await File.WriteAllTextAsync(LockPath, "", Ct);
 
-        // Act — large staleLockTimeoutMs keeps the lock safe; small timeoutMs forces a fast timeout.
+        // Act - large staleLockTimeoutMs keeps the lock safe; small timeoutMs forces a fast timeout.
         var ex = await Assert.ThrowsAsync<TimeoutException>(
             () => FileLock.WithLockAsync(
                 _target,
@@ -221,7 +221,7 @@ public sealed class FileLockTests : IDisposable
                 staleLockTimeoutMs: 60_000,
                 Ct));
 
-        // Assert — the lock was NOT reclaimed (file still exists) and the error is descriptive.
+        // Assert - the lock was NOT reclaimed (file still exists) and the error is descriptive.
         Assert.True(File.Exists(LockPath), "Fresh lock must not be deleted before the stale threshold.");
         Assert.Contains(_target, ex.Message);
         Assert.Contains("Timed out acquiring lock", ex.Message);
@@ -230,15 +230,15 @@ public sealed class FileLockTests : IDisposable
     [Fact]
     public async Task WithLockAsync_Convenience_Overload_Uses_60s_Default_Stale_Threshold()
     {
-        // Arrange — a fresh lock file (age << 60s).
+        // Arrange - a fresh lock file (age << 60s).
         await File.WriteAllTextAsync(LockPath, "", Ct);
 
-        // Act — the convenience overload (no staleLockTimeoutMs) should apply the 60s default,
+        // Act - the convenience overload (no staleLockTimeoutMs) should apply the 60s default,
         // meaning a fresh lock is never stolen; a small timeoutMs forces a fast failure.
         var ex = await Assert.ThrowsAsync<TimeoutException>(
             () => FileLock.WithLockAsync(_target, () => Task.FromResult(0), timeoutMs: 200, Ct));
 
-        // Assert — fresh lock survived and the 60s default was honoured.
+        // Assert - fresh lock survived and the 60s default was honoured.
         Assert.True(File.Exists(LockPath), "Fresh lock must not be deleted when using the convenience overload.");
         Assert.Contains("Timed out acquiring lock", ex.Message);
         Assert.Equal(FileLock.DefaultStaleLockTimeoutMs, 60_000);
@@ -247,13 +247,13 @@ public sealed class FileLockTests : IDisposable
     [Fact]
     public async Task WithLockAsync_Void_Overload_Takes_Over_Stale_Lock()
     {
-        // Arrange — a lock left behind and older than the stale-lock timeout.
+        // Arrange - a lock left behind and older than the stale-lock timeout.
         await File.WriteAllTextAsync(LockPath, "", Ct);
         await Task.Delay(250, Ct);
 
         var ran = false;
 
-        // Act — the void overload should also reclaim a stale lock.
+        // Act - the void overload should also reclaim a stale lock.
         await FileLock.WithLockAsync(
             _target,
             () =>
@@ -265,7 +265,7 @@ public sealed class FileLockTests : IDisposable
             staleLockTimeoutMs: 50,
             Ct);
 
-        // Assert — the action ran and the lock was released afterwards.
+        // Assert - the action ran and the lock was released afterwards.
         Assert.True(ran);
         Assert.False(File.Exists(LockPath));
     }
@@ -273,10 +273,10 @@ public sealed class FileLockTests : IDisposable
     [Fact]
     public async Task WithLockAsync_Zero_StaleLockTimeoutMs_Reclaims_Any_Existing_Lock_Immediately()
     {
-        // Arrange — a lock file that was just created (age ≈ 0ms).
+        // Arrange - a lock file that was just created (age ≈ 0ms).
         await File.WriteAllTextAsync(LockPath, "", Ct);
 
-        // Act — staleLockTimeoutMs: 0 means every existing lock is immediately stale.
+        // Act - staleLockTimeoutMs: 0 means every existing lock is immediately stale.
         var result = await FileLock.WithLockAsync(
             _target,
             () => Task.FromResult("reclaimed"),
@@ -284,7 +284,7 @@ public sealed class FileLockTests : IDisposable
             staleLockTimeoutMs: 0,
             Ct);
 
-        // Assert — the action ran successfully and the lock was cleaned up.
+        // Assert - the action ran successfully and the lock was cleaned up.
         Assert.Equal("reclaimed", result);
         Assert.False(File.Exists(LockPath));
     }

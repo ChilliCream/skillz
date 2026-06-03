@@ -19,7 +19,7 @@ internal static class GitArguments
     /// <see cref="ValidateNonOption"/>: anything outside this set (whitespace,
     /// shell metacharacters, <c>..</c>, and so on) is refused rather than risk
     /// argument injection or surprising ref interpretation. It is deliberately
-    /// stricter than git's own ref naming rules — ordinary branch and tag names
+    /// stricter than git's own ref naming rules - ordinary branch and tag names
     /// pass, exotic ones are rejected on purpose.
     /// </remarks>
     private static readonly SearchValues<char> s_refAllowedChars =
@@ -31,8 +31,8 @@ internal static class GitArguments
     /// <remarks>
     /// Setting the smudge/clean/process filters to empty (and marking LFS not required)
     /// makes git check out the small LFS <em>pointer files</em> instead of downloading the
-    /// real binaries from the LFS server. We only need the repository's text — the
-    /// <c>SKILL.md</c> and skill files — so this skips slow, large, and potentially failing
+    /// real binaries from the LFS server. We only need the repository's text - the
+    /// <c>SKILL.md</c> and skill files - so this skips slow, large, and potentially failing
     /// LFS fetches. Applied via <c>-c</c> so it affects only this command, not the user's
     /// git config; <c>GitClient.CloneAsync</c> also sets <c>GIT_LFS_SKIP_SMUDGE=1</c> as a backstop.
     /// </remarks>
