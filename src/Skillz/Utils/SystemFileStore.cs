@@ -78,6 +78,16 @@ internal sealed class SystemFileStore : IFileStore
 
     public IEnumerable<string> EnumerateDirectories(string path) => Directory.EnumerateDirectories(path);
 
+    public bool IsDirectoryEmpty(string path)
+    {
+        if (!Directory.Exists(path))
+        {
+            return true;
+        }
+
+        return !Directory.EnumerateFileSystemEntries(path).Any();
+    }
+
     public Task<string> ReadAllTextAsync(string path, CancellationToken cancellationToken)
         => File.ReadAllTextAsync(path, cancellationToken);
 

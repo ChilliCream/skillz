@@ -52,6 +52,12 @@ internal interface IFileStore
     /// </summary>
     IEnumerable<string> EnumerateDirectories(string path);
 
+    /// <summary>
+    /// Determines whether the directory at the given path contains no entries (no files and
+    /// no subdirectories). A path that does not exist is treated as empty.
+    /// </summary>
+    bool IsDirectoryEmpty(string path);
+
     Task<string> ReadAllTextAsync(string path, CancellationToken cancellationToken);
 
     Task WriteAllTextAsync(string path, string content, CancellationToken cancellationToken);

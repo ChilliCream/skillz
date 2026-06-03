@@ -69,6 +69,20 @@ internal sealed class FakeFileStore : IFileStore
             .ToList();
     }
 
+    public bool IsDirectoryEmpty(string path)
+    {
+        var normalized = Normalize(path);
+        if (!Dirs.Contains(normalized))
+        {
+            return true;
+        }
+
+        var prefix = normalized + "/";
+        var hasChildDir = Dirs.Any(d => d.StartsWithOrdinal(prefix));
+        var hasChildFile = Files.Keys.Any(f => f.StartsWithOrdinal(prefix));
+        return !hasChildDir && !hasChildFile;
+    }
+
     public Task<string> ReadAllTextAsync(string path, CancellationToken cancellationToken)
     {
         var normalized = Normalize(path);

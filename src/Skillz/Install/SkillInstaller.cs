@@ -195,10 +195,30 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // mkdir below will surface a real problem
+            // A failed clean must fail the install: CreateDirectory below is a silent
+            // no-op on an existing directory, so swallowing this would leave stale files
+            // from a prior skill in place and the materialize step would merge new files
+            // over them, producing a corrupt skill while reporting success.
+            throw new CliException(
+                1,
+                $"Failed to clean install destination '{path}': {ex.Message}",
+                title: "Install destination could not be cleaned",
+                hint: "Remove or fix permissions on the destination directory and try again.");
         }
 
         fileStore.CreateDirectory(path);
+
+        // The destination must be empty before we materialize into it. CreateDirectory is
+        // a no-op when the path already exists, so a successful-looking clean that left
+        // contents behind would otherwise silently merge into the new skill.
+        if (!fileStore.IsDirectoryEmpty(path))
+        {
+            throw new CliException(
+                1,
+                $"Install destination '{path}' is not empty after cleaning",
+                title: "Install destination could not be cleaned",
+                hint: "Remove the destination directory and try again.");
+        }
     }
 
     private static async Task CopyDirectoryAsync(string src, string dest, CancellationToken cancellationToken)
@@ -388,7 +408,16 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
             var realLinkDir =
                 RealPath.ResolveWithNearestExistingParent(linkDir ?? string.Empty)
                 ?? Path.GetFullPath(linkDir ?? string.Empty);
-            var relativePath = Path.GetRelativePath(realLinkDir, target);
+
+            // Resolve the target through the same symlink-following semantics used for the
+            // link directory. Computing the relative path from a resolved link dir to a raw
+            // (only lexically normalized) target diverges whenever a parent of either path
+            // is a symlink, producing a relative link that routes through that symlink and
+            // dangles once it is removed or repointed. Both endpoints must be resolved
+            // consistently.
+            var realTargetForLink =
+                RealPath.ResolveWithNearestExistingParent(target) ?? Path.GetFullPath(target);
+            var relativePath = Path.GetRelativePath(realLinkDir, realTargetForLink);
 
             Directory.CreateSymbolicLink(linkPath, relativePath);
             return true;
