@@ -148,4 +148,64 @@ public class FrontmatterParserTests
         Assert.Empty(result.Data);
         Assert.Equal("Body", result.Content);
     }
+
+    [Fact]
+    public void Parses_Frontmatter_When_Preceded_By_Leading_Blank_Line()
+    {
+        // Arrange — editor artifact: a blank line before the opening fence
+        var raw = "\n---\nname: my-skill\ndescription: A test skill\n---\nBody";
+
+        // Act
+        var result = FrontmatterParser.Parse(raw);
+
+        // Assert
+        Assert.Equal("my-skill", result.Data["name"]);
+        Assert.Equal("A test skill", result.Data["description"]);
+        Assert.Equal("Body", result.Content);
+    }
+
+    [Fact]
+    public void Parses_Frontmatter_When_Preceded_By_Leading_Spaces()
+    {
+        // Arrange — editor artifact: spaces before the opening fence
+        var raw = "   ---\nname: my-skill\ndescription: A test skill\n---\nBody";
+
+        // Act
+        var result = FrontmatterParser.Parse(raw);
+
+        // Assert
+        Assert.Equal("my-skill", result.Data["name"]);
+        Assert.Equal("A test skill", result.Data["description"]);
+        Assert.Equal("Body", result.Content);
+    }
+
+    [Fact]
+    public void Parses_Frontmatter_When_Preceded_By_Mixed_Leading_Whitespace_With_Crlf()
+    {
+        // Arrange — several blank CRLF lines and spaces before the opening fence
+        var raw = "\r\n\r\n  ---\r\nname: my-skill\r\ndescription: A test\r\n---\r\nBody";
+
+        // Act
+        var result = FrontmatterParser.Parse(raw);
+
+        // Assert
+        Assert.Equal("my-skill", result.Data["name"]);
+        Assert.Equal("A test", result.Data["description"]);
+        Assert.Equal("Body", result.Content);
+    }
+
+    [Fact]
+    public void Returns_Empty_Data_When_Triple_Dash_Appears_Only_In_Body()
+    {
+        // Arrange — no opening fence; '---' is real content mid-document and must NOT be
+        // mistaken for frontmatter (the text before it is not whitespace).
+        var raw = "Some intro text.\n---\nname: not-frontmatter\n---\nMore body";
+
+        // Act
+        var result = FrontmatterParser.Parse(raw);
+
+        // Assert
+        Assert.Empty(result.Data);
+        Assert.Equal(raw, result.Content);
+    }
 }

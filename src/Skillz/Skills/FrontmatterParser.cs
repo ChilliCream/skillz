@@ -11,7 +11,25 @@ internal record FrontmatterResult(Dictionary<string, object> Data, string Conten
 /// <summary>Parses YAML frontmatter delimited by <c>---</c> from a raw skill document.</summary>
 internal static partial class FrontmatterParser
 {
-    [GeneratedRegex(@"\A---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)\z")]
+
+    // Parses a YAML-style frontmatter document into two capture groups: the frontmatter body
+    // (group 1) and the remaining document content (group 2).
+    //
+    // Pattern breakdown:
+    //   \A            Anchor to the absolute start of the string (unlike ^, never matches after a
+    //                 newline). Guarantees the fence we find is THE opening fence, not one mid-document.
+    //   \s*           Tolerates blank lines / leading spaces before the opening fence (common editor
+    //                 artifacts). The '---' must still be the first non-whitespace content - a '---'
+    //                 that appears after real content is body text, not an opening fence.
+    //   ---\r?\n      The opening fence, followed by either a Windows (\r\n) or Unix (\n) line ending.
+    //   ([\s\S]*?)    Group 1: the frontmatter body. [\s\S] matches ANY char including newlines
+    //                 (unlike '.'); *? is lazy so it stops at the FIRST closing fence, not the last.
+    //   \r?\n---\r?\n? The closing fence on its own line. The trailing \n is optional (\r?\n?) so a
+    //                 file that ends immediately after the closing '---' still matches.
+    //   ([\s\S]*)     Group 2: everything after the frontmatter - the actual document body.
+    //   \z            Anchor to the absolute end of the string (unlike \Z, won't match before a
+    //                 trailing newline), so group 2 captures the body in full.
+    [GeneratedRegex(@"\A\s*---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)\z")]
     private static partial Regex FrontmatterRegex();
 
     /// <summary>
