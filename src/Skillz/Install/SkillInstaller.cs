@@ -229,15 +229,21 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
             RealPath.TryGetRealPath(src)
             ?? throw new InvalidOperationException($"Source path cannot be resolved: {src}");
 
-        await CopyDirectoryAsync(src, dest, sourceRoot, cancellationToken);
+        await CopyDirectoryAsync(src, dest, sourceRoot, depth: 0, cancellationToken);
     }
 
     private static async Task CopyDirectoryAsync(
         string src,
         string dest,
         string sourceRoot,
+        int depth,
         CancellationToken cancellationToken)
     {
+        if (depth > 50)
+        {
+            throw new InvalidOperationException($"Maximum directory recursion depth exceeded at: {src}. A cyclic symlink may be present.");
+        }
+
         Directory.CreateDirectory(dest);
 
         var entries = new DirectoryInfo(src).EnumerateFileSystemInfos();
@@ -259,11 +265,11 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
 
             if (isReparsePoint)
             {
-                await CopyReparsePointTargetAsync(entry, destPath, sourceRoot, cancellationToken);
+                await CopyReparsePointTargetAsync(entry, destPath, sourceRoot, depth + 1, cancellationToken);
             }
             else if (isDirectory)
             {
-                await CopyDirectoryAsync(srcPath, destPath, sourceRoot, cancellationToken);
+                await CopyDirectoryAsync(srcPath, destPath, sourceRoot, depth + 1, cancellationToken);
             }
             else
             {
@@ -278,6 +284,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
         FileSystemInfo entry,
         string destPath,
         string sourceRoot,
+        int depth,
         CancellationToken cancellationToken)
     {
         FileSystemInfo? resolved;
@@ -313,7 +320,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
                 File.Copy(file.FullName, destPath, overwrite: true);
                 break;
             case DirectoryInfo dir:
-                await CopyDirectoryAsync(dir.FullName, destPath, sourceRoot, cancellationToken);
+                await CopyDirectoryAsync(dir.FullName, destPath, sourceRoot, depth + 1, cancellationToken);
                 break;
             default:
                 throw new InvalidOperationException($"Refusing to copy unsupported symlink target: {entry.FullName}");
