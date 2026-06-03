@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.CommandLine;
-using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Locking;
 using Skillz.Net;
@@ -15,8 +14,6 @@ internal sealed class UpdateCommand(
     IGlobalLockFile globalLockFile,
     IProjectLockFile projectLockFile,
     IBlobClient blobClient,
-    IFileStore fileStore,
-    ISystemEnvironment system,
     ConsoleEnvironment consoleEnvironment) : BaseCommand("update", "Check for skill updates.")
 {
     private readonly Argument<string[]> _skillsArgument = new("skills")
@@ -128,21 +125,6 @@ internal sealed class UpdateCommand(
 
     private async Task<UpdateScope> ResolveScopeAsync(UpdateCheckOptions options, CancellationToken cancellationToken)
     {
-        if (options.Skills is { Length: > 0 })
-        {
-            if (options.Global)
-            {
-                return UpdateScope.Global;
-            }
-
-            if (options.Project)
-            {
-                return UpdateScope.Project;
-            }
-
-            return UpdateScope.Both;
-        }
-
         if (options.Global && options.Project)
         {
             return UpdateScope.Both;
@@ -158,9 +140,23 @@ internal sealed class UpdateCommand(
             return UpdateScope.Project;
         }
 
+        // Explicit skill names without a scope flag target both scopes, and never prompt: the
+        // names themselves disambiguate which skills to check across global and project.
+        if (options.Skills is { Length: > 0 })
+        {
+            return UpdateScope.Both;
+        }
+
+        // No explicit scope flag. In non-interactive mode (an explicit -y or redirected input)
+        // we cannot ask the user, and there is no reliable, side-effect-free way to know whether
+        // the current directory has project skills (they may live in agent-specific dirs that the
+        // command does not track). Rather than silently guess one scope and risk checking the
+        // wrong one, default to checking BOTH global and project skills. This is the safe,
+        // predictable choice: nothing is ever silently mis-scoped, and a redundant scope merely
+        // reports "no skills" for the empty side.
         if (options.Yes || consoleEnvironment.IsInputRedirected)
         {
-            return await HasProjectSkillsAsync(cancellationToken) ? UpdateScope.Project : UpdateScope.Global;
+            return UpdateScope.Both;
         }
 
         return await interaction.SelectAsync(
@@ -172,44 +168,6 @@ internal sealed class UpdateCommand(
                 ("Both (update all skills)", UpdateScope.Both)
             },
             cancellationToken);
-    }
-
-    private Task<bool> HasProjectSkillsAsync(CancellationToken cancellationToken)
-    {
-        var cwd = system.CurrentDirectory;
-
-        var skillsDir = Path.Combine(cwd, KnownConfigNames.UniversalSkillsDirectory);
-        try
-        {
-            if (fileStore.FileExists(Path.Combine(cwd, KnownConfigNames.ProjectLockFileName)))
-            {
-                return Task.FromResult(true);
-            }
-
-            if (!fileStore.DirectoryExists(skillsDir))
-            {
-                return Task.FromResult(false);
-            }
-
-            foreach (var entry in fileStore.EnumerateDirectories(skillsDir))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (fileStore.FileExists(Path.Combine(entry, KnownConfigNames.SkillFileName)))
-                {
-                    return Task.FromResult(true);
-                }
-            }
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return Task.FromResult(false);
-        }
-        catch (IOException)
-        {
-            return Task.FromResult(false);
-        }
-
-        return Task.FromResult(false);
     }
 
     private async Task<(int UpdatesAvailableCount, int FailCount, int CheckedCount)> CheckGlobalSkillsAsync(
@@ -250,46 +208,56 @@ internal sealed class UpdateCommand(
             checkable.Add((name, entry));
         }
 
-        for (var i = 0; i < checkable.Count; i++)
+        // Whether progress is drawn as an in-place TTY line (\r) rather than plain log lines.
+        // When true, the line MUST be cleared once checking ends — including on cancellation or
+        // an unexpected exception mid-loop — so no stale partial progress text is left behind.
+        var inlineProgress = !consoleEnvironment.IsInputRedirected
+            && consoleEnvironment.IsTty
+            && checkable.Count > 0;
+
+        try
         {
-            var (skillName, entry) = checkable[i];
-            var progressText =
-                $"Checking global skill {i + 1}/{checkable.Count}: {TerminalSanitizer.SanitizeMetadata(skillName)}";
-            if (!consoleEnvironment.IsInputRedirected && consoleEnvironment.IsTty)
+            for (var i = 0; i < checkable.Count; i++)
             {
-                Console.Write($"\r\x1b[K{progressText}");
-            }
-            else
-            {
-                interaction.WriteDim(progressText);
-            }
+                var (skillName, entry) = checkable[i];
+                var progressText =
+                    $"Checking global skill {i + 1}/{checkable.Count}: {TerminalSanitizer.SanitizeMetadata(skillName)}";
+                if (inlineProgress)
+                {
+                    Console.Write($"\r\x1b[K{progressText}");
+                }
+                else
+                {
+                    interaction.WriteDim(progressText);
+                }
 
-            var check = await TryFetchSkillFolderHashAsync(
-                entry.Source,
-                entry.SkillPath!,
-                entry.Ref,
-                cancellationToken);
+                var check = await TryFetchSkillFolderHashAsync(
+                    entry.Source,
+                    entry.SkillPath!,
+                    entry.Ref,
+                    cancellationToken);
 
-            switch (check.Outcome)
-            {
-                case HashCheckOutcome.TimedOut:
-                    timedOut.Add(skillName);
-                    break;
-                case HashCheckOutcome.Missing:
-                    failed.Add(skillName);
-                    break;
-                case HashCheckOutcome.Found
-                    when !check.Hash!.EqualsOrdinal(entry.SkillFolderHash):
-                    updates.Add((skillName, entry));
-                    break;
+                switch (check.Outcome)
+                {
+                    case HashCheckOutcome.TimedOut:
+                        timedOut.Add(skillName);
+                        break;
+                    case HashCheckOutcome.Missing:
+                        failed.Add(skillName);
+                        break;
+                    case HashCheckOutcome.Found
+                        when !check.Hash!.EqualsOrdinal(entry.SkillFolderHash):
+                        updates.Add((skillName, entry));
+                        break;
+                }
             }
         }
-
-        if (!consoleEnvironment.IsInputRedirected
-            && consoleEnvironment.IsTty
-            && checkable.Count > 0)
+        finally
         {
-            Console.Write("\r\x1b[K");
+            if (inlineProgress)
+            {
+                Console.Write("\r\x1b[K");
+            }
         }
 
         var checkedCount = checkable.Count + skipped.Count;
