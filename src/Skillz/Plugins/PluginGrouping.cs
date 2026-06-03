@@ -2,9 +2,7 @@ namespace Skillz.Plugins;
 
 internal interface IPluginGrouping
 {
-    Task<Dictionary<string, string>> GetPluginGroupingsAsync(
-        string basePath,
-        CancellationToken cancellationToken);
+    Task<Dictionary<string, string>> GetPluginGroupingsAsync(string basePath, CancellationToken cancellationToken);
 }
 
 internal sealed class PluginGrouping : IPluginGrouping
@@ -33,24 +31,7 @@ internal sealed class PluginGrouping : IPluginGrouping
                 {
                     foreach (var skillPath in skills)
                     {
-                        if (!PathContainment.IsValidRelativePath(skillPath))
-                        {
-                            continue;
-                        }
-
-                        var skillDir = Path.Combine(pluginBase, skillPath);
-                        // Normalize: if path ends with SKILL.md, use the parent directory
-                        var fullPath = Path.GetFullPath(skillDir);
-                        if (fullPath.EndsWithOrdinalIgnoreCase("/SKILL.md")
-                            || fullPath.EndsWithOrdinalIgnoreCase("\\SKILL.md"))
-                        {
-                            fullPath = Path.GetDirectoryName(fullPath) ?? fullPath;
-                        }
-
-                        if (PathContainment.IsContainedInRealPath(skillDir, basePath))
-                        {
-                            groupings[fullPath] = name;
-                        }
+                        AddGrouping(groupings, basePath, pluginBase, skillPath, name);
                     }
                 }
             },
@@ -67,28 +48,37 @@ internal sealed class PluginGrouping : IPluginGrouping
 
                 foreach (var skillPath in skills)
                 {
-                    if (!PathContainment.IsValidRelativePath(skillPath))
-                    {
-                        continue;
-                    }
-
-                    var skillDir = Path.Combine(basePath, skillPath);
-                    // Normalize: if path ends with SKILL.md, use the parent directory
-                    var fullPath = Path.GetFullPath(skillDir);
-                    if (fullPath.EndsWithOrdinalIgnoreCase("/SKILL.md")
-                        || fullPath.EndsWithOrdinalIgnoreCase("\\SKILL.md"))
-                    {
-                        fullPath = Path.GetDirectoryName(fullPath) ?? fullPath;
-                    }
-
-                    if (PathContainment.IsContainedInRealPath(skillDir, basePath))
-                    {
-                        groupings[fullPath] = name;
-                    }
+                    AddGrouping(groupings, basePath, basePath, skillPath, name);
                 }
             },
             cancellationToken);
 
         return groupings;
+    }
+
+    private static void AddGrouping(
+        Dictionary<string, string> groupings,
+        string basePath,
+        string skillBase,
+        string skillPath,
+        string name)
+    {
+        if (!PathContainment.IsValidRelativePath(skillPath))
+        {
+            return;
+        }
+
+        var skillDir = Path.Combine(skillBase, skillPath);
+        // Normalize: if path ends with SKILL.md, use the parent directory
+        var fullPath = Path.GetFullPath(skillDir);
+        if (fullPath.EndsWithOrdinalIgnoreCase("/SKILL.md") || fullPath.EndsWithOrdinalIgnoreCase("\\SKILL.md"))
+        {
+            fullPath = Path.GetDirectoryName(fullPath) ?? fullPath;
+        }
+
+        if (PathContainment.IsContainedInRealPath(skillDir, basePath))
+        {
+            groupings[fullPath] = name;
+        }
     }
 }
