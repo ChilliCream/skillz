@@ -163,9 +163,10 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
                     continue;
                 }
 
-                // Restrict artifact fetches to HTTP(S); a file://, gopher://, etc. URL in the index
-                // would let an untrusted origin redirect the fetch to a local or non-web resource.
-                if (artifactUri.Scheme is not "http" and not "https")
+                // A malicious index can supply an absolute url pointing at any host/scheme.
+                // Pin every derived fetch to the index origin so it cannot be redirected
+                // off-host (or to a non-web scheme like file://) before it is ever fetched.
+                if (!IsSameOriginAsIndex(indexUrl, artifactUri))
                 {
                     continue;
                 }
@@ -265,6 +266,15 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
             var skillBaseUrl = $"{entry.BaseUrl!.TrimEnd('/')}/{entry.WellKnownPath}/{entry.Name}";
             var skillMdUrl = $"{skillBaseUrl}/SKILL.md";
 
+            // The legacy base url is derived from the index origin; pin the resolved fetch target
+            // to that same origin before issuing the request.
+            if (!Uri.TryCreate(skillMdUrl, UriKind.Absolute, out var skillMdUri)
+                || !IsSameOriginAsIndex(entry.BaseUrl!, skillMdUri))
+            {
+                TempDirCleanup.SafeDelete(stagingRoot);
+                return null;
+            }
+
             using var response = await client.GetAsync(skillMdUrl, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
@@ -301,6 +311,12 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
                     }
 
                     var fileUrl = $"{skillBaseUrl}/{relativeFile}";
+                    if (!Uri.TryCreate(fileUrl, UriKind.Absolute, out var fileUri)
+                        || !IsSameOriginAsIndex(entry.BaseUrl!, fileUri))
+                    {
+                        continue;
+                    }
+
                     try
                     {
                         using var fileResponse = await client
@@ -409,6 +425,28 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
         {
             return null;
         }
+    }
+
+    /// <summary>
+    /// Returns whether <paramref name="target"/> shares the same origin (scheme, host, and port)
+    /// as the index at <paramref name="referenceUrl"/>, so a malicious index cannot redirect a
+    /// derived fetch to a different host or scheme than the one the user chose to trust.
+    /// </summary>
+    private static bool IsSameOriginAsIndex(string referenceUrl, Uri target)
+    {
+        if (!target.IsAbsoluteUri)
+        {
+            return false;
+        }
+
+        if (!Uri.TryCreate(referenceUrl, UriKind.Absolute, out var reference))
+        {
+            return false;
+        }
+
+        return reference.Scheme.EqualsOrdinalIgnoreCase(target.Scheme)
+            && reference.Host.EqualsOrdinalIgnoreCase(target.Host)
+            && reference.Port == target.Port;
     }
 
     private static string ComputeDigest(byte[] bytes)

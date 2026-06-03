@@ -450,6 +450,122 @@ public class WellKnownProviderTests
     }
 
     [Fact]
+    public async Task Rejects_V2_Entry_With_Absolute_Url_To_Different_Host_Before_Any_Fetch()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler();
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            $$"""
+            {
+              "$schema": "{{SchemaV2}}",
+              "skills": [
+                {
+                  "name": "code-review",
+                  "type": "skill-md",
+                  "description": "Review code.",
+                  "url": "https://attacker.evil.com/code-review/SKILL.md",
+                  "digest": "{{Digest(SampleSkillMd)}}"
+                }
+              ]
+            }
+            """);
+        handler.AddRouteNotFound("https://example.com/.well-known/skills/index.json");
+        // Route the attacker target so a fetch WOULD succeed if it ever fired.
+        handler.AddRoute("https://attacker.evil.com/code-review/SKILL.md", SampleSkillMd);
+
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
+
+        // Act
+        var skills = await provider.FetchSkillsAsync(
+            new SkillSource.WellKnown("https://example.com"),
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Empty(skills);
+        Assert.DoesNotContain(
+            handler.Requests,
+            r => r.RequestUri!.Host == "attacker.evil.com");
+    }
+
+    [Fact]
+    public async Task Rejects_V2_Entry_With_File_Scheme_Url_Before_Any_Fetch()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler();
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            $$"""
+            {
+              "$schema": "{{SchemaV2}}",
+              "skills": [
+                {
+                  "name": "code-review",
+                  "type": "skill-md",
+                  "description": "Review code.",
+                  "url": "file:///etc/passwd",
+                  "digest": "{{Digest(SampleSkillMd)}}"
+                }
+              ]
+            }
+            """);
+        handler.AddRouteNotFound("https://example.com/.well-known/skills/index.json");
+
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
+
+        // Act
+        var skills = await provider.FetchSkillsAsync(
+            new SkillSource.WellKnown("https://example.com"),
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Empty(skills);
+        Assert.DoesNotContain(
+            handler.Requests,
+            r => r.RequestUri!.Scheme == "file");
+    }
+
+    [Fact]
+    public async Task Rejects_V2_Entry_With_Absolute_Url_To_Metadata_Ip_Before_Any_Fetch()
+    {
+        // Arrange
+        var handler = new StubHttpMessageHandler();
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            $$"""
+            {
+              "$schema": "{{SchemaV2}}",
+              "skills": [
+                {
+                  "name": "code-review",
+                  "type": "skill-md",
+                  "description": "Review code.",
+                  "url": "https://169.254.169.254/latest/meta-data",
+                  "digest": "{{Digest(SampleSkillMd)}}"
+                }
+              ]
+            }
+            """);
+        handler.AddRouteNotFound("https://example.com/.well-known/skills/index.json");
+
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), new FakeFileStore());
+
+        // Act
+        var skills = await provider.FetchSkillsAsync(
+            new SkillSource.WellKnown("https://example.com"),
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Empty(skills);
+        Assert.DoesNotContain(
+            handler.Requests,
+            r => r.RequestUri!.Host == "169.254.169.254");
+    }
+
+    [Fact]
     public async Task FetchSkillsAsync_Throws_On_Wrong_Source_Type()
     {
         // Arrange
