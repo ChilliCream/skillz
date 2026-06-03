@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Text;
+using Skillz.Git;
 using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Locking;
@@ -77,7 +78,7 @@ internal sealed class AddCommandExecutor(
             && !options.SkillFilters.Contains(sourceFilter, StringComparer.OrdinalIgnoreCase)
                 ? [.. options.SkillFilters, sourceFilter]
                 : options.SkillFilters;
-        interaction.WriteDim($"Source: {parsed.DisplayString}");
+        interaction.WriteDim($"Source: {GitUrl.RedactUrlUserInfo(parsed.DisplayString)}");
 
         // Fetch skills into a temp staging area, and clean it up no matter how we exit below.
         var skills = await FetchSkillsAsync(parsed, options, skillFilters, cancellationToken);
@@ -532,7 +533,10 @@ internal sealed class AddCommandExecutor(
         CancellationToken cancellationToken)
     {
         var now = DateTime.UtcNow.ToString("o");
-        var sourceUrl = parsed.Url;
+        // Never persist embedded credentials: strip any userinfo before the URL reaches the lock
+        // file. Re-clones during update authenticate via git's own credential helpers, not via a
+        // token baked into the stored URL, so a credential-free URL still works for private repos.
+        var sourceUrl = GitUrl.StripUserInfo(parsed.Url);
         var sourceType = parsed.SourceType;
         var refValue = parsed.Ref;
         var ownerRepo = OwnerRepoParser.FindOwnerRepo(parsed);

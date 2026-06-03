@@ -26,11 +26,18 @@ internal static partial class GitUrl
     /// <c>@</c>; this is the part that gets hidden.</description></item>
     /// </list>
     /// <para>
+    /// The user-info group is greedy and runs up to the <em>last</em> <c>@</c>
+    /// before the path, so a password that itself contains an <c>@</c> (for
+    /// example <c>https://user:p@ss@host/repo.git</c>) is captured in full. It
+    /// cannot cross a <c>/</c> or whitespace, so a path-embedded <c>@</c> such as
+    /// <c>https://host/p@th</c> is left untouched.
+    /// </para>
+    /// <para>
     /// scp-style remotes such as <c>git@host:path</c> have no <c>://</c> and are
     /// intentionally not matched: they carry a username but not a secret.
     /// </para>
     /// </remarks>
-    [GeneratedRegex(@"(?<scheme>[A-Za-z][A-Za-z0-9+.-]*://)(?<userinfo>[^/@\s]+@)", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"(?<scheme>[A-Za-z][A-Za-z0-9+.-]*://)(?<userinfo>[^/\s]*@)", RegexOptions.CultureInvariant)]
     private static partial Regex UrlUserInfoRegex();
 
     /// <summary>
@@ -44,5 +51,20 @@ internal static partial class GitUrl
     public static string RedactUrlUserInfo(string value)
     {
         return UrlUserInfoRegex().Replace(value, "${scheme}<redacted>@");
+    }
+
+    /// <summary>
+    /// Removes any embedded credentials from a URL by dropping the
+    /// <c>userinfo@</c> component entirely, leaving a clean
+    /// <c>scheme://host/path</c> URL. Use this before persisting a URL so tokens
+    /// and passwords never land in a lock file; git resolves authentication for
+    /// the credential-free URL via its own credential helpers at clone time.
+    /// See <see cref="UrlUserInfoRegex"/> for the matching rules.
+    /// </summary>
+    /// <param name="value">The URL that may contain credentials.</param>
+    /// <returns>The same URL with any user-info component removed.</returns>
+    public static string StripUserInfo(string value)
+    {
+        return UrlUserInfoRegex().Replace(value, "${scheme}");
     }
 }
