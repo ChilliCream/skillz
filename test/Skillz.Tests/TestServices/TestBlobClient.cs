@@ -4,7 +4,7 @@ namespace Skillz.Tests.TestServices;
 
 internal sealed class TestBlobClient : IBlobClient
 {
-    public Func<string, string, string?, string?, RepoTree?>? OnFetchTree { get; set; }
+    public Func<string, string, string?, RepoTree?>? OnFetchTree { get; set; }
 
     public Func<string, string, string, string?, string?>? OnFetchFile { get; set; }
 
@@ -12,10 +12,9 @@ internal sealed class TestBlobClient : IBlobClient
         string owner,
         string repo,
         string? @ref,
-        string? path,
         CancellationToken cancellationToken)
     {
-        var result = OnFetchTree?.Invoke(owner, repo, @ref, path);
+        var result = OnFetchTree?.Invoke(owner, repo, @ref);
         return Task.FromResult(result);
     }
 

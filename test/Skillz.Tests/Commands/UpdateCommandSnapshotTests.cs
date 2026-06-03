@@ -92,7 +92,7 @@ public class UpdateCommandSnapshotTests : IDisposable
                 }
             };
         var blob = services.GetRequiredService<TestBlobClient>();
-        blob.OnFetchTree = (_, _, _, _) =>
+        blob.OnFetchTree = (_, _, _) =>
             new RepoTree("tree-sha", "main", [new TreeEntry { Path = "skills/my-skill", Type = "tree", Sha = "abc123" }]);
 
         // Act
@@ -126,7 +126,7 @@ public class UpdateCommandSnapshotTests : IDisposable
                 }
             };
         var blob = services.GetRequiredService<TestBlobClient>();
-        blob.OnFetchTree = (_, _, _, _) =>
+        blob.OnFetchTree = (_, _, _) =>
             new RepoTree("new-sha", "main", [new TreeEntry { Path = "skills/my-skill", Type = "tree", Sha = "xyz789" }]);
 
         // Act

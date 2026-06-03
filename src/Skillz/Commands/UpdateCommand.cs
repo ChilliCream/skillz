@@ -401,7 +401,7 @@ internal sealed class UpdateCommand(
 
         try
         {
-            var tree = await blobClient.FetchTreeAsync(owner, repo, @ref, path: null, cancellationToken);
+            var tree = await blobClient.FetchTreeAsync(owner, repo, @ref, cancellationToken);
             if (tree is null)
             {
                 return null;

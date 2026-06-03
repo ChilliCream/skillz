@@ -5,8 +5,8 @@ namespace Skillz.Net;
 
 internal sealed class GitHubTokenProvider : IGitHubTokenProvider
 {
-    private static readonly object s_warningLock = new();
-    private static bool s_warningShown;
+    private readonly object _warningLock = new();
+    private bool _warningShown;
 
     public async Task<string?> FindTokenAsync(CancellationToken cancellationToken)
     {
@@ -40,24 +40,16 @@ internal sealed class GitHubTokenProvider : IGitHubTokenProvider
         }
     }
 
-    internal static void ResetWarningStateForTests()
+    private void EmitWarningOnce()
     {
-        lock (s_warningLock)
+        lock (_warningLock)
         {
-            s_warningShown = false;
-        }
-    }
-
-    private static void EmitWarningOnce()
-    {
-        lock (s_warningLock)
-        {
-            if (s_warningShown)
+            if (_warningShown)
             {
                 return;
             }
 
-            s_warningShown = true;
+            _warningShown = true;
         }
 
         Console.Error.Write(

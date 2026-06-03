@@ -84,7 +84,7 @@ public class UpdateCommandTests : IDisposable
             };
 
         var blob = services.GetRequiredService<TestBlobClient>();
-        blob.OnFetchTree = (_, _, _, _) =>
+        blob.OnFetchTree = (_, _, _) =>
             new RepoTree(
                 "tree-sha",
                 "main",
@@ -132,7 +132,7 @@ public class UpdateCommandTests : IDisposable
             };
 
         var blob = services.GetRequiredService<TestBlobClient>();
-        blob.OnFetchTree = (_, _, _, _) =>
+        blob.OnFetchTree = (_, _, _) =>
             new RepoTree(
                 "new-tree-sha",
                 "main",

@@ -15,11 +15,6 @@ public class BlobClientTests
         }
         """;
 
-    public BlobClientTests()
-    {
-        BlobClient.ResetAuthStateForTests();
-    }
-
     [Fact]
     public async Task Does_Not_Invoke_Token_Resolver_When_Unauth_Succeeds()
     {
@@ -35,7 +30,6 @@ public class BlobClientTests
             "vercel",
             "skills",
             "main",
-            path: null,
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -62,7 +56,6 @@ public class BlobClientTests
             "vercel",
             "skills",
             "main",
-            path: null,
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -93,7 +86,6 @@ public class BlobClientTests
             "private",
             "repo",
             @ref: null,
-            path: null,
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -116,7 +108,6 @@ public class BlobClientTests
             "vercel",
             "skills",
             "main",
-            path: null,
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -148,13 +139,11 @@ public class BlobClientTests
             "vercel",
             "skills",
             "main",
-            path: null,
             TestContext.Current.CancellationToken);
         var second = await client.FetchTreeAsync(
             "vercel",
             "agent-skills",
             "main",
-            path: null,
             TestContext.Current.CancellationToken);
 
         // Assert
@@ -188,7 +177,6 @@ public class BlobClientTests
             "vercel",
             "skills",
             @ref: null,
-            path: null,
             TestContext.Current.CancellationToken);
 
         // Assert

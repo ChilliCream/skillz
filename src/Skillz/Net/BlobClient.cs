@@ -1,4 +1,3 @@
-using System.Collections.Immutable;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -11,22 +10,13 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
 
     private static readonly TimeSpan s_fetchTimeout = TimeSpan.FromSeconds(10);
 
-    private static readonly object s_rateLimitLock = new();
-    private static bool s_rateLimitedThisSession;
-
-    internal static void ResetAuthStateForTests()
-    {
-        lock (s_rateLimitLock)
-        {
-            s_rateLimitedThisSession = false;
-        }
-    }
+    private readonly object _rateLimitLock = new();
+    private bool _rateLimitedThisSession;
 
     public async Task<RepoTree?> FetchTreeAsync(
         string owner,
         string repo,
         string? @ref,
-        string? path,
         CancellationToken cancellationToken)
     {
         var ownerRepo = $"{owner}/{repo}";
@@ -47,7 +37,7 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
                 var result = await FetchTreeBranchAsync(ownerRepo, branch, token, cancellationToken);
                 if (result.Tree is not null)
                 {
-                    return ApplySubpath(result.Tree, path);
+                    return result.Tree;
                 }
             }
 
@@ -60,7 +50,7 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
             var result = await FetchTreeBranchAsync(ownerRepo, branch, token: null, cancellationToken);
             if (result.Tree is not null)
             {
-                return ApplySubpath(result.Tree, path);
+                return result.Tree;
             }
 
             if (result.RateLimited)
@@ -87,7 +77,7 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
             var result = await FetchTreeBranchAsync(ownerRepo, branch, fallbackToken, cancellationToken);
             if (result.Tree is not null)
             {
-                return ApplySubpath(result.Tree, path);
+                return result.Tree;
             }
         }
 
@@ -101,6 +91,9 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
         string? @ref,
         CancellationToken cancellationToken)
     {
+        // Blobs are fetched unauthenticated from raw.githubusercontent.com by design: skill repos
+        // are public, the raw CDN has generous limits, and it needs no token or User-Agent. This
+        // intentionally differs from the API tree fetch, which falls back to an authenticated retry.
         var branch = string.IsNullOrEmpty(@ref) ? "HEAD" : @ref;
         var url = $"https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}";
 
@@ -201,34 +194,19 @@ internal sealed class BlobClient(IHttpClientFactory httpClientFactory, IGitHubTo
         return null;
     }
 
-    private static RepoTree ApplySubpath(RepoTree tree, string? path)
+    private bool IsRateLimited()
     {
-        if (string.IsNullOrEmpty(path))
+        lock (_rateLimitLock)
         {
-            return tree;
-        }
-
-        var prefix = path.EndsWith('/') ? path : path + "/";
-        var filtered = tree
-            .Tree.Where(e => e.Path.StartsWithOrdinal(prefix) || e.Path == path)
-            .ToImmutableArray();
-
-        return new RepoTree(tree.Sha, tree.Branch, filtered);
-    }
-
-    private static bool IsRateLimited()
-    {
-        lock (s_rateLimitLock)
-        {
-            return s_rateLimitedThisSession;
+            return _rateLimitedThisSession;
         }
     }
 
-    private static void MarkRateLimited()
+    private void MarkRateLimited()
     {
-        lock (s_rateLimitLock)
+        lock (_rateLimitLock)
         {
-            s_rateLimitedThisSession = true;
+            _rateLimitedThisSession = true;
         }
     }
 
