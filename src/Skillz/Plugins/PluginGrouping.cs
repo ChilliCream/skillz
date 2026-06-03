@@ -1,11 +1,8 @@
+using Skillz.Utils;
+
 namespace Skillz.Plugins;
 
-internal interface IPluginGrouping
-{
-    Task<Dictionary<string, string>> GetPluginGroupingsAsync(string basePath, CancellationToken cancellationToken);
-}
-
-internal sealed class PluginGrouping : IPluginGrouping
+internal sealed class PluginGrouping(IFileStore fileStore)
 {
     public async Task<Dictionary<string, string>> GetPluginGroupingsAsync(
         string basePath,
@@ -13,45 +10,20 @@ internal sealed class PluginGrouping : IPluginGrouping
     {
         var groupings = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        await PluginManifest.TryReadMarketplaceAsync(
-            basePath,
-            (pluginBase, skills, name) =>
+        foreach (var plugin in await PluginManifest.ReadPluginsAsync(fileStore, basePath, cancellationToken))
+        {
+            if (string.IsNullOrEmpty(plugin.Name)
+                || plugin.Skills is not { Count: > 0 }
+                || !PathContainment.IsContainedInRealPath(plugin.PluginBase, basePath))
             {
-                if (string.IsNullOrEmpty(name))
-                {
-                    return;
-                }
+                continue;
+            }
 
-                if (!PathContainment.IsContainedInRealPath(pluginBase, basePath))
-                {
-                    return;
-                }
-
-                if (skills is { Count: > 0 })
-                {
-                    foreach (var skillPath in skills)
-                    {
-                        AddGrouping(groupings, basePath, pluginBase, skillPath, name);
-                    }
-                }
-            },
-            cancellationToken);
-
-        await PluginManifest.TryReadPluginJsonAsync(
-            basePath,
-            (skills, name) =>
+            foreach (var skillPath in plugin.Skills)
             {
-                if (string.IsNullOrEmpty(name) || skills is not { Count: > 0 })
-                {
-                    return;
-                }
-
-                foreach (var skillPath in skills)
-                {
-                    AddGrouping(groupings, basePath, basePath, skillPath, name);
-                }
-            },
-            cancellationToken);
+                AddGrouping(groupings, basePath, plugin.PluginBase, skillPath, plugin.Name);
+            }
+        }
 
         return groupings;
     }

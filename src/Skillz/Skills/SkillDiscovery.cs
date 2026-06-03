@@ -20,8 +20,8 @@ namespace Skillz.Skills;
 /// priority) location wins over a later duplicate.
 /// </remarks>
 internal sealed class SkillDiscovery(
-    IPluginManifest pluginManifest,
-    IPluginGrouping pluginGrouping,
+    PluginManifest pluginManifest,
+    PluginGrouping pluginGrouping,
     IFileStore fileStore,
     ISystemEnvironment system) : ISkillDiscovery
 {

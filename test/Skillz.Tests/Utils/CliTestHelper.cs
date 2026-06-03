@@ -69,12 +69,6 @@ internal static class CliTestHelper
         services.AddSingleton<TestSourceParser>();
         services.AddSingleton<ISourceParser>(sp => sp.GetRequiredService<TestSourceParser>());
 
-        services.AddSingleton<TestPluginManifest>();
-        services.AddSingleton<IPluginManifest>(sp => sp.GetRequiredService<TestPluginManifest>());
-
-        services.AddSingleton<TestPluginGrouping>();
-        services.AddSingleton<IPluginGrouping>(sp => sp.GetRequiredService<TestPluginGrouping>());
-
         services.AddSingleton<TestProjectLockFile>();
         services.AddSingleton<IProjectLockFile>(sp => sp.GetRequiredService<TestProjectLockFile>());
 

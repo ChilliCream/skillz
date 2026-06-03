@@ -15,10 +15,11 @@ public class SkillDiscoveryTests : IDisposable
     {
         _testDir = Path.Combine(Path.GetTempPath(), $"skillz-discovery-test-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_testDir);
+        var fileStore = new SystemFileStore();
         _discovery = new SkillDiscovery(
-            new PluginManifest(),
-            new PluginGrouping(),
-            new SystemFileStore(),
+            new PluginManifest(fileStore),
+            new PluginGrouping(fileStore),
+            fileStore,
             new FakeSystemEnvironment());
     }
 

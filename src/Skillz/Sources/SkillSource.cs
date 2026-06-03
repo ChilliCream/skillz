@@ -14,6 +14,10 @@ internal abstract record SkillSource
     {
         get
         {
+            if (field is not null)
+            {
+                return field;
+            }
             var url = Url;
             if (!string.IsNullOrEmpty(Ref))
             {
@@ -23,7 +27,7 @@ internal abstract record SkillSource
             {
                 url += $" ({subpath})";
             }
-            return url;
+            return field = url;
         }
     }
 

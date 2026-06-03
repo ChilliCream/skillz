@@ -1,16 +1,18 @@
 using System.Collections.Immutable;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
+using Skillz.Utils;
 
 namespace Skillz.Plugins;
 
-internal interface IPluginManifest
-{
-    Task<ImmutableArray<string>> GetPluginSkillPathsAsync(
-        string basePath,
-        CancellationToken cancellationToken);
-}
+/// <summary>
+/// A plugin resolved from a manifest: its base directory, declared skill paths,
+/// and name. Produced by <see cref="PluginManifest.ReadPluginsAsync"/> and shared
+/// by both skill-path discovery and grouping.
+/// </summary>
+internal readonly record struct PluginEntry(string PluginBase, List<string>? Skills, string? Name);
 
-internal sealed class PluginManifest : IPluginManifest
+internal sealed class PluginManifest(IFileStore fileStore)
 {
     public async Task<ImmutableArray<string>> GetPluginSkillPathsAsync(
         string basePath,
@@ -18,40 +20,31 @@ internal sealed class PluginManifest : IPluginManifest
     {
         var searchDirs = new List<string>();
 
-        await TryReadMarketplaceAsync(
-            basePath,
-            (pluginBase, skills, _) => AddPluginSkillPaths(basePath, pluginBase, skills, searchDirs),
-            cancellationToken);
-
-        await TryReadPluginJsonAsync(
-            basePath,
-            (skills, _) => AddPluginSkillPaths(basePath, basePath, skills, searchDirs),
-            cancellationToken);
+        foreach (var plugin in await ReadPluginsAsync(fileStore, basePath, cancellationToken))
+        {
+            AddPluginSkillPaths(basePath, plugin, searchDirs);
+        }
 
         return [.. searchDirs];
     }
 
-    private static void AddPluginSkillPaths(
-        string basePath,
-        string pluginBase,
-        List<string>? skills,
-        List<string> searchDirs)
+    private static void AddPluginSkillPaths(string basePath, PluginEntry plugin, List<string> searchDirs)
     {
-        if (!PathContainment.IsContainedInRealPath(pluginBase, basePath))
+        if (!PathContainment.IsContainedInRealPath(plugin.PluginBase, basePath))
         {
             return;
         }
 
-        if (skills is { Count: > 0 })
+        if (plugin.Skills is { Count: > 0 })
         {
-            foreach (var skillPath in skills)
+            foreach (var skillPath in plugin.Skills)
             {
                 if (!PathContainment.IsValidRelativePath(skillPath))
                 {
                     continue;
                 }
 
-                var skillDir = Path.GetDirectoryName(Path.Combine(pluginBase, skillPath));
+                var skillDir = Path.GetDirectoryName(Path.Combine(plugin.PluginBase, skillPath));
                 if (skillDir is null)
                 {
                     continue;
@@ -64,38 +57,40 @@ internal sealed class PluginManifest : IPluginManifest
             }
         }
 
-        searchDirs.Add(Path.Combine(pluginBase, "skills"));
+        searchDirs.Add(Path.Combine(plugin.PluginBase, "skills"));
     }
 
-    internal static async Task TryReadMarketplaceAsync(
+    /// <summary>
+    /// Reads <c>marketplace.json</c> then <c>plugin.json</c> under
+    /// <paramref name="basePath"/> and returns the plugins each declares.
+    /// Missing or malformed manifests contribute no entries.
+    /// </summary>
+    internal static async Task<IReadOnlyList<PluginEntry>> ReadPluginsAsync(
+        IFileStore fileStore,
         string basePath,
-        Action<string, List<string>?, string?> onPlugin,
         CancellationToken cancellationToken)
     {
-        var marketplacePath = Path.Combine(basePath, ".claude-plugin", "marketplace.json");
-        MarketplaceManifest? manifest;
-        try
-        {
-            await using var stream = File.OpenRead(marketplacePath);
-            manifest = await JsonSerializer.DeserializeAsync(
-                stream,
-                JsonSourceGenerationContext.Default.MarketplaceManifest,
-                cancellationToken);
-        }
-        catch (FileNotFoundException)
-        {
-            return;
-        }
-        catch (DirectoryNotFoundException)
-        {
-            return;
-        }
-        catch (JsonException)
-        {
-            return;
-        }
+        var plugins = new List<PluginEntry>();
 
-        if (manifest is null)
+        await AddMarketplacePluginsAsync(fileStore, basePath, plugins, cancellationToken);
+        await AddSinglePluginAsync(fileStore, basePath, plugins, cancellationToken);
+
+        return plugins;
+    }
+
+    private static async Task AddMarketplacePluginsAsync(
+        IFileStore fileStore,
+        string basePath,
+        List<PluginEntry> plugins,
+        CancellationToken cancellationToken)
+    {
+        var manifest = await TryDeserializeAsync(
+            fileStore,
+            Path.Combine(basePath, ".claude-plugin", "marketplace.json"),
+            JsonSourceGenerationContext.Default.MarketplaceManifest,
+            cancellationToken);
+
+        if (manifest?.Plugins is null)
         {
             return;
         }
@@ -106,74 +101,90 @@ internal sealed class PluginManifest : IPluginManifest
             return;
         }
 
-        if (manifest.Plugins is null)
-        {
-            return;
-        }
-
         foreach (var plugin in manifest.Plugins)
         {
-            string? sourceString = null;
-            if (plugin.Source is { } sourceElement)
-            {
-                if (sourceElement.ValueKind == JsonValueKind.String)
-                {
-                    sourceString = sourceElement.GetString();
-                }
-                else if (sourceElement.ValueKind == JsonValueKind.Null
-                    || sourceElement.ValueKind == JsonValueKind.Undefined)
-                {
-                    sourceString = null;
-                }
-                else
-                {
-                    continue;
-                }
-            }
-
-            if (sourceString is not null && !PathContainment.IsValidRelativePath(sourceString))
+            if (!TryResolveSource(plugin.Source, out var sourceString))
             {
                 continue;
             }
 
             var pluginBase = Path.Combine(basePath, pluginRoot ?? string.Empty, sourceString ?? string.Empty);
-            onPlugin(pluginBase, plugin.Skills, plugin.Name);
+            plugins.Add(new PluginEntry(pluginBase, plugin.Skills, plugin.Name));
         }
     }
 
-    internal static async Task TryReadPluginJsonAsync(
+    private static async Task AddSinglePluginAsync(
+        IFileStore fileStore,
         string basePath,
-        Action<List<string>?, string?> onPlugin,
+        List<PluginEntry> plugins,
         CancellationToken cancellationToken)
     {
-        var pluginPath = Path.Combine(basePath, ".claude-plugin", "plugin.json");
-        SinglePluginManifest? manifest;
+        var manifest = await TryDeserializeAsync(
+            fileStore,
+            Path.Combine(basePath, ".claude-plugin", "plugin.json"),
+            JsonSourceGenerationContext.Default.SinglePluginManifest,
+            cancellationToken);
+
+        if (manifest is not null)
+        {
+            plugins.Add(new PluginEntry(basePath, manifest.Skills, manifest.Name));
+        }
+    }
+
+    /// <summary>
+    /// Resolves a plugin's <c>source</c> to a relative path. A string source is a
+    /// relative path; a null/undefined source means the plugin lives at the root.
+    /// Returns <see langword="false"/> to skip the plugin when the source is an
+    /// unsupported value (e.g. a remote <c>{ source, repo }</c> object) or not a
+    /// valid relative path.
+    /// </summary>
+    private static bool TryResolveSource(JsonElement? source, out string? sourceString)
+    {
+        sourceString = null;
+
+        if (source is { } sourceElement)
+        {
+            if (sourceElement.ValueKind == JsonValueKind.String)
+            {
+                sourceString = sourceElement.GetString();
+            }
+            else if (sourceElement.ValueKind is not (JsonValueKind.Null or JsonValueKind.Undefined))
+            {
+                return false;
+            }
+        }
+
+        return sourceString is null || PathContainment.IsValidRelativePath(sourceString);
+    }
+
+    private static async Task<T?> TryDeserializeAsync<T>(
+        IFileStore fileStore,
+        string path,
+        JsonTypeInfo<T> typeInfo,
+        CancellationToken cancellationToken)
+        where T : class
+    {
+        string json;
         try
         {
-            await using var stream = File.OpenRead(pluginPath);
-            manifest = await JsonSerializer.DeserializeAsync(
-                stream,
-                JsonSourceGenerationContext.Default.SinglePluginManifest,
-                cancellationToken);
+            json = await fileStore.ReadAllTextAsync(path, cancellationToken);
         }
         catch (FileNotFoundException)
         {
-            return;
+            return null;
         }
         catch (DirectoryNotFoundException)
         {
-            return;
+            return null;
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize(json, typeInfo);
         }
         catch (JsonException)
         {
-            return;
+            return null;
         }
-
-        if (manifest is null)
-        {
-            return;
-        }
-
-        onPlugin(manifest.Skills, manifest.Name);
     }
 }

@@ -40,8 +40,6 @@ public class CliTestHelperTests
         Assert.IsType<TestInstaller>(provider.GetRequiredService<ISkillInstaller>());
         Assert.IsType<TestSkillDiscovery>(provider.GetRequiredService<ISkillDiscovery>());
         Assert.IsType<TestSourceParser>(provider.GetRequiredService<ISourceParser>());
-        Assert.IsType<TestPluginManifest>(provider.GetRequiredService<IPluginManifest>());
-        Assert.IsType<TestPluginGrouping>(provider.GetRequiredService<IPluginGrouping>());
         Assert.IsType<TestProjectLockFile>(provider.GetRequiredService<IProjectLockFile>());
         Assert.IsType<TestGlobalLockFile>(provider.GetRequiredService<IGlobalLockFile>());
     }

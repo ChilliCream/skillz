@@ -1,4 +1,5 @@
 using Skillz.Plugins;
+using Skillz.Utils;
 using Xunit;
 
 namespace Skillz.Tests.Plugins;
@@ -6,7 +7,7 @@ namespace Skillz.Tests.Plugins;
 public class PluginManifestTests : IDisposable
 {
     private readonly string _testDir;
-    private readonly PluginManifest _manifest = new();
+    private readonly PluginManifest _manifest = new(new SystemFileStore());
 
     public PluginManifestTests()
     {

@@ -63,8 +63,8 @@ internal static class Program
         builder.Services.AddSingleton<XdgPaths>();
         builder.Services.AddSingleton<ISkillInstaller, SkillInstaller>();
 
-        builder.Services.AddSingleton<IPluginManifest, PluginManifest>();
-        builder.Services.AddSingleton<IPluginGrouping, PluginGrouping>();
+        builder.Services.AddSingleton<PluginManifest>();
+        builder.Services.AddSingleton<PluginGrouping>();
         builder.Services.AddSingleton<ISkillDiscovery, SkillDiscovery>();
 
         builder.Services.AddSingleton<ISourceParser, SourceParser>();

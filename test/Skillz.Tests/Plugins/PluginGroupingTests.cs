@@ -1,4 +1,5 @@
 using Skillz.Plugins;
+using Skillz.Utils;
 using Xunit;
 
 namespace Skillz.Tests.Plugins;
@@ -6,7 +7,7 @@ namespace Skillz.Tests.Plugins;
 public class PluginGroupingTests : IDisposable
 {
     private readonly string _testDir;
-    private readonly PluginGrouping _grouping = new();
+    private readonly PluginGrouping _grouping = new(new SystemFileStore());
 
     public PluginGroupingTests()
     {
