@@ -1,9 +1,11 @@
 using Skillz.Plugins;
 using Skillz.Skills;
+using Skillz.Utils;
 
 namespace Skillz.Install;
 
-internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment system) : ISkillInstaller
+internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment system, IFileStore fileStore)
+    : ISkillInstaller
 {
     private static readonly HashSet<string> s_excludeFiles = new(StringComparer.Ordinal) { "metadata.json" };
 
@@ -177,7 +179,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
         }
     }
 
-    private static void CleanAndCreateDirectory(string path, string containmentBase)
+    private void CleanAndCreateDirectory(string path, string containmentBase)
     {
         if (!PathContainment.IsContainedInRealPath(path, containmentBase))
         {
@@ -186,29 +188,17 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
 
         try
         {
-            // Delete any reparse point (symlink / self-loop) as a link first,
-            // never recursing through it — so replacing a symlinked
+            // Delete whatever is there first. A reparse point (symlink / self-loop) is
+            // removed as a link, never recursing through it — so replacing a symlinked
             // destination can never touch whatever it points at.
-            var info = new FileInfo(path);
-            if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                DeleteReparsePoint(path);
-            }
-            else if (Directory.Exists(path))
-            {
-                Directory.Delete(path, recursive: true);
-            }
-            else if (File.Exists(path))
-            {
-                File.Delete(path);
-            }
+            fileStore.DeletePath(path);
         }
         catch
         {
             // mkdir below will surface a real problem
         }
 
-        Directory.CreateDirectory(path);
+        fileStore.CreateDirectory(path);
     }
 
     private static async Task CopyDirectoryAsync(string src, string dest, CancellationToken cancellationToken)

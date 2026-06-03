@@ -32,23 +32,47 @@ internal sealed class SystemFileStore : IFileStore
 
     public void DeletePath(string path)
     {
-        if (Directory.Exists(path))
+        FileAttributes attributes;
+        try
         {
-            var info = new DirectoryInfo(path);
-            if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
-            {
-                // Delete the symlink as a link — never recurse through it,
-                // so the link target's contents are left untouched.
-                info.Delete();
-            }
-            else
-            {
-                Directory.Delete(path, recursive: true);
-            }
+            attributes = File.GetAttributes(path);
         }
-        else if (File.Exists(path))
+        catch (Exception ex)
+            when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            return;
+        }
+
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
+        {
+            // Delete the symlink as a link — never recurse through it, so the
+            // link target's contents are left untouched. This holds whether the
+            // target is a directory, a file, or gone (a broken symlink).
+            DeleteReparsePoint(path);
+        }
+        else if ((attributes & FileAttributes.Directory) != 0)
+        {
+            Directory.Delete(path, recursive: true);
+        }
+        else
         {
             File.Delete(path);
+        }
+    }
+
+    private static void DeleteReparsePoint(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            Directory.Delete(path);
+        }
+        catch (IOException)
+        {
+            Directory.Delete(path);
         }
     }
 

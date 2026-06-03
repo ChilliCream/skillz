@@ -1,6 +1,7 @@
 using Skillz.Install;
 using Skillz.Skills;
 using Skillz.Tests.TestServices;
+using Skillz.Utils;
 using Xunit;
 
 namespace Skillz.Tests.Install;
@@ -22,7 +23,7 @@ public class InstallerTests : IDisposable
 
         var system = new FakeSystemEnvironment { HomeDirectory = _home, CurrentDirectory = _projectDir };
         var registry = new AgentRegistry(system);
-        _installer = new SkillInstaller(registry, system);
+        _installer = new SkillInstaller(registry, system, new SystemFileStore());
     }
 
     public void Dispose()
