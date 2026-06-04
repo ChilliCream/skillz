@@ -49,4 +49,17 @@ internal interface IInteractionService
         IEnumerable<T> preSelected,
         CancellationToken cancellationToken)
         where T : notnull;
+
+    /// <summary>
+    /// Presents a multi-select where choices are grouped under headers. Items sharing a
+    /// <paramref name="groupHeader"/> render under that header (in first-seen order), so the caller
+    /// orders <paramref name="choices"/> up front to control both group and within-group order.
+    /// </summary>
+    Task<ImmutableArray<T>> MultiSelectGroupedAsync<T>(
+        string message,
+        IEnumerable<T> choices,
+        Func<T, string> groupHeader,
+        Func<T, string> label,
+        CancellationToken cancellationToken)
+        where T : notnull;
 }

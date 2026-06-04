@@ -38,19 +38,30 @@ internal sealed class AddCommandPrompter(
             return skills;
         }
 
-        // Sort by PluginName (nulls last) then InstallName
-        var sorted = skills
+        // Named groups first (by plugin name), the unclaimed bucket last, skills alphabetical within
+        // a group - mirroring how `skillz list` renders. Ordering up front means the prompt's GroupBy
+        // preserves this order for both headers and their children.
+        var ordered = skills
             .OrderBy(s => s.PluginName is null ? 1 : 0)
             .ThenBy(s => s.PluginName, StringComparer.Ordinal)
-            .ThenBy(s => s.InstallName, StringComparer.Ordinal);
+            .ThenBy(s => s.InstallName, StringComparer.Ordinal)
+            .ToImmutableArray();
 
-        var choices = sorted.Select(s =>
+        // No plugin claims any skill - a lone "Other" header would just be noise, so use the flat picker.
+        if (ordered.All(s => s.PluginName is null))
         {
-            var hint = s.Description.Length > 60 ? s.Description[..57] + "..." : s.Description;
-            return ($"{s.InstallName} - {hint}", s);
-        });
+            return await interaction.MultiSelectAsync(
+                "Select skills to install",
+                ordered.Select(static s => (s.Label, s)),
+                cancellationToken);
+        }
 
-        return await interaction.MultiSelectAsync("Select skills to install", choices, cancellationToken);
+        return await interaction.MultiSelectGroupedAsync(
+            "Select skills to install",
+            ordered,
+            static s => s.PluginName is { } pluginName ? pluginName.ToTitleCase() : "Other",
+            static s => s.Label,
+            cancellationToken);
     }
 
     public async Task<ImmutableArray<string>> SelectAgentsAsync(
@@ -146,5 +157,20 @@ internal sealed class AddCommandPrompter(
         }
 
         return interaction.ConfirmAsync(sb.ToString(), defaultValue: true, cancellationToken);
+    }
+}
+
+file static class Extensions
+{
+    extension(ResolvedSkill skill)
+    {
+        public string Label
+        {
+            get
+            {
+                var hint = skill.Description.Length > 60 ? skill.Description[..57] + "..." : skill.Description;
+                return $"{skill.InstallName} - {hint}";
+            }
+        }
     }
 }

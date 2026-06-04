@@ -46,8 +46,28 @@ internal sealed class TestInteractionService : IInteractionService
     public Func<string, IReadOnlyList<string>, IReadOnlyList<int>>? OnMultiSelectByIndex { get; set; }
 
     /// <summary>
+    /// Selection hook for the grouped prompt, keyed by (group index, item-within-group index)
+    /// rather than label, so duplicate labels across groups can be disambiguated in tests. Takes
+    /// the message and the group structure (group labels paired with their item labels, in
+    /// presentation order) and returns the (group, item) pairs to select.
+    /// </summary>
+    public Func<
+        string,
+        IReadOnlyList<(string Group, IReadOnlyList<string> Items)>,
+        IReadOnlyList<(int Group, int Item)>
+    >? OnMultiSelectGroupedByIndex { get; set; }
+
+    /// <summary>
+    /// Captures the group structure (group labels paired with their item labels, in presentation
+    /// order) handed to the most recent <c>MultiSelectGroupedAsync</c> call, so tests can assert
+    /// the grouping, ordering, and child membership built by the caller.
+    /// </summary>
+    public IReadOnlyList<(string Group, IReadOnlyList<string> Items)>? LastGroupedStructure { get; private set; }
+
+    /// <summary>
     /// Captures the pre-selected values handed to the most recent <c>MultiSelectAsync</c>
-    /// call, so tests can assert last-used defaults are passed through to the prompt.
+    /// call, so tests can assert last-used defaults are passed
+    /// through to the prompt.
     /// </summary>
     public IReadOnlyList<object>? LastPreSelected { get; private set; }
 
@@ -129,10 +149,7 @@ internal sealed class TestInteractionService : IInteractionService
         return action();
     }
 
-    public Task<bool> ConfirmAsync(
-        string message,
-        bool defaultValue,
-        CancellationToken cancellationToken)
+    public Task<bool> ConfirmAsync(string message, bool defaultValue, CancellationToken cancellationToken)
     {
         var result = OnConfirm is not null ? OnConfirm(message, defaultValue) : defaultValue;
         return Task.FromResult(result);
@@ -189,6 +206,39 @@ internal sealed class TestInteractionService : IInteractionService
         var selectedLabels = OnMultiSelect is not null ? OnMultiSelect(message, labels) : Array.Empty<string>();
         var selectedSet = new HashSet<string>(selectedLabels, StringComparer.Ordinal);
         ImmutableArray<T> result = [.. pairs.Where(c => selectedSet.Contains(c.Label)).Select(c => c.Value)];
+        return Task.FromResult(result);
+    }
+
+    public Task<ImmutableArray<T>> MultiSelectGroupedAsync<T>(
+        string message,
+        IEnumerable<T> choices,
+        Func<T, string> groupHeader,
+        Func<T, string> label,
+        CancellationToken cancellationToken)
+        where T : notnull
+    {
+        // Group the same way the real service does (GroupBy on the header selector, source order
+        // preserved) so tests can assert the headers, ordering, and membership the caller produced.
+        var groups = choices.GroupBy(groupHeader).Select(g => (Group: g.Key, Items: g.ToList())).ToList();
+
+        var structure = groups.Select(g => (g.Group, (IReadOnlyList<string>)g.Items.Select(label).ToList())).ToList();
+        LastGroupedStructure = structure;
+
+        if (groups.Count == 0)
+        {
+            return Task.FromResult<ImmutableArray<T>>([]);
+        }
+
+        // The hook addresses items by (group, item-within-group) index so duplicate labels never
+        // collide; resolve each pair back to its value in flattened presentation order.
+        IReadOnlyList<(int Group, int Item)> selected = OnMultiSelectGroupedByIndex?.Invoke(message, structure) ?? [];
+        ImmutableArray<T> result =
+        [
+            .. groups
+                .SelectMany((g, gi) => g.Items.Select((item, ii) => (gi, ii, item)))
+                .Where(x => selected.Contains((x.gi, x.ii)))
+                .Select(x => x.item)
+        ];
         return Task.FromResult(result);
     }
 }
