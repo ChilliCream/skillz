@@ -223,8 +223,7 @@ internal sealed class ConsoleInteractionService(IAnsiConsole? console = null) : 
             return [];
         }
 
-        prompt.UseConverter(handle =>
-            Markup.Escape(handle >= 0 ? label(values[handle]) : headers[-handle - 1]));
+        prompt.UseConverter(handle => Markup.Escape(handle >= 0 ? label(values[handle]) : headers[-handle - 1]));
 
         var selected = await ShowRequiringSelectionAsync(prompt, cancellationToken);
 
@@ -253,5 +252,33 @@ internal sealed class ConsoleInteractionService(IAnsiConsole? console = null) : 
         }
 
         throw new OperationCanceledException(cancellationToken);
+    }
+
+    public async Task<ImmutableArray<T>> SearchableMultiSelectAsync<T>(
+        string title,
+        IReadOnlyList<SearchableSection<T>> sections,
+        IEnumerable<T> preSelected,
+        CancellationToken cancellationToken)
+        where T : notnull
+    {
+        // Defensive: a non-interactive console can't drive the key loop. The executor never calls
+        // this path non-interactively, but if it ever does, fall back to the guaranteed selection.
+        if (!_console.Profile.Capabilities.Interactive)
+        {
+            var selectableValues = sections
+                .Where(s => !s.AlwaysIncluded)
+                .SelectMany(s => s.Items)
+                .Select(item => item.Value)
+                .ToHashSet();
+
+            return sections
+                .Where(s => s.AlwaysIncluded)
+                .SelectMany(y => y.Items.Select(item => item.Value))
+                .Concat(preSelected.Where(selectableValues.Contains))
+                .ToImmutableArray();
+        }
+
+        var prompt = new SearchableMultiSelectionPrompt<T>(title, sections, preSelected);
+        return await prompt.ShowAsync(_console, cancellationToken);
     }
 }

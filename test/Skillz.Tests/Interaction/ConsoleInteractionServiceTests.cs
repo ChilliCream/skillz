@@ -304,4 +304,40 @@ public class ConsoleInteractionServiceTests
             service.MultiSelectGroupedAsync("Pick some", CollidingGroups(), i => i.Group, i => i.Label, cts.Token)
         );
     }
+
+    [Fact]
+    public async Task SearchableMultiSelectAsync_Should_ReturnAlwaysIncludedPlusSelectablePreSelected_When_NonInteractive()
+    {
+        // Arrange: a non-interactive console cannot drive the key loop, so the service must fall back
+        // to a deterministic selection without prompting.
+        using var console = new TestConsole();
+        console.Profile.Capabilities.Interactive = false;
+        var service = new ConsoleInteractionService(console);
+
+        var sections = new[]
+        {
+            new SearchableSection<string>(
+                "Universal",
+                AlwaysIncluded: true,
+                [("Codex", "codex"), ("OpenCode", "opencode")]),
+            new SearchableSection<string>(
+                "Additional",
+                AlwaysIncluded: false,
+                [("Claude Code", "claude-code"), ("Cursor", "cursor")])
+        };
+
+        // "claude-code" IS selectable; "ghost" is in no section and must be dropped.
+        var preSelected = new[] { "claude-code", "ghost" };
+
+        // Act
+        var selected = await service.SearchableMultiSelectAsync(
+            "Pick agents",
+            sections,
+            preSelected,
+            TestContext.Current.CancellationToken);
+
+        // Assert: all always-included values (section order) plus only the selectable pre-selected
+        // value; the non-selectable "ghost" is filtered out.
+        Assert.Equal(["codex", "opencode", "claude-code"], selected);
+    }
 }

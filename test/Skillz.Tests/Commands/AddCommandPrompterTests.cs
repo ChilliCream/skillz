@@ -128,12 +128,14 @@ public class AddCommandPrompterTests
     }
 
     [Fact]
-    public async Task SelectAgentsAsync_Should_PreSelectLastUsedAgents_When_PreviouslySaved()
+    public async Task SelectAgentsAsync_Should_PreSelectLastUsedAdditionalAgent_When_PreviouslySaved()
     {
-        // Arrange: a prior run saved opencode as the chosen agent.
+        // Arrange: a prior run saved claude-code, the only additional (non-universal) agent here.
+        // opencode and codex are universal (.agents/skills) and are always included, never
+        // pre-selected as additional choices.
         var (prompter, interaction, globalLock) = CreatePrompter();
-        globalLock.OnGetLastSelectedAgents = () => ["opencode"];
-        interaction.OnMultiSelectByIndex = (_, _) => [];
+        globalLock.OnGetLastSelectedAgents = () => ["claude-code"];
+        interaction.OnSearchableSelectByIndex = (_, _, _) => [];
 
         // Act
         await prompter.SelectAgentsAsync(
@@ -141,18 +143,19 @@ public class AddCommandPrompterTests
             global: false,
             TestContext.Current.CancellationToken);
 
-        // Assert: the saved last-used agent is handed to the prompt as a pre-selection.
+        // Assert: the saved last-used additional agent is handed to the prompt as a pre-selection.
         Assert.NotNull(interaction.LastPreSelected);
-        Assert.Equal(["opencode"], interaction.LastPreSelected.Cast<string>());
+        Assert.Equal(["claude-code"], interaction.LastPreSelected.Cast<string>());
     }
 
     [Fact]
-    public async Task SelectAgentsAsync_Should_DropLastUsedAgentsNoLongerAvailable_When_PreSelecting()
+    public async Task SelectAgentsAsync_Should_DropUniversalAndUnavailableLastUsed_When_PreSelecting()
     {
-        // Arrange: last-used includes an agent that is not in the current available set.
+        // Arrange: last-used includes a universal agent (always included, never pre-selected as an
+        // additional choice) and an agent that is no longer available.
         var (prompter, interaction, globalLock) = CreatePrompter();
-        globalLock.OnGetLastSelectedAgents = () => ["opencode", "uninstalled-agent"];
-        interaction.OnMultiSelectByIndex = (_, _) => [];
+        globalLock.OnGetLastSelectedAgents = () => ["claude-code", "opencode", "uninstalled-agent"];
+        interaction.OnSearchableSelectByIndex = (_, _, _) => [];
 
         // Act
         await prompter.SelectAgentsAsync(
@@ -160,18 +163,19 @@ public class AddCommandPrompterTests
             global: false,
             TestContext.Current.CancellationToken);
 
-        // Assert: only the still-available last-used agent is pre-selected.
+        // Assert: only the still-available, additional last-used agent is pre-selected.
         Assert.NotNull(interaction.LastPreSelected);
-        Assert.Equal(["opencode"], interaction.LastPreSelected.Cast<string>());
+        Assert.Equal(["claude-code"], interaction.LastPreSelected.Cast<string>());
     }
 
     [Fact]
-    public async Task SelectAgentsAsync_Should_PreSelectCommonDefaults_When_NoLastUsedSaved()
+    public async Task SelectAgentsAsync_Should_PreSelectAdditionalCommonDefaults_When_NoLastUsedSaved()
     {
-        // Arrange: no prior selection saved.
+        // Arrange: no prior selection saved. Of the common defaults {claude-code, opencode, codex}
+        // only claude-code is additional (opencode and codex are universal).
         var (prompter, interaction, globalLock) = CreatePrompter();
         globalLock.OnGetLastSelectedAgents = () => null;
-        interaction.OnMultiSelectByIndex = (_, _) => [];
+        interaction.OnSearchableSelectByIndex = (_, _, _) => [];
 
         // Act
         await prompter.SelectAgentsAsync(
@@ -179,22 +183,21 @@ public class AddCommandPrompterTests
             global: false,
             TestContext.Current.CancellationToken);
 
-        // Assert: falls back to the common defaults that are present in the available set.
+        // Assert: falls back to the additional common defaults present in the available set.
         Assert.NotNull(interaction.LastPreSelected);
-        Assert.Equal(
-            ["claude-code", "codex", "opencode"],
-            interaction.LastPreSelected.Cast<string>().OrderBy(a => a, StringComparer.Ordinal));
+        Assert.Equal(["claude-code"], interaction.LastPreSelected.Cast<string>());
     }
 
     [Fact]
-    public async Task SelectAgentsAsync_Should_SaveSelection_When_AgentsChosen()
+    public async Task SelectAgentsAsync_Should_SaveUniversalsPlusChosenAdditional_When_AgentsChosen()
     {
-        // Arrange: user picks the second offered agent (index 1).
+        // Arrange: user toggles the only additional agent (claude-code, selectable index 0).
+        // The universals (codex, opencode) are always included.
         var (prompter, interaction, globalLock) = CreatePrompter();
         ImmutableArray<string>? saved = null;
         globalLock.OnGetLastSelectedAgents = () => null;
         globalLock.OnSaveLastSelectedAgents = agents => saved = [.. agents];
-        interaction.OnMultiSelectByIndex = (_, _) => [1];
+        interaction.OnSearchableSelectByIndex = (_, _, _) => [0];
 
         // Act
         var selected = await prompter.SelectAgentsAsync(
@@ -202,9 +205,13 @@ public class AddCommandPrompterTests
             global: false,
             TestContext.Current.CancellationToken);
 
-        // Assert: the chosen agent is returned and persisted for next time.
-        Assert.Equal(["opencode"], selected);
+        // Assert: the result and the persisted set are the universals plus the chosen additional agent.
+        Assert.Equal(
+            ["claude-code", "codex", "opencode"],
+            selected.OrderBy(a => a, StringComparer.Ordinal));
         Assert.NotNull(saved);
-        Assert.Equal(["opencode"], saved.Value);
+        Assert.Equal(
+            ["claude-code", "codex", "opencode"],
+            saved.Value.OrderBy(a => a, StringComparer.Ordinal));
     }
 }

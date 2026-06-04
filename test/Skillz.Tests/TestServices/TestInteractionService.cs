@@ -65,8 +65,21 @@ internal sealed class TestInteractionService : IInteractionService
     public IReadOnlyList<(string Group, IReadOnlyList<string> Items)>? LastGroupedStructure { get; private set; }
 
     /// <summary>
-    /// Captures the pre-selected values handed to the most recent <c>MultiSelectAsync</c>
-    /// call, so tests can assert last-used defaults are passed
+    /// Selection hook for <see cref="SearchableMultiSelectAsync{T}"/>. Receives the title, the
+    /// always-included labels and the selectable labels (each in presentation order) and returns
+    /// the indices of the selectable items to select. When null, the selectable items whose value
+    /// is in <c>preSelected</c> are selected.
+    /// </summary>
+    public Func<
+        string,
+        IReadOnlyList<string>,
+        IReadOnlyList<string>,
+        IReadOnlyList<int>
+    >? OnSearchableSelectByIndex { get; set; }
+
+    /// <summary>
+    /// Captures the pre-selected values handed to the most recent <c>MultiSelectAsync</c> or
+    /// <c>SearchableMultiSelectAsync</c> call, so tests can assert last-used defaults are passed
     /// through to the prompt.
     /// </summary>
     public IReadOnlyList<object>? LastPreSelected { get; private set; }
@@ -240,5 +253,55 @@ internal sealed class TestInteractionService : IInteractionService
                 .Select(x => x.item)
         ];
         return Task.FromResult(result);
+    }
+
+    public Task<ImmutableArray<T>> SearchableMultiSelectAsync<T>(
+        string title,
+        IReadOnlyList<SearchableSection<T>> sections,
+        IEnumerable<T> preSelected,
+        CancellationToken cancellationToken)
+        where T : notnull
+    {
+        var preSelectedList = preSelected.ToList();
+        LastPreSelected = preSelectedList.Cast<object>().ToList();
+
+        // Always-included values are part of the result regardless of any selection, in section order.
+        var alwaysIncluded = sections
+            .Where(s => s.AlwaysIncluded)
+            .SelectMany(s => s.Items)
+            .Select(item => item.Value)
+            .ToList();
+
+        // The selectable items form one flat, index-addressable list (section order).
+        var selectable = sections.Where(s => !s.AlwaysIncluded).SelectMany(s => s.Items).ToList();
+
+        IReadOnlyList<int> selectedIndices;
+        if (OnSearchableSelectByIndex is not null)
+        {
+            var alwaysIncludedLabels = sections
+                .Where(s => s.AlwaysIncluded)
+                .SelectMany(s => s.Items)
+                .Select(item => item.Label)
+                .ToList();
+            var selectableLabels = selectable.Select(item => item.Label).ToList();
+            selectedIndices = OnSearchableSelectByIndex(title, alwaysIncludedLabels, selectableLabels);
+        }
+        else
+        {
+            var preSelectedSet = new HashSet<T>(preSelectedList);
+            selectedIndices = Enumerable
+                .Range(0, selectable.Count)
+                .Where(i => preSelectedSet.Contains(selectable[i].Value))
+                .ToList();
+        }
+
+        var builder = ImmutableArray.CreateBuilder<T>();
+        builder.AddRange(alwaysIncluded);
+        foreach (var index in selectedIndices.Order())
+        {
+            builder.Add(selectable[index].Value);
+        }
+
+        return Task.FromResult(builder.ToImmutable());
     }
 }

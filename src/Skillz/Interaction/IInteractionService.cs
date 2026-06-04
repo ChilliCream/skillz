@@ -62,4 +62,11 @@ internal interface IInteractionService
         Func<T, string> label,
         CancellationToken cancellationToken)
         where T : notnull;
+
+    Task<ImmutableArray<T>> SearchableMultiSelectAsync<T>(
+        string title,
+        IReadOnlyList<SearchableSection<T>> sections,
+        IEnumerable<T> preSelected,
+        CancellationToken cancellationToken)
+        where T : notnull;
 }

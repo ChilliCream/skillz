@@ -74,14 +74,28 @@ internal sealed class AddCommandPrompter(
             return [];
         }
 
-        // Try to get last-used agents as pre-selection defaults
+        // Universal agents share .agents/skills and are always installed; only the rest are
+        // individually selectable. Both lists are sorted by display name for a stable picker.
+        var universal = available
+            .Where(registry.IsUniversalAgent)
+            .OrderBy(a => registry.GetConfig(a).DisplayName, StringComparer.Ordinal)
+            .ToList();
+
+        var additional = available
+            .Where(a => !registry.IsUniversalAgent(a))
+            .OrderBy(a => registry.GetConfig(a).DisplayName, StringComparer.Ordinal)
+            .ToList();
+
+        var additionalSet = new HashSet<string>(additional, StringComparer.Ordinal);
+
+        // Pre-selection applies only to the additional (selectable) set; universals are always in.
         IReadOnlyList<string>? defaults = null;
         try
         {
             var lastUsed = await globalLock.GetLastSelectedAgentsAsync(cancellationToken);
             if (lastUsed is { Length: > 0 } lastUsedAgents)
             {
-                defaults = lastUsedAgents.Where(a => available.Contains(a, StringComparer.Ordinal)).ToList();
+                defaults = lastUsedAgents.Where(additionalSet.Contains).ToList();
                 if (defaults.Count == 0)
                 {
                     defaults = null;
@@ -93,22 +107,32 @@ internal sealed class AddCommandPrompter(
             // Swallow - best effort
         }
 
-        // If no last-used, fall back to common defaults
-        defaults ??= available.Where(a => a is "claude-code" or "opencode" or "codex").ToList();
+        // If no last-used, fall back to whichever common defaults are in the additional set.
+        defaults ??= additional.Where(a => a is "claude-code" or "opencode" or "codex").ToList();
 
-        var choices = available.Select(a =>
+        var sections = new List<SearchableSection<string>>();
+        if (universal.Count > 0)
         {
-            var config = registry.GetConfig(a);
-            return ($"{config.DisplayName} ({a})", a);
-        });
+            sections.Add(
+                new SearchableSection<string>(
+                    "Universal (.agents/skills) - always included",
+                    AlwaysIncluded: true,
+                    universal.Select(a => ($"{registry.GetConfig(a).DisplayName} ({a})", a)).ToList()));
+        }
 
-        var selected = await interaction.MultiSelectAsync(
+        sections.Add(
+            new SearchableSection<string>(
+                "Additional agents",
+                AlwaysIncluded: false,
+                additional.Select(a => ($"{registry.GetConfig(a).DisplayName} ({a})", a)).ToList()));
+
+        var selected = await interaction.SearchableMultiSelectAsync(
             "Which agents do you want to install to?",
-            choices,
+            sections,
             defaults,
             cancellationToken);
 
-        // Save selection for next time
+        // Save the full selection (universals + chosen additional) for next time.
         if (selected.Length > 0)
         {
             try
