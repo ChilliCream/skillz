@@ -76,7 +76,7 @@ public class ProjectLockFileTests : IDisposable
               "version": 1,
               "skills": {
                 "my-skill": {
-                  "source": "vercel-labs/skills",
+                  "source": "chillicream/skills",
                   "sourceType": "github",
                   "computedHash": "abc123"
                 }
@@ -97,7 +97,7 @@ public class ProjectLockFileTests : IDisposable
         Assert.Equal(1, result.Version);
         Assert.Single(result.Skills);
         var entry = result.Skills["my-skill"];
-        Assert.Equal("vercel-labs/skills", entry.Source);
+        Assert.Equal("chillicream/skills", entry.Source);
         Assert.Equal("github", entry.SourceType);
         Assert.Equal("abc123", entry.ComputedHash);
     }

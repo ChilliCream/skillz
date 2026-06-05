@@ -97,10 +97,10 @@ public class SourceParserTests
     public void GitHub_Shorthand()
     {
         // Act
-        var result = new SourceParser().Parse("vercel-labs/agent-skills");
+        var result = new SourceParser().Parse("chillicream/agent-skills");
 
         // Assert
-        Assert.Equal(new SkillSource.GitHub("https://github.com/vercel-labs/agent-skills.git"), result);
+        Assert.Equal(new SkillSource.GitHub("https://github.com/chillicream/agent-skills.git"), result);
     }
 
     [Fact]
@@ -127,11 +127,11 @@ public class SourceParserTests
     public void GitHub_ShorthandWithBranchFragment()
     {
         // Act
-        var result = new SourceParser().Parse("vercel-labs/agent-skills#feature/install");
+        var result = new SourceParser().Parse("chillicream/agent-skills#feature/install");
 
         // Assert
         Assert.Equal(
-            new SkillSource.GitHub("https://github.com/vercel-labs/agent-skills.git", "feature/install"),
+            new SkillSource.GitHub("https://github.com/chillicream/agent-skills.git", "feature/install"),
             result);
     }
 
@@ -139,10 +139,10 @@ public class SourceParserTests
     public void GitHub_ShorthandTrailingSlash()
     {
         // Act
-        var result = new SourceParser().Parse("vercel-labs/agent-skills/");
+        var result = new SourceParser().Parse("chillicream/agent-skills/");
 
         // Assert
-        Assert.Equal(new SkillSource.GitHub("https://github.com/vercel-labs/agent-skills.git"), result);
+        Assert.Equal(new SkillSource.GitHub("https://github.com/chillicream/agent-skills.git"), result);
     }
 
     [Fact]
@@ -405,11 +405,11 @@ public class SourceParserTests
     public void GitHubShorthand_OwnerRepoAtHyphenatedSkill()
     {
         // Act
-        var result = new SourceParser().Parse("vercel-labs/agent-skills@find-skills");
+        var result = new SourceParser().Parse("chillicream/agent-skills@find-skills");
 
         // Assert
         var github = Assert.IsType<SkillSource.GitHub>(result);
-        Assert.Equal("https://github.com/vercel-labs/agent-skills.git", github.Url);
+        Assert.Equal("https://github.com/chillicream/agent-skills.git", github.Url);
         Assert.Equal("find-skills", github.SkillFilter);
     }
 
