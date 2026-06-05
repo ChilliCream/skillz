@@ -4,11 +4,11 @@ A CLI for managing AI agent skills - markdown `SKILL.md` files with YAML
 frontmatter that teach AI coding agents how to do specific tasks.
 
 ```bash
-# Persistent install (.NET 8+ SDK)
-dotnet tool install -g skillz
+# One-shot run, no install (.NET 10+ SDK)
+dnx skillz add chillicream/agent-skills
 
-# Or one-shot run, no install (.NET 10+ SDK)
-dnx skillz add anthropics/skills --agent claude-code
+# Or persistent install
+dotnet tool install -g skillz
 ```
 
 End-user documentation - including the full `dnx` reference - lives in

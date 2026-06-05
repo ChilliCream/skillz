@@ -8,19 +8,13 @@ repos, or local paths - into whichever agents you have on your machine.
 
 ## Install
 
-```bash
-dotnet tool install -g skillz
-```
-
-Requires the .NET SDK (8.0 or newer). After install, `skillz` is on your `PATH`.
-
 ### Run without installing (`dnx`)
 
 If you have the **.NET 10 SDK** (or newer), `dnx` runs the tool one-shot - no
 `PATH` shim, no global state:
 
 ```bash
-dnx skillz add anthropics/skills
+dnx skillz add chillicream/agent-skills
 ```
 
 `dnx` is a shell script that ships with the SDK; it forwards to
@@ -64,6 +58,16 @@ pinned there instead of the latest - handy for repo-local tool versions.
 
 `dnx skillz` and `dotnet tool exec skillz` are equivalent; `dnx` is just the
 shorter form.
+
+### Persistent install
+
+To put `skillz` on your `PATH` for repeated use:
+
+```bash
+dotnet tool install -g skillz
+```
+
+Requires the .NET SDK (8.0 or newer).
 
 ## Quick start
 
