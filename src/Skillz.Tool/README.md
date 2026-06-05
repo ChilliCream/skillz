@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/ChilliCream/skillz/main/assets/logo.svg" alt="Skillz" width="120" height="120" />
-</p>
-
 # skillz
 
 A CLI for managing AI agent skills.
