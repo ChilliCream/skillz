@@ -6,10 +6,12 @@
     <ToolCommandName>skillz</ToolCommandName>
     <PackageId>skillz</PackageId>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Skillz/Skillz.csproj" />
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="../../assets/icon.png" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

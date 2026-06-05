@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.svg" alt="Skillz" width="120" height="120" />
+</p>
+
 # Skillz
 
 A CLI for managing AI agent skills - markdown `SKILL.md` files with YAML
