@@ -1,6 +1,7 @@
 using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Skillz.Commands;
+using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Tests.TestServices;
 using Xunit;
@@ -26,9 +27,15 @@ internal static class CommandSnapshot
         var root = services.GetRequiredService<SkillzRootCommand>();
         var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
 
-        // Captured so absolute paths in the output can be scrubbed back to stable tokens.
-        var cwd = Directory.GetCurrentDirectory();
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        // Scrub absolute paths back to stable tokens using the SAME ambient state the command builds
+        // its paths from - the injected ISystemEnvironment - rather than the real process. On macOS the
+        // two diverge: the temp workspace is rooted under /var/folders/... but Directory.GetCurrentDirectory()
+        // returns it symlink-resolved as /private/var/folders/..., so scrubbing by the process cwd would
+        // miss the /var form that actually appears in the output. Reading from ISystemEnvironment keeps the
+        // tokens matching the output on every platform.
+        var systemEnvironment = services.GetRequiredService<ISystemEnvironment>();
+        var cwd = systemEnvironment.CurrentDirectory;
+        var home = systemEnvironment.HomeDirectory;
 
         var originalOut = Console.Out;
         var originalError = Console.Error;
