@@ -7,7 +7,7 @@
     <WarningsNotAsErrors>NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
-    <Version>0.2.1</Version>
+    <Version>0.2.2</Version>
     <RepositoryType>GitHub</RepositoryType>
     <RepositoryUrl>https://github.com/ChilliCream/skillz.git</RepositoryUrl>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
