@@ -169,8 +169,8 @@ Common flags: `--global / -g`, `--agent / -a <name>`, `--skill / -s <name>`,
 
 ## Source code
 
-<https://github.com/PascalSenn/skillz>
+<https://github.com/chillicream/skillz>
 
 ## License
 
-MIT - see [LICENSE](https://github.com/PascalSenn/skillz/blob/main/LICENSE).
+MIT - see [LICENSE](https://github.com/chillicream/skillz/blob/main/LICENSE).
