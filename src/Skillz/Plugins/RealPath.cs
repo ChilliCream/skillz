@@ -257,7 +257,19 @@ internal static class RealPath
                 return null;
             }
 
-            current = Path.GetFullPath(resolved.FullName);
+            // ResolveLinkTarget follows the link chain but can hand back a target whose own parent
+            // chain still contains symlinks (e.g. on macOS a target under /var/folders, where /var
+            // is itself a symlink to /private/var). Re-resolve it from the root so the result is
+            // fully canonical; otherwise one path resolves to /private/var and another to /var and a
+            // containment check between them spuriously fails. On Linux, where the parents hold no
+            // symlinks, this is a no-op.
+            var canonicalTarget = TryGetRealPath(resolved.FullName);
+            if (canonicalTarget is null)
+            {
+                return null;
+            }
+
+            current = canonicalTarget;
         }
 
         return Path.GetFullPath(current);

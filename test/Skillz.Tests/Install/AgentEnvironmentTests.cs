@@ -211,7 +211,7 @@ public class AgentEnvironmentTests
     public void InstalledAgents_Replit_DetectsViaCwd()
     {
         // Arrange
-        var existing = new HashSet<string>(StringComparer.Ordinal) { "/my-project/.replit" };
+        var existing = new HashSet<string>(StringComparer.Ordinal) { Path.Combine("/my-project", ".replit") };
         var (detector, _) = Create(existingDirs: existing, cwd: "/my-project");
 
         // Act

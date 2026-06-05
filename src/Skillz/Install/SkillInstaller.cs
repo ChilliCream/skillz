@@ -37,14 +37,21 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
         {
             if (config.GlobalSkillsDirectory is null)
             {
-                return Path.Combine(baseDirectory, config.SkillsDirectory);
+                return Path.Combine(baseDirectory, NormalizeRelative(config.SkillsDirectory));
             }
 
             return config.GlobalSkillsDirectory;
         }
 
-        return Path.Combine(baseDirectory, config.SkillsDirectory);
+        return Path.Combine(baseDirectory, NormalizeRelative(config.SkillsDirectory));
     }
+
+    // Registry skills directories are authored with forward slashes (e.g. ".claude/skills").
+    // Path.Combine leaves those interior separators untouched, so on Windows the result would be
+    // ".claude/skills" instead of the native ".claude\skills". Rewrite them to the platform
+    // separator so callers (and equality checks against Path.Combine-built paths) see a native path.
+    private static string NormalizeRelative(string relative) =>
+        relative.Replace('/', Path.DirectorySeparatorChar);
 
     public string GetCanonicalPath(string skillName, bool global = false, string? workingDirectory = null)
     {
