@@ -81,18 +81,6 @@ dotnet pack src/Skillz.Tool -c Release -o ./artifacts
 
 Produces `artifacts/skillz.<version>.nupkg` ready for `dotnet nuget push`.
 
-## Architecture
-
-The CLI is built on `Microsoft.Extensions.Hosting` + `System.CommandLine` +
-`Spectre.Console`, with AOT-safe JSON via `System.Text.Json` source generators.
-Commands inherit from a `BaseCommand` template method; cross-cutting state lives
-on a single `CliExecutionContext`; user interaction goes through
-`IInteractionService`.
-
-See [`aspire-cli-pattern.md`](aspire-cli-pattern.md) for an in-depth look at the
-architectural patterns this CLI is modeled on, distilled from the Microsoft
-Aspire CLI source.
-
 ## Contributing
 
 Issues and PRs welcome. Before sending a PR:
