@@ -73,28 +73,28 @@ Requires the .NET SDK (8.0 or newer).
 
 ```bash
 # Install all skills from a GitHub repo into Claude Code
-skillz add anthropics/skills --agent claude-code
+dnx skillz add chillicream/agent-skills --agent claude-code
 
 # Pick specific skills interactively
-skillz add anthropics/skills
+dnx skillz add chillicream/agent-skills
 
 # Install one skill into multiple agents
-skillz add anthropics/skills --skill code-review --agent claude-code --agent cursor
+dnx skillz add chillicream/agent-skills --skill code-review --agent claude-code --agent cursor
 
 # Install everything into every detected agent, no prompts
-skillz add anthropics/skills --all
+dnx skillz add chillicream/agent-skills --all
 
 # List what's installed
-skillz list
+dnx skillz list
 
 # Update installed skills to the latest version
-skillz update
+dnx skillz update
 
 # Remove a skill
-skillz remove code-review
+dnx skillz remove code-review
 
 # Scaffold a new skill
-skillz init my-skill
+dnx skillz init my-skill
 ```
 
 ## Sources
