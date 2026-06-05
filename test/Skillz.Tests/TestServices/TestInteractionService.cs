@@ -20,7 +20,14 @@ internal sealed class TestInteractionService : IInteractionService
                 Ansi = AnsiSupport.No,
                 ColorSystem = ColorSystemSupport.NoColors,
                 Interactive = InteractionSupport.No,
-                Out = new AnsiConsoleOutput(_writer)
+                Out = new AnsiConsoleOutput(_writer),
+
+                // Spectre auto-detects CI runners via profile enrichers that run after the settings
+                // above and override the capabilities we just pinned - GitHubEnricher, for one, forces
+                // Ansi back on when GITHUB_ACTIONS=true. That makes [dim] and other decorations emit
+                // escape codes into the captured output, so the inline snapshots pass locally but fail
+                // on CI. Disabling enrichment keeps the profile exactly as configured here, everywhere.
+                Enrichment = new ProfileEnrichment { UseDefaultEnrichers = false }
             });
 
         // Pin the render width so panels and grids have deterministic geometry regardless of the
