@@ -9,8 +9,15 @@ public class PathContainmentTests : IDisposable
 
     public PathContainmentTests()
     {
-        _root = Path.Combine(Path.GetTempPath(), "skillz-path-containment-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_root);
+        var root = Path.Combine(Path.GetTempPath(), "skillz-path-containment-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+
+        // Canonicalize the temp root so expectations built with Path.GetFullPath - which tidies a
+        // path string but does not follow symlinks - match RealPath's fully-resolved output. On macOS
+        // the temp dir lives under /var, itself a symlink to /private/var; without this the two sides
+        // would diverge only by that prefix. The symlinks each test creates under this root are still
+        // resolved by the code under test, so the behavior being asserted is unaffected.
+        _root = RealPath.TryGetRealPath(root) ?? root;
     }
 
     public void Dispose()
