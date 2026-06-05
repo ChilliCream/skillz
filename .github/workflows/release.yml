@@ -57,3 +57,6 @@ jobs:
         with:
           name: nuget-package
           path: ./nupkg/*.nupkg
+
+      - name: Push to NuGet
+        run: dotnet nuget push ./nupkg/*.nupkg --api-key ${{ secrets.SKILLZ_NUGET_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
