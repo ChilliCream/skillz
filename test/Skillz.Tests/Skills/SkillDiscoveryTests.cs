@@ -211,6 +211,13 @@ public class SkillDiscoveryTests : IDisposable
     [Fact]
     public async Task Skips_Skill_With_Control_Byte_In_Directory_Name()
     {
+        // Windows refuses to create a directory whose name contains a control byte, so the
+        // scenario this guards against cannot occur there - the filesystem rejects it.
+        if (OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
         // Arrange: a skill directory whose name carries an ESC byte must be skipped, not returned -
         // Skill.Path stays byte-exact for file I/O, so a poisoned path is rejected rather than rewritten.
         var dir = Path.Combine(_testDir, "skills", "bad\u001bdir");

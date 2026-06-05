@@ -107,6 +107,13 @@ internal static class CommandSnapshot
     {
         value = value.Replace("\r\n", "\n");
 
+        // Normalize Windows separators to '/' so a single snapshot matches on every platform. This
+        // also collapses the doubled "\\" that JSON escaping produces, so the cwd/home tokens below
+        // (normalized the same way) still match inside JSON output.
+        value = value.Replace("\\\\", "/").Replace('\\', '/');
+        cwd = cwd.Replace('\\', '/');
+        home = home.Replace('\\', '/');
+
         // Replace the (more specific) working directory before home in case one nests the other.
         if (cwd.Length > 0)
         {
