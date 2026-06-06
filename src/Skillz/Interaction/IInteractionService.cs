@@ -65,7 +65,7 @@ internal interface IInteractionService
 
     Task<ImmutableArray<T>> SearchableMultiSelectAsync<T>(
         string title,
-        IReadOnlyList<SearchableSection<T>> sections,
+        IReadOnlyList<SearchableItem<T>> items,
         IEnumerable<T> preSelected,
         CancellationToken cancellationToken)
         where T : notnull;

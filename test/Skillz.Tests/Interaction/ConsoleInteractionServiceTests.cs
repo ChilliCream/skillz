@@ -306,38 +306,34 @@ public class ConsoleInteractionServiceTests
     }
 
     [Fact]
-    public async Task SearchableMultiSelectAsync_Should_ReturnAlwaysIncludedPlusSelectablePreSelected_When_NonInteractive()
+    public async Task SearchableMultiSelectAsync_Should_ReturnMandatoryUnionPreSelected_When_NonInteractive()
     {
-        // Arrange: a non-interactive console cannot drive the key loop, so the service must fall back
-        // to a deterministic selection without prompting.
+        // Arrange: a non-interactive console cannot drive the key loop, so the service must fall back to
+        // a deterministic selection without prompting: every mandatory item plus the pre-selected ones.
         using var console = new TestConsole();
         console.Profile.Capabilities.Interactive = false;
         var service = new ConsoleInteractionService(console);
 
-        var sections = new[]
+        var items = new[]
         {
-            new SearchableSection<string>(
-                "Universal",
-                AlwaysIncluded: true,
-                [("Codex", "codex"), ("OpenCode", "opencode")]),
-            new SearchableSection<string>(
-                "Additional",
-                AlwaysIncluded: false,
-                [("Claude Code", "claude-code"), ("Cursor", "cursor")])
+            new SearchableItem<string>("codex", "Codex (codex)", Mandatory: true, Note: "universal · .agents"),
+            new SearchableItem<string>("opencode", "OpenCode (opencode)", Mandatory: true, Note: "universal · .agents"),
+            new SearchableItem<string>("claude-code", "Claude Code (claude-code)"),
+            new SearchableItem<string>("cursor", "Cursor (cursor)")
         };
 
-        // "claude-code" IS selectable; "ghost" is in no section and must be dropped.
+        // Mandatory: codex, opencode (always included). Pre-selected: claude-code is an item; "ghost" is
+        // not an item and must be dropped. opencode appears in neither extra set but is mandatory.
         var preSelected = new[] { "claude-code", "ghost" };
 
         // Act
         var selected = await service.SearchableMultiSelectAsync(
             "Pick agents",
-            sections,
+            items,
             preSelected,
             TestContext.Current.CancellationToken);
 
-        // Assert: all always-included values (section order) plus only the selectable pre-selected
-        // value; the non-selectable "ghost" is filtered out.
+        // Assert: mandatory items union the pre-selected items, in item order; the non-item "ghost" is dropped.
         Assert.Equal(["codex", "opencode", "claude-code"], selected);
     }
 }

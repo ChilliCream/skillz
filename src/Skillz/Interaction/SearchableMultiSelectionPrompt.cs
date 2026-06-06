@@ -7,9 +7,9 @@ namespace Skillz.Interaction;
 /// <summary>
 /// A custom multi-select prompt with type-to-search, modelled on the npx-skills agent picker.
 /// Spectre's <c>MultiSelectionPrompt</c> has no search box, so we drive our own key loop over a
-/// <see cref="LiveDisplay"/>. "Always included" sections render as a static, non-navigable bullet
-/// list; the remaining sections form one filterable, toggleable list keyed by item index so
-/// duplicate labels never cross-select.
+/// <see cref="LiveDisplay"/>. It is one flat, filterable, toggleable list keyed by item index so
+/// duplicate labels never cross-select; mandatory items (e.g. universal agents) start selected, render
+/// their marker in blue, and cannot be toggled off.
 /// </summary>
 internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
 {
@@ -19,18 +19,8 @@ internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
     // Rows of the selectable list shown at once; the rest scroll with "N more" indicators.
     private const int WindowSize = 12;
 
-    // How many always-included items to spell out before collapsing into "...and N more".
-    private const int AlwaysIncludedPreviewCount = 8;
-
     private readonly string _title;
-    private readonly IReadOnlyList<SearchableSection<T>> _sections;
-
-    // Values that are always part of the result, in section order.
-    private readonly List<T> _alwaysIncluded = [];
-
-    // The flattened selectable items in section order; selection state is keyed by index here.
-    private readonly List<(string Label, T Value)> _selectable = [];
-
+    private readonly IReadOnlyList<SearchableItem<T>> _items;
     private readonly HashSet<int> _selected = [];
 
     private string _query = string.Empty;
@@ -38,31 +28,17 @@ internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
 
     public SearchableMultiSelectionPrompt(
         string title,
-        IReadOnlyList<SearchableSection<T>> sections,
+        IReadOnlyList<SearchableItem<T>> items,
         IEnumerable<T> preSelected)
     {
         _title = title;
-        _sections = sections;
-
-        foreach (var section in sections)
-        {
-            if (section.AlwaysIncluded)
-            {
-                foreach (var (_, value) in section.Items)
-                {
-                    _alwaysIncluded.Add(value);
-                }
-            }
-            else
-            {
-                _selectable.AddRange(section.Items);
-            }
-        }
+        _items = items;
 
         var preSelectedSet = new HashSet<T>(preSelected);
-        for (var i = 0; i < _selectable.Count; i++)
+        for (var i = 0; i < _items.Count; i++)
         {
-            if (preSelectedSet.Contains(_selectable[i].Value))
+            // Mandatory items start selected regardless of the caller's pre-selection.
+            if (_items[i].Mandatory || preSelectedSet.Contains(_items[i].Value))
             {
                 _selected.Add(i);
             }
@@ -71,7 +47,7 @@ internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
 
     public async Task<ImmutableArray<T>> ShowAsync(IAnsiConsole console, CancellationToken cancellationToken)
     {
-        var hasSelectable = _selectable.Count > 0;
+        var hasItems = _items.Count > 0;
 
         // LiveDisplay already takes the console's exclusivity lock; wrapping it in our own
         // RunExclusive would re-enter that lock and trip Spectre's "interactive functions running
@@ -94,8 +70,8 @@ internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
                     break;
                 }
 
-                // With no selectable items only Enter is meaningful; everything else is ignored.
-                if (hasSelectable)
+                // With no items only Enter is meaningful; everything else is ignored.
+                if (hasItems)
                 {
                     if (HandleKey(key))
                     {
@@ -145,7 +121,9 @@ internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
                 if (filtered.Count > 0 && _cursor >= 0 && _cursor < filtered.Count)
                 {
                     var target = filtered[_cursor];
-                    if (!_selected.Add(target))
+
+                    // The cursor may rest on a mandatory item, but space cannot deselect it.
+                    if (!_items[target].Mandatory && !_selected.Add(target))
                     {
                         _selected.Remove(target);
                     }
@@ -188,13 +166,15 @@ internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
     {
         if (_query.Length == 0)
         {
-            return [.. Enumerable.Range(0, _selectable.Count)];
+            return [.. Enumerable.Range(0, _items.Count)];
         }
 
         var result = new List<int>();
-        for (var i = 0; i < _selectable.Count; i++)
+        for (var i = 0; i < _items.Count; i++)
         {
-            if (_selectable[i].Label.Contains(_query, StringComparison.OrdinalIgnoreCase))
+            var item = _items[i];
+            if (item.Label.Contains(_query, StringComparison.OrdinalIgnoreCase)
+                || item.Note?.Contains(_query, StringComparison.OrdinalIgnoreCase) == true)
             {
                 result.Add(i);
             }
@@ -206,14 +186,13 @@ internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
     private ImmutableArray<T> BuildResult()
     {
         var builder = ImmutableArray.CreateBuilder<T>();
-        builder.AddRange(_alwaysIncluded);
 
-        // Selectable values in item order, regardless of the current filter.
-        for (var i = 0; i < _selectable.Count; i++)
+        // Selected values in item order, regardless of the current filter.
+        for (var i = 0; i < _items.Count; i++)
         {
             if (_selected.Contains(i))
             {
-                builder.Add(_selectable[i].Value);
+                builder.Add(_items[i].Value);
             }
         }
 
@@ -222,48 +201,27 @@ internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
 
     private IRenderable BuildRenderable()
     {
-        var rows = new List<IRenderable> { new Markup($"[bold]{Markup.Escape(_title)}[/]") };
-
-        foreach (var section in _sections)
+        var rows = new List<IRenderable>
         {
-            if (!section.AlwaysIncluded)
-            {
-                continue;
-            }
+            new Markup($"[bold]{Markup.Escape(_title)}[/]"),
+            new Markup($"[dim]Search:[/] {Markup.Escape(_query)}")
+        };
 
-            rows.Add(new Rule($"[dim]{Markup.Escape(section.Header)}[/]") { Justification = Justify.Left });
-            AppendAlwaysIncluded(rows, section.Items);
-        }
-
-        var selectableSection = _sections.FirstOrDefault(s => !s.AlwaysIncluded);
-        if (selectableSection is not null)
-        {
-            rows.Add(new Rule($"[dim]{Markup.Escape(selectableSection.Header)}[/]") { Justification = Justify.Left });
-        }
-
-        rows.Add(new Markup($"[dim]Search:[/] {Markup.Escape(_query)}"));
-        AppendSelectable(rows);
+        AppendItems(rows);
         rows.Add(new Markup("[dim]↑↓ move · space select · type to search · enter confirm[/]"));
         rows.Add(new Markup(BuildFooter()));
+        rows.Add(new Markup(BuildLegend()));
 
         return new Rows(rows);
     }
 
-    private static void AppendAlwaysIncluded(List<IRenderable> rows, IReadOnlyList<(string Label, T Value)> items)
-    {
-        var shown = Math.Min(AlwaysIncludedPreviewCount, items.Count);
-        for (var i = 0; i < shown; i++)
-        {
-            rows.Add(new Markup($"  [dim]•[/] {Markup.Escape(items[i].Label)}"));
-        }
+    // Legend for the three marker states, pinned to the bottom of the frame.
+    private static string BuildLegend()
+        => "[blue]●[/] [dim]universal (always included)[/]  "
+            + "[green]●[/] [dim]selected[/]  "
+            + "[dim]○ not selected[/]";
 
-        if (items.Count > shown)
-        {
-            rows.Add(new Markup($"  [dim]...and {items.Count - shown} more[/]"));
-        }
-    }
-
-    private void AppendSelectable(List<IRenderable> rows)
+    private void AppendItems(List<IRenderable> rows)
     {
         var filtered = GetFilteredIndices();
         if (filtered.Count == 0)
@@ -294,13 +252,29 @@ internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
         for (var pos = windowStart; pos < windowEnd; pos++)
         {
             var itemIndex = filtered[pos];
+            var item = _items[itemIndex];
             var isCursor = pos == _cursor;
             var isSelected = _selected.Contains(itemIndex);
             var pointer = isCursor ? "[cyan]❯[/]" : " ";
-            var marker = isSelected ? "[green]●[/]" : "[dim]○[/]";
-            var label = Markup.Escape(_selectable[itemIndex].Label);
-            var styledLabel = isCursor ? $"[invert]{label}[/]" : label;
-            rows.Add(new Markup($"{pointer} {marker} {styledLabel}"));
+
+            // Mandatory items render the marker in blue; others use green when selected, dim when not.
+            string marker;
+            if (item.Mandatory)
+            {
+                marker = "[blue]●[/]";
+            }
+            else
+            {
+                marker = isSelected ? "[green]●[/]" : "[dim]○[/]";
+            }
+
+            var label = Markup.Escape(item.Label);
+
+            // Underline the label under the cursor; the marker carries any mandatory styling on its own.
+            var styledLabel = isCursor ? $"[underline]{label}[/]" : label;
+
+            var note = item.Note is { } noteText ? $"  [dim]{Markup.Escape(noteText)}[/]" : string.Empty;
+            rows.Add(new Markup($"{pointer} {marker} {styledLabel}{note}"));
         }
 
         if (windowEnd < filtered.Count)
@@ -312,11 +286,12 @@ internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
     private string BuildFooter()
     {
         var selectedLabels = new List<string>();
-        for (var i = 0; i < _selectable.Count; i++)
+        for (var i = 0; i < _items.Count; i++)
         {
-            if (_selected.Contains(i))
+            // Mandatory items are always selected; omit them so the summary shows only the user's own picks.
+            if (_selected.Contains(i) && !_items[i].Mandatory)
             {
-                selectedLabels.Add(_selectable[i].Label);
+                selectedLabels.Add(_items[i].Label);
             }
         }
 

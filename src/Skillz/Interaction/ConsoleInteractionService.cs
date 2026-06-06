@@ -256,29 +256,23 @@ internal sealed class ConsoleInteractionService(IAnsiConsole? console = null) : 
 
     public async Task<ImmutableArray<T>> SearchableMultiSelectAsync<T>(
         string title,
-        IReadOnlyList<SearchableSection<T>> sections,
+        IReadOnlyList<SearchableItem<T>> items,
         IEnumerable<T> preSelected,
         CancellationToken cancellationToken)
         where T : notnull
     {
-        // Defensive: a non-interactive console can't drive the key loop. The executor never calls
-        // this path non-interactively, but if it ever does, fall back to the guaranteed selection.
+        // Defensive: a non-interactive console can't drive the key loop. Fall back to the
+        // pre-selected values plus every mandatory item, in item order.
         if (!_console.Profile.Capabilities.Interactive)
         {
-            var selectableValues = sections
-                .Where(s => !s.AlwaysIncluded)
-                .SelectMany(s => s.Items)
+            var preSelectedSet = new HashSet<T>(preSelected);
+            return items
+                .Where(item => item.Mandatory || preSelectedSet.Contains(item.Value))
                 .Select(item => item.Value)
-                .ToHashSet();
-
-            return sections
-                .Where(s => s.AlwaysIncluded)
-                .SelectMany(y => y.Items.Select(item => item.Value))
-                .Concat(preSelected.Where(selectableValues.Contains))
                 .ToImmutableArray();
         }
 
-        var prompt = new SearchableMultiSelectionPrompt<T>(title, sections, preSelected);
+        var prompt = new SearchableMultiSelectionPrompt<T>(title, items, preSelected);
         return await prompt.ShowAsync(_console, cancellationToken);
     }
 }

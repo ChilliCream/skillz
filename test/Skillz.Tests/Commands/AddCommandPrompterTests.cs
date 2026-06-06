@@ -128,14 +128,43 @@ public class AddCommandPrompterTests
     }
 
     [Fact]
-    public async Task SelectAgentsAsync_Should_PreSelectLastUsedAdditionalAgent_When_PreviouslySaved()
+    public async Task SelectAgentsAsync_Should_InterleaveUniversalsAlphabetically_When_Prompting()
     {
-        // Arrange: a prior run saved claude-code, the only additional (non-universal) agent here.
-        // opencode and codex are universal (.agents/skills) and are always included, never
-        // pre-selected as additional choices.
+        // Arrange: a deliberately shuffled mix where universals and non-universals must INTERLEAVE by
+        // display name, not group on top. cursor (Cursor) and warp (Warp) are universal (.agents/skills);
+        // claude-code (Claude Code) and goose (Goose) are not. Sorted by DisplayName the order is
+        // Claude Code, Cursor, Goose, Warp - i.e. non, universal, non, universal: the first row is a
+        // non-universal and the LAST row is a universal, which is impossible if universals were grouped first.
         var (prompter, interaction, globalLock) = CreatePrompter();
-        globalLock.OnGetLastSelectedAgents = () => ["claude-code"];
-        interaction.OnSearchableSelectByIndex = (_, _, _) => [];
+        globalLock.OnGetLastSelectedAgents = () => null;
+        interaction.OnSearchableSelectByIndex = (_, _) => [];
+
+        // Act
+        await prompter.SelectAgentsAsync(
+            ["warp", "claude-code", "goose", "cursor"],
+            global: false,
+            TestContext.Current.CancellationToken);
+
+        // Assert: one alphabetical list with universals in their natural position - mandatory + noted where
+        // universal, plain otherwise - proving the list is merged, not "universals first".
+        Assert.NotNull(interaction.LastSearchableItems);
+        Assert.Equal(
+            [
+                ("Claude Code (claude-code)", false, null),
+                ("Cursor (cursor)", true, "universal · .agents"),
+                ("Goose (goose)", false, null),
+                ("Warp (warp)", true, "universal · .agents")
+            ],
+            interaction.LastSearchableItems);
+    }
+
+    [Fact]
+    public async Task SelectAgentsAsync_Should_PreSelectLastUsedAvailableAgents_When_PreviouslySaved()
+    {
+        // Arrange: a prior run saved claude-code and opencode; both are still available.
+        var (prompter, interaction, globalLock) = CreatePrompter();
+        globalLock.OnGetLastSelectedAgents = () => ["claude-code", "opencode"];
+        interaction.OnSearchableSelectByIndex = (_, _) => [];
 
         // Act
         await prompter.SelectAgentsAsync(
@@ -143,19 +172,18 @@ public class AddCommandPrompterTests
             global: false,
             TestContext.Current.CancellationToken);
 
-        // Assert: the saved last-used additional agent is handed to the prompt as a pre-selection.
+        // Assert: the saved last-used agents (still available) are handed to the prompt as pre-selection.
         Assert.NotNull(interaction.LastPreSelected);
-        Assert.Equal(["claude-code"], interaction.LastPreSelected.Cast<string>());
+        Assert.Equal(["claude-code", "opencode"], interaction.LastPreSelected.Cast<string>());
     }
 
     [Fact]
-    public async Task SelectAgentsAsync_Should_DropUniversalAndUnavailableLastUsed_When_PreSelecting()
+    public async Task SelectAgentsAsync_Should_DropUnavailableLastUsed_When_PreSelecting()
     {
-        // Arrange: last-used includes a universal agent (always included, never pre-selected as an
-        // additional choice) and an agent that is no longer available.
+        // Arrange: last-used includes an agent that is no longer available; it must be dropped.
         var (prompter, interaction, globalLock) = CreatePrompter();
         globalLock.OnGetLastSelectedAgents = () => ["claude-code", "opencode", "uninstalled-agent"];
-        interaction.OnSearchableSelectByIndex = (_, _, _) => [];
+        interaction.OnSearchableSelectByIndex = (_, _) => [];
 
         // Act
         await prompter.SelectAgentsAsync(
@@ -163,19 +191,19 @@ public class AddCommandPrompterTests
             global: false,
             TestContext.Current.CancellationToken);
 
-        // Assert: only the still-available, additional last-used agent is pre-selected.
+        // Assert: only the still-available last-used agents are pre-selected.
         Assert.NotNull(interaction.LastPreSelected);
-        Assert.Equal(["claude-code"], interaction.LastPreSelected.Cast<string>());
+        Assert.Equal(["claude-code", "opencode"], interaction.LastPreSelected.Cast<string>());
     }
 
     [Fact]
-    public async Task SelectAgentsAsync_Should_PreSelectAdditionalCommonDefaults_When_NoLastUsedSaved()
+    public async Task SelectAgentsAsync_Should_PreSelectUniversalsPlusCommonDefaults_When_NoLastUsedSaved()
     {
-        // Arrange: no prior selection saved. Of the common defaults {claude-code, opencode, codex}
-        // only claude-code is additional (opencode and codex are universal).
+        // Arrange: no prior selection saved. The fallback pre-selection is all universals (opencode,
+        // codex) plus whichever of {claude-code, opencode, codex} are available - here claude-code.
         var (prompter, interaction, globalLock) = CreatePrompter();
         globalLock.OnGetLastSelectedAgents = () => null;
-        interaction.OnSearchableSelectByIndex = (_, _, _) => [];
+        interaction.OnSearchableSelectByIndex = (_, _) => [];
 
         // Act
         await prompter.SelectAgentsAsync(
@@ -183,21 +211,25 @@ public class AddCommandPrompterTests
             global: false,
             TestContext.Current.CancellationToken);
 
-        // Assert: falls back to the additional common defaults present in the available set.
+        // Assert: universals plus the common-default claude-code are pre-selected; augment is not.
         Assert.NotNull(interaction.LastPreSelected);
-        Assert.Equal(["claude-code"], interaction.LastPreSelected.Cast<string>());
+        Assert.Equal(
+            ["claude-code", "codex", "opencode"],
+            interaction.LastPreSelected.Cast<string>().OrderBy(a => a, StringComparer.Ordinal));
     }
 
     [Fact]
-    public async Task SelectAgentsAsync_Should_SaveUniversalsPlusChosenAdditional_When_AgentsChosen()
+    public async Task SelectAgentsAsync_Should_SaveChosenAgentsPlusMandatoryUniversals_When_AgentsChosen()
     {
-        // Arrange: user toggles the only additional agent (claude-code, selectable index 0).
-        // The universals (codex, opencode) are always included.
+        // Arrange: the merged list is DisplayName-ordered: Claude Code (claude-code, non-universal, index
+        // 0), Codex (codex, mandatory universal, index 1), OpenCode (opencode, mandatory universal, index 2).
+        // The user toggles only the non-universal claude-code at index 0; the mandatory universals are always
+        // part of the result regardless.
         var (prompter, interaction, globalLock) = CreatePrompter();
         ImmutableArray<string>? saved = null;
         globalLock.OnGetLastSelectedAgents = () => null;
         globalLock.OnSaveLastSelectedAgents = agents => saved = [.. agents];
-        interaction.OnSearchableSelectByIndex = (_, _, _) => [0];
+        interaction.OnSearchableSelectByIndex = (_, _) => [0];
 
         // Act
         var selected = await prompter.SelectAgentsAsync(
@@ -205,13 +237,10 @@ public class AddCommandPrompterTests
             global: false,
             TestContext.Current.CancellationToken);
 
-        // Assert: the result and the persisted set are the universals plus the chosen additional agent.
-        Assert.Equal(
-            ["claude-code", "codex", "opencode"],
-            selected.OrderBy(a => a, StringComparer.Ordinal));
+        // Assert: the result and the persisted set are the toggled agent plus the mandatory universals,
+        // in item (DisplayName) order.
+        Assert.Equal(["claude-code", "codex", "opencode"], selected);
         Assert.NotNull(saved);
-        Assert.Equal(
-            ["claude-code", "codex", "opencode"],
-            saved.Value.OrderBy(a => a, StringComparer.Ordinal));
+        Assert.Equal(["claude-code", "codex", "opencode"], saved.Value);
     }
 }

@@ -72,17 +72,22 @@ internal sealed class TestInteractionService : IInteractionService
     public IReadOnlyList<(string Group, IReadOnlyList<string> Items)>? LastGroupedStructure { get; private set; }
 
     /// <summary>
-    /// Selection hook for <see cref="SearchableMultiSelectAsync{T}"/>. Receives the title, the
-    /// always-included labels and the selectable labels (each in presentation order) and returns
-    /// the indices of the selectable items to select. When null, the selectable items whose value
-    /// is in <c>preSelected</c> are selected.
+    /// Selection hook for <see cref="SearchableMultiSelectAsync{T}"/>. Receives the title and the
+    /// item labels (in presentation order) and returns the indices of the items to select. When
+    /// null, the items whose value is in <c>preSelected</c> are selected.
     /// </summary>
     public Func<
         string,
         IReadOnlyList<string>,
-        IReadOnlyList<string>,
         IReadOnlyList<int>
     >? OnSearchableSelectByIndex { get; set; }
+
+    /// <summary>
+    /// Captures the items (label, mandatory flag, note) handed to the most recent
+    /// <c>SearchableMultiSelectAsync</c> call, so tests can assert the styling and order built by
+    /// the caller.
+    /// </summary>
+    public IReadOnlyList<(string Label, bool Mandatory, string? Note)>? LastSearchableItems { get; private set; }
 
     /// <summary>
     /// Captures the pre-selected values handed to the most recent <c>MultiSelectAsync</c> or
@@ -264,49 +269,47 @@ internal sealed class TestInteractionService : IInteractionService
 
     public Task<ImmutableArray<T>> SearchableMultiSelectAsync<T>(
         string title,
-        IReadOnlyList<SearchableSection<T>> sections,
+        IReadOnlyList<SearchableItem<T>> items,
         IEnumerable<T> preSelected,
         CancellationToken cancellationToken)
         where T : notnull
     {
         var preSelectedList = preSelected.ToList();
         LastPreSelected = preSelectedList.Cast<object>().ToList();
+        LastSearchableItems = items.Select(item => (item.Label, item.Mandatory, item.Note)).ToList();
 
-        // Always-included values are part of the result regardless of any selection, in section order.
-        var alwaysIncluded = sections
-            .Where(s => s.AlwaysIncluded)
-            .SelectMany(s => s.Items)
-            .Select(item => item.Value)
-            .ToList();
+        // Mandatory items are always selected in the real prompt and a hook can never deselect them.
+        // Seed the selection with every mandatory index so the double honours that contract.
+        var selectedIndices = new HashSet<int>();
+        for (var i = 0; i < items.Count; i++)
+        {
+            if (items[i].Mandatory)
+            {
+                selectedIndices.Add(i);
+            }
+        }
 
-        // The selectable items form one flat, index-addressable list (section order).
-        var selectable = sections.Where(s => !s.AlwaysIncluded).SelectMany(s => s.Items).ToList();
-
-        IReadOnlyList<int> selectedIndices;
         if (OnSearchableSelectByIndex is not null)
         {
-            var alwaysIncludedLabels = sections
-                .Where(s => s.AlwaysIncluded)
-                .SelectMany(s => s.Items)
-                .Select(item => item.Label)
-                .ToList();
-            var selectableLabels = selectable.Select(item => item.Label).ToList();
-            selectedIndices = OnSearchableSelectByIndex(title, alwaysIncludedLabels, selectableLabels);
+            var labels = items.Select(item => item.Label).ToList();
+            selectedIndices.UnionWith(OnSearchableSelectByIndex(title, labels));
         }
         else
         {
             var preSelectedSet = new HashSet<T>(preSelectedList);
-            selectedIndices = Enumerable
-                .Range(0, selectable.Count)
-                .Where(i => preSelectedSet.Contains(selectable[i].Value))
-                .ToList();
+            for (var i = 0; i < items.Count; i++)
+            {
+                if (preSelectedSet.Contains(items[i].Value))
+                {
+                    selectedIndices.Add(i);
+                }
+            }
         }
 
         var builder = ImmutableArray.CreateBuilder<T>();
-        builder.AddRange(alwaysIncluded);
         foreach (var index in selectedIndices.Order())
         {
-            builder.Add(selectable[index].Value);
+            builder.Add(items[index].Value);
         }
 
         return Task.FromResult(builder.ToImmutable());

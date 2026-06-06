@@ -24,6 +24,9 @@ internal sealed class AddCommandPrompter(
         ("Global (install in home directory)", true)
     ];
 
+    private static readonly ImmutableHashSet<string> s_defaultSelection =
+        ImmutableHashSet.Create(StringComparer.Ordinal, "claude-code", "opencode", "codex");
+
     public async Task<ImmutableArray<ResolvedSkill>> SelectSkillsAsync(
         ImmutableArray<ResolvedSkill> skills,
         CancellationToken cancellationToken)
@@ -74,28 +77,33 @@ internal sealed class AddCommandPrompter(
             return [];
         }
 
-        // Universal agents share .agents/skills and are always installed; only the rest are
-        // individually selectable. Both lists are sorted by display name for a stable picker.
-        var universal = available
-            .Where(registry.IsUniversalAgent)
+        // Universal agents share .agents/skills, so installing to them is mandatory: their rows are mandatory.
+        var ordered = available
             .OrderBy(a => registry.GetConfig(a).DisplayName, StringComparer.Ordinal)
             .ToList();
 
-        var additional = available
-            .Where(a => !registry.IsUniversalAgent(a))
-            .OrderBy(a => registry.GetConfig(a).DisplayName, StringComparer.Ordinal)
+        var items = ordered
+            .Select(a =>
+            {
+                var isUniversal = registry.IsUniversalAgent(a);
+                return new SearchableItem<string>(
+                    a,
+                    $"{registry.GetConfig(a).DisplayName} ({a})",
+                    Mandatory: isUniversal,
+                    Note: isUniversal ? "universal · .agents" : null);
+            })
             .ToList();
 
-        var additionalSet = new HashSet<string>(additional, StringComparer.Ordinal);
-
-        // Pre-selection applies only to the additional (selectable) set; universals are always in.
+        // Pre-selection: last-used (filtered to what's available) if any; otherwise all universals plus
+        // whichever common defaults are present.
         IReadOnlyList<string>? defaults = null;
         try
         {
             var lastUsed = await globalLock.GetLastSelectedAgentsAsync(cancellationToken);
             if (lastUsed is { Length: > 0 } lastUsedAgents)
             {
-                defaults = lastUsedAgents.Where(additionalSet.Contains).ToList();
+                var availableSet = new HashSet<string>(available, StringComparer.Ordinal);
+                defaults = lastUsedAgents.Where(availableSet.Contains).ToList();
                 if (defaults.Count == 0)
                 {
                     defaults = null;
@@ -107,32 +115,17 @@ internal sealed class AddCommandPrompter(
             // Swallow - best effort
         }
 
-        // If no last-used, fall back to whichever common defaults are in the additional set.
-        defaults ??= additional.Where(a => a is "claude-code" or "opencode" or "codex").ToList();
-
-        var sections = new List<SearchableSection<string>>();
-        if (universal.Count > 0)
-        {
-            sections.Add(
-                new SearchableSection<string>(
-                    "Universal (.agents/skills) - always included",
-                    AlwaysIncluded: true,
-                    universal.Select(a => ($"{registry.GetConfig(a).DisplayName} ({a})", a)).ToList()));
-        }
-
-        sections.Add(
-            new SearchableSection<string>(
-                "Additional agents",
-                AlwaysIncluded: false,
-                additional.Select(a => ($"{registry.GetConfig(a).DisplayName} ({a})", a)).ToList()));
+        defaults ??= ordered
+            .Where(a => registry.IsUniversalAgent(a) || s_defaultSelection.Contains(a))
+            .ToList();
 
         var selected = await interaction.SearchableMultiSelectAsync(
             "Which agents do you want to install to?",
-            sections,
+            items,
             defaults,
             cancellationToken);
 
-        // Save the full selection (universals + chosen additional) for next time.
+        // Save the selection for next time.
         if (selected.Length > 0)
         {
             try
