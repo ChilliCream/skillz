@@ -1,28 +1,28 @@
-using Skillz.Utils;
+using Skillz.Paths;
 using Xunit;
 
-namespace Skillz.Tests.Utils;
+namespace Skillz.Tests.Paths;
 
-public class PathUtilsTests
+public class SafePathDisplayTests
 {
     [Fact]
-    public void Shorten_Should_NotMangleSibling_When_PathSharesHomePrefixWithoutBoundary()
+    public void AbbreviateForDisplay_Should_NotMangleSibling_When_PathSharesHomePrefixWithoutBoundary()
     {
         // Arrange: home is a string-prefix of the path but NOT a directory ancestor
-        // (home=/home/bob, path=/home/bobby/...). The old code mangled this to "~by/...".
+        // (home=/home/bob, path=/home/bobby/...), so it must not be abbreviated to "~by/...".
         var sep = Path.DirectorySeparatorChar;
         var home = $"{sep}home{sep}bob";
         var path = $"{sep}home{sep}bobby{sep}skills{sep}alpha";
 
         // Act
-        var result = PathUtils.Shorten(path, home, cwd: null);
+        var result = SafePath.AbbreviateForDisplay(path, home, cwd: null);
 
         // Assert
         Assert.Equal(path, result);
     }
 
     [Fact]
-    public void Shorten_Should_NotMangleSibling_When_PathSharesCwdPrefixWithoutBoundary()
+    public void AbbreviateForDisplay_Should_NotMangleSibling_When_PathSharesCwdPrefixWithoutBoundary()
     {
         // Arrange
         var sep = Path.DirectorySeparatorChar;
@@ -30,14 +30,14 @@ public class PathUtilsTests
         var path = $"{sep}work{sep}project{sep}skills{sep}alpha";
 
         // Act
-        var result = PathUtils.Shorten(path, home: null, cwd: cwd);
+        var result = SafePath.AbbreviateForDisplay(path, home: null, cwd: cwd);
 
         // Assert
         Assert.Equal(path, result);
     }
 
     [Fact]
-    public void Shorten_Should_ShortenToTilde_When_PathIsWithinHome()
+    public void AbbreviateForDisplay_Should_ShortenToTilde_When_PathIsWithinHome()
     {
         // Arrange
         var sep = Path.DirectorySeparatorChar;
@@ -45,14 +45,14 @@ public class PathUtilsTests
         var path = $"{home}{sep}skills{sep}alpha";
 
         // Act
-        var result = PathUtils.Shorten(path, home, cwd: null);
+        var result = SafePath.AbbreviateForDisplay(path, home, cwd: null);
 
         // Assert
         Assert.Equal($"~{sep}skills{sep}alpha", result);
     }
 
     [Fact]
-    public void Shorten_Should_ShortenToDot_When_PathIsWithinCwd()
+    public void AbbreviateForDisplay_Should_ShortenToDot_When_PathIsWithinCwd()
     {
         // Arrange
         var sep = Path.DirectorySeparatorChar;
@@ -60,7 +60,7 @@ public class PathUtilsTests
         var path = $"{cwd}{sep}skills{sep}alpha";
 
         // Act
-        var result = PathUtils.Shorten(path, home: null, cwd: cwd);
+        var result = SafePath.AbbreviateForDisplay(path, home: null, cwd: cwd);
 
         // Assert
         Assert.Equal($".{sep}skills{sep}alpha", result);

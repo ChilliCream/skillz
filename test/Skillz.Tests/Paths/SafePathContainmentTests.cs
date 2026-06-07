@@ -1,23 +1,23 @@
-using Skillz.Plugins;
+using Skillz.Paths;
 using Xunit;
 
-namespace Skillz.Tests.Plugins;
+namespace Skillz.Tests.Paths;
 
-public class PathContainmentTests : IDisposable
+public class SafePathContainmentTests : IDisposable
 {
     private readonly string _root;
 
-    public PathContainmentTests()
+    public SafePathContainmentTests()
     {
         var root = Path.Combine(Path.GetTempPath(), "skillz-path-containment-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
 
         // Canonicalize the temp root so expectations built with Path.GetFullPath - which tidies a
-        // path string but does not follow symlinks - match RealPath's fully-resolved output. On macOS
+        // path string but does not follow symlinks - match SafePath's fully-resolved output. On macOS
         // the temp dir lives under /var, itself a symlink to /private/var; without this the two sides
         // would diverge only by that prefix. The symlinks each test creates under this root are still
         // resolved by the code under test, so the behavior being asserted is unaffected.
-        _root = RealPath.TryGetRealPath(root) ?? root;
+        _root = SafePath.ResolveExisting(root) ?? root;
     }
 
     public void Dispose()
@@ -29,117 +29,121 @@ public class PathContainmentTests : IDisposable
                 Directory.Delete(_root, recursive: true);
             }
         }
-        catch
+        catch (IOException)
+        {
+            // best-effort cleanup
+        }
+        catch (UnauthorizedAccessException)
         {
             // best-effort cleanup
         }
     }
 
     [Fact]
-    public void IsContainedIn_PathWithinBase_ReturnsTrue()
+    public void Contains_PathWithinBase_ReturnsTrue()
     {
         // Arrange
         var baseDir = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "skillz-base"));
         var target = Path.Combine(baseDir, "child", "skill");
 
         // Act & Assert
-        Assert.True(PathContainment.IsContainedIn(target, baseDir));
+        Assert.True(SafePath.Contains(baseDir, target, LeafPolicy.Follow));
     }
 
     [Fact]
-    public void IsContainedIn_PathAtBase_ReturnsTrue()
+    public void Contains_PathAtBase_ReturnsTrue()
     {
         // Arrange
         var baseDir = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "skillz-base"));
 
         // Act & Assert
-        Assert.True(PathContainment.IsContainedIn(baseDir, baseDir));
+        Assert.True(SafePath.Contains(baseDir, baseDir, LeafPolicy.Follow));
     }
 
     [Fact]
-    public void IsContainedIn_PathOutsideBase_ReturnsFalse()
+    public void Contains_PathOutsideBase_ReturnsFalse()
     {
         // Arrange
         var baseDir = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "skillz-base"));
         var target = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "elsewhere", "skill"));
 
         // Act & Assert
-        Assert.False(PathContainment.IsContainedIn(target, baseDir));
+        Assert.False(SafePath.Contains(baseDir, target, LeafPolicy.Follow));
     }
 
     [Fact]
-    public void IsContainedIn_PathTraversal_ReturnsFalse()
+    public void Contains_PathTraversal_ReturnsFalse()
     {
         // Arrange
         var baseDir = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "skillz-base"));
         var traversal = Path.Combine(baseDir, "..", "..", "etc");
 
         // Act & Assert
-        Assert.False(PathContainment.IsContainedIn(traversal, baseDir));
+        Assert.False(SafePath.Contains(baseDir, traversal, LeafPolicy.Follow));
     }
 
     [Fact]
-    public void IsContainedIn_SiblingDirectoryWithSamePrefix_ReturnsFalse()
+    public void Contains_SiblingDirectoryWithSamePrefix_ReturnsFalse()
     {
         // Arrange
         var baseDir = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "skillz-base"));
         var sibling = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "skillz-base-other"));
 
         // Act & Assert
-        Assert.False(PathContainment.IsContainedIn(sibling, baseDir));
+        Assert.False(SafePath.Contains(baseDir, sibling, LeafPolicy.Follow));
     }
 
     [Fact]
-    public void IsValidRelativePath_DotSlashPrefix_ReturnsTrue()
+    public void IsValidManifestRelativePath_DotSlashPrefix_ReturnsTrue()
     {
         // Act & Assert
-        Assert.True(PathContainment.IsValidRelativePath("./skills/foo"));
+        Assert.True(SafePath.IsValidManifestRelativePath("./skills/foo"));
     }
 
     [Fact]
-    public void IsValidRelativePath_NoPrefix_ReturnsFalse()
+    public void IsValidManifestRelativePath_NoPrefix_ReturnsFalse()
     {
         // Act & Assert
-        Assert.False(PathContainment.IsValidRelativePath("skills/foo"));
+        Assert.False(SafePath.IsValidManifestRelativePath("skills/foo"));
     }
 
     [Fact]
-    public void IsValidRelativePath_AbsolutePath_ReturnsFalse()
+    public void IsValidManifestRelativePath_AbsolutePath_ReturnsFalse()
     {
         // Act & Assert
-        Assert.False(PathContainment.IsValidRelativePath("/etc/passwd"));
+        Assert.False(SafePath.IsValidManifestRelativePath("/etc/passwd"));
     }
 
     [Fact]
-    public void IsValidRelativePath_ParentTraversal_ReturnsFalse()
+    public void IsValidManifestRelativePath_ParentTraversal_ReturnsFalse()
     {
         // Act & Assert
-        Assert.False(PathContainment.IsValidRelativePath("../outside"));
+        Assert.False(SafePath.IsValidManifestRelativePath("../outside"));
     }
 
     [Fact]
-    public void IsValidRelativePath_EmptyString_ReturnsFalse()
+    public void IsValidManifestRelativePath_EmptyString_ReturnsFalse()
     {
         // Act & Assert
-        Assert.False(PathContainment.IsValidRelativePath(string.Empty));
+        Assert.False(SafePath.IsValidManifestRelativePath(string.Empty));
     }
 
     [Fact]
-    public void IsValidRelativePath_ControlCharacter_ReturnsFalse()
+    public void IsValidManifestRelativePath_ControlCharacter_ReturnsFalse()
     {
         // Act & Assert
-        Assert.False(PathContainment.IsValidRelativePath("./skills/\u001bfoo"));
+        Assert.False(SafePath.IsValidManifestRelativePath("./skills/foo"));
     }
 
     [Fact]
-    public void IsValidRelativePath_NulByte_ReturnsFalse()
+    public void IsValidManifestRelativePath_NulByte_ReturnsFalse()
     {
         // A NUL would otherwise reach Path.Combine and crash discovery.
-        Assert.False(PathContainment.IsValidRelativePath("./skills/\0foo"));
+        Assert.False(SafePath.IsValidManifestRelativePath("./skills/\0foo"));
     }
 
     [Fact]
-    public void IsContainedInRealPath_SymlinkedBaseDirectory_ReturnsTrue()
+    public void Contains_SymlinkedBaseDirectory_ReturnsTrue()
     {
         // Arrange
         if (OperatingSystem.IsWindows())
@@ -153,11 +157,11 @@ public class PathContainmentTests : IDisposable
         Directory.CreateSymbolicLink(linkBase, realBase);
 
         // Act & Assert
-        Assert.True(PathContainment.IsContainedInRealPath(Path.Combine(linkBase, "child"), linkBase));
+        Assert.True(SafePath.Contains(linkBase, Path.Combine(linkBase, "child"), LeafPolicy.Preserve));
     }
 
     [Fact]
-    public void IsContainedInRealPath_SymlinkedParentEscapesBase_ReturnsFalse()
+    public void Contains_SymlinkedParentEscapesBase_ReturnsFalse()
     {
         // Arrange
         if (OperatingSystem.IsWindows())
@@ -172,11 +176,11 @@ public class PathContainmentTests : IDisposable
         Directory.CreateSymbolicLink(Path.Combine(baseDir, "link"), outside);
 
         // Act & Assert
-        Assert.False(PathContainment.IsContainedInRealPath(Path.Combine(baseDir, "link", "child"), baseDir));
+        Assert.False(SafePath.Contains(baseDir, Path.Combine(baseDir, "link", "child"), LeafPolicy.Preserve));
     }
 
     [Fact]
-    public void IsContainedInRealPath_ExistingTargetThroughSymlinkedParentEscapesBase_ReturnsFalse()
+    public void Contains_ExistingTargetThroughSymlinkedParentEscapesBase_ReturnsFalse()
     {
         // Arrange
         if (OperatingSystem.IsWindows())
@@ -191,11 +195,11 @@ public class PathContainmentTests : IDisposable
         Directory.CreateSymbolicLink(Path.Combine(baseDir, "link"), outside);
 
         // Act & Assert
-        Assert.False(PathContainment.IsContainedInRealPath(Path.Combine(baseDir, "link", "child"), baseDir));
+        Assert.False(SafePath.Contains(baseDir, Path.Combine(baseDir, "link", "child"), LeafPolicy.Preserve));
     }
 
     [Fact]
-    public void TryGetRealPath_ExistingTargetThroughSymlinkedParent_ReturnsResolvedPath()
+    public void ResolveExisting_ExistingTargetThroughSymlinkedParent_ReturnsResolvedPath()
     {
         // Arrange
         if (OperatingSystem.IsWindows())
@@ -209,14 +213,14 @@ public class PathContainmentTests : IDisposable
         Directory.CreateSymbolicLink(linkBase, realBase);
 
         // Act
-        var result = RealPath.TryGetRealPath(Path.Combine(linkBase, "child"));
+        var result = SafePath.ResolveExisting(Path.Combine(linkBase, "child"));
 
         // Assert
         Assert.Equal(Path.GetFullPath(Path.Combine(realBase, "child")), result);
     }
 
     [Fact]
-    public void IsContainedInRealPath_DeeplyNestedNonExistentTarget_ReturnsTrue()
+    public void Contains_DeeplyNestedNonExistentTarget_ReturnsTrue()
     {
         // Arrange
         var baseDir = Path.Combine(_root, "base");
@@ -225,11 +229,11 @@ public class PathContainmentTests : IDisposable
         var target = Path.Combine(baseDir, "a", "b", "c", "skill");
 
         // Act & Assert
-        Assert.True(PathContainment.IsContainedInRealPath(target, baseDir));
+        Assert.True(SafePath.Contains(baseDir, target, LeafPolicy.Preserve));
     }
 
     [Fact]
-    public void IsContainedInRealPath_PathTraversalAfterResolution_ReturnsFalse()
+    public void Contains_PathTraversalAfterResolution_ReturnsFalse()
     {
         // Arrange
         var baseDir = Path.Combine(_root, "base");
@@ -238,11 +242,11 @@ public class PathContainmentTests : IDisposable
         var target = Path.Combine(baseDir, "..", "outside", "skill");
 
         // Act & Assert
-        Assert.False(PathContainment.IsContainedInRealPath(target, baseDir));
+        Assert.False(SafePath.Contains(baseDir, target, LeafPolicy.Preserve));
     }
 
     [Fact]
-    public void IsContainedInRealPath_UsesPlatformCaseSensitivity()
+    public void Contains_UsesPlatformCaseSensitivity()
     {
         // Arrange
         var baseDir = Path.Combine(_root, "CaseBase");
@@ -250,30 +254,30 @@ public class PathContainmentTests : IDisposable
         var differentCaseTarget = Path.Combine(_root, "casebase", "child");
 
         // Act
-        var result = PathContainment.IsContainedInRealPath(differentCaseTarget, baseDir);
+        var result = SafePath.Contains(baseDir, differentCaseTarget, LeafPolicy.Preserve);
 
         // Assert
         Assert.Equal(!OperatingSystem.IsLinux(), result);
     }
 
     [Fact]
-    public void IsContainedInRealPath_SingleNonExistentLeaf_ReturnsTrue()
+    public void Contains_SingleNonExistentLeaf_ReturnsTrue()
     {
         // Arrange
-        // Regression: FileInfo.Attributes returns -1 for a non-existent path,
-        // which previously made the resolver treat every not-yet-created
-        // destination as unresolvable and reject the (normal) install.
+        // A not-yet-created destination must resolve: FileInfo.Attributes returns -1
+        // for a non-existent path, and that sentinel is guarded so a normal install
+        // target is not treated as unresolvable.
         var baseDir = Path.Combine(_root, "base");
         Directory.CreateDirectory(baseDir);
 
         var target = Path.Combine(baseDir, "skill-not-created-yet");
 
         // Act & Assert
-        Assert.True(PathContainment.IsContainedInRealPath(target, baseDir));
+        Assert.True(SafePath.Contains(baseDir, target, LeafPolicy.Preserve));
     }
 
     [Fact]
-    public void IsContainedInRealPath_LeafSymlinkPointingOutside_ReturnsTrue()
+    public void Contains_LeafSymlinkPointingOutside_ReturnsTrue()
     {
         // Arrange
         if (OperatingSystem.IsWindows())
@@ -282,10 +286,10 @@ public class PathContainmentTests : IDisposable
         }
 
         // The leaf is a symlink escaping the base, but it lives directly inside
-        // the base. Because we only resolve the parent chain (not the leaf), it
-        // is reported as contained - the caller replaces the link safely. This
-        // is what makes idempotent reinstall of a skillz-managed agent->canonical
-        // symlink work.
+        // the base. Because we only resolve the parent chain (not the leaf) under
+        // the Preserve policy, it is reported as contained - the caller replaces
+        // the link safely. This is what makes idempotent reinstall of a
+        // skillz-managed agent->canonical symlink work.
         var baseDir = Path.Combine(_root, "base");
         var outside = Path.Combine(_root, "outside");
         Directory.CreateDirectory(baseDir);
@@ -293,11 +297,11 @@ public class PathContainmentTests : IDisposable
         Directory.CreateSymbolicLink(Path.Combine(baseDir, "leaf"), outside);
 
         // Act & Assert
-        Assert.True(PathContainment.IsContainedInRealPath(Path.Combine(baseDir, "leaf"), baseDir));
+        Assert.True(SafePath.Contains(baseDir, Path.Combine(baseDir, "leaf"), LeafPolicy.Preserve));
     }
 
     [Fact]
-    public void ResolveWithNearestExistingParent_NonExistentTarget_ReturnsParentResolvedPath()
+    public void ResolveForCreate_NonExistentTarget_ReturnsParentResolvedPath()
     {
         // Arrange
         // Regression for the FileInfo.Attributes == -1 bug: a non-existent
@@ -323,7 +327,7 @@ public class PathContainmentTests : IDisposable
         var target = Path.Combine(baseForLookup, "a", "b", "skill");
 
         // Act
-        var resolved = RealPath.ResolveWithNearestExistingParent(target);
+        var resolved = SafePath.ResolveForCreate(target);
 
         // Assert
         Assert.Equal(Path.GetFullPath(Path.Combine(realBase, "a", "b", "skill")), resolved);

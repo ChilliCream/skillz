@@ -1,9 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Win32.SafeHandles;
+using Skillz;
+using Skillz.Paths;
 using Skillz.Sources;
 using Skillz.Sources.Providers;
 using Skillz.Tests.Net;
 using Skillz.Tests.TestServices;
+using Skillz.Utils;
 using Xunit;
 
 namespace Skillz.Tests.Sources.Providers;
@@ -579,4 +583,132 @@ public class WellKnownProviderTests
                 cancellationToken: TestContext.Current.CancellationToken)
         );
     }
+
+    [Fact]
+    public async Task Refuses_To_Write_Through_A_Symlinked_Legacy_Destination_Leaf()
+    {
+        // Arrange: the index lists a SKILL.md plus a references/README.md. The destination leaf
+        // for references/README.md is turned into a symlink that escapes the staging skill dir
+        // the instant its parent directory is created, so the write must refuse to follow it.
+        var handler = new StubHttpMessageHandler();
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/index.json",
+            """
+            {
+              "skills": [
+                {
+                  "name": "legacy-skill",
+                  "description": "Legacy skill.",
+                  "files": ["SKILL.md", "references/README.md"]
+                }
+              ]
+            }
+            """);
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/legacy-skill/SKILL.md",
+            LegacySkillMd,
+            contentType: "text/markdown");
+        handler.AddRoute(
+            "https://example.com/.well-known/agent-skills/legacy-skill/references/README.md",
+            "PAYLOAD-THAT-MUST-NOT-BE-WRITTEN-THROUGH",
+            contentType: "text/markdown");
+
+        var planting = new SymlinkPlantingFileStore("references/README.md", "/outside/escape-target");
+        var provider = new WellKnownProvider(new FakeHttpClientFactory(handler), planting);
+
+        // Act
+        var skills = await provider.FetchSkillsAsync(
+            new SkillSource.WellKnown("https://example.com"),
+            options: null,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: the skill is still resolved (SKILL.md wrote fine), but the symlinked leaf was
+        // refused - its payload bytes were never written and the escape target is untouched.
+        var skill = Assert.Single(skills);
+        Assert.Equal("legacy-skill", skill.InstallName);
+        Assert.True(planting.RefusedLeafWrite, "the symlinked destination leaf should have been refused");
+        Assert.DoesNotContain(
+            planting.Inner.Files,
+            pair => pair.Value.Length > 0
+                && Encoding.UTF8.GetString(pair.Value).Contains("PAYLOAD-THAT-MUST-NOT-BE-WRITTEN-THROUGH", StringComparison.Ordinal));
+    }
+}
+
+/// <summary>
+/// Wraps a <see cref="FakeFileStore"/> and, the moment the directory whose name matches the
+/// parent of <c>relativeLeak</c> is created, plants a symlink at <c>relativeLeak</c> pointing
+/// at an out-of-tree target. This makes the well-known legacy write's destination leaf a
+/// symlink right before the no-follow write runs, so the refusal can be asserted at the seam.
+/// </summary>
+file sealed class SymlinkPlantingFileStore(string relativeLeak, string escapeTarget) : IFileStore
+{
+    public FakeFileStore Inner { get; } = new();
+
+    public bool RefusedLeafWrite { get; private set; }
+
+    private readonly string _leakName = relativeLeak.Replace('\\', '/');
+
+    public void CreateDirectory(string path)
+    {
+        Inner.CreateDirectory(path);
+
+        // When the directory holding the leaked leaf is created, turn the leaf into an escaping
+        // symlink so the subsequent no-follow write must refuse it.
+        var normalized = path.Replace('\\', '/').TrimEnd('/');
+        var parentOfLeak = _leakName.Contains('/') ? _leakName[.._leakName.LastIndexOf('/')] : string.Empty;
+        if (parentOfLeak.Length > 0 && normalized.EndsWith("/" + parentOfLeak, StringComparison.Ordinal))
+        {
+            var leakRoot = normalized[..^(parentOfLeak.Length + 1)];
+            Inner.AddSymlink(leakRoot + "/" + _leakName, escapeTarget);
+        }
+    }
+
+    public Task WriteAllBytesNoFollowAsync(string path, byte[] bytes, string containRoot, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Inner.WriteAllBytesNoFollowAsync(path, bytes, containRoot, cancellationToken);
+        }
+        catch (CliException)
+        {
+            RefusedLeafWrite = true;
+            throw;
+        }
+    }
+
+    public bool PathExists(string path) => Inner.PathExists(path);
+
+    public bool IsSymlink(string path) => Inner.IsSymlink(path);
+
+    public bool FileExists(string path) => Inner.FileExists(path);
+
+    public bool DirectoryExists(string path) => Inner.DirectoryExists(path);
+
+    public void DeleteDirectory(string path, bool recursive) => Inner.DeleteDirectory(path, recursive);
+
+    public void DeleteFile(string path) => Inner.DeleteFile(path);
+
+    public void DeletePath(string path) => Inner.DeletePath(path);
+
+    public IEnumerable<string> EnumerateDirectories(string path) => Inner.EnumerateDirectories(path);
+
+    public bool IsDirectoryEmpty(string path) => Inner.IsDirectoryEmpty(path);
+
+    public Task<string> ReadAllTextAsync(string path, CancellationToken cancellationToken)
+        => Inner.ReadAllTextAsync(path, cancellationToken);
+
+    public Task WriteAllTextAsync(string path, string content, CancellationToken cancellationToken)
+        => Inner.WriteAllTextAsync(path, content, cancellationToken);
+
+    public Task WriteAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken)
+        => Inner.WriteAllBytesAsync(path, bytes, cancellationToken);
+
+    public SafeFileHandle OpenReadNoFollow(string path, string containRoot)
+        => Inner.OpenReadNoFollow(path, containRoot);
+
+    public Task<string> ReadAllTextNoFollowAsync(string path, string containRoot, CancellationToken cancellationToken)
+        => Inner.ReadAllTextNoFollowAsync(path, containRoot, cancellationToken);
+
+    public IEnumerable<WalkEntry> Walk(string root, WalkOptions options, CancellationToken cancellationToken)
+        => Inner.Walk(root, options, cancellationToken);
 }

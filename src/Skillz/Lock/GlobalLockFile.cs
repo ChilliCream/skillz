@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json.Serialization.Metadata;
 using Skillz.Install;
+using Skillz.Paths;
 
 namespace Skillz.Locking;
 
@@ -54,7 +55,9 @@ internal sealed class GlobalLockFile(XdgPaths xdgPaths, TimeProvider timeProvide
 
     private static bool IsPoisoned(string key, SkillLockEntry entry)
         => HasControl(key, entry.Source, entry.SkillPath, entry.Ref, entry.SourceUrl)
-            || IsUnsafeSkillPath(entry.SkillPath);
+            // A null/empty SkillPath is left untouched so existing lock entries are not
+            // retroactively invalidated.
+            || (!string.IsNullOrEmpty(entry.SkillPath) && SafePath.IsUnsafeStoredRelative(entry.SkillPath));
 
     public Task<SkillLockFile> ReadAsync(CancellationToken cancellationToken)
         => ReadFileAsync(xdgPaths.GetGlobalLockPath(), cancellationToken);

@@ -1,4 +1,6 @@
+using Microsoft.Win32.SafeHandles;
 using Skillz.Install;
+using Skillz.Paths;
 using Skillz.Skills;
 using Skillz.Tests.TestServices;
 using Skillz.Utils;
@@ -944,5 +946,17 @@ public class InstallerTests : IDisposable
 
         public Task WriteAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken)
             => _inner.WriteAllBytesAsync(path, bytes, cancellationToken);
+
+        public SafeFileHandle OpenReadNoFollow(string path, string containRoot)
+            => _inner.OpenReadNoFollow(path, containRoot);
+
+        public Task<string> ReadAllTextNoFollowAsync(string path, string containRoot, CancellationToken cancellationToken)
+            => _inner.ReadAllTextNoFollowAsync(path, containRoot, cancellationToken);
+
+        public Task WriteAllBytesNoFollowAsync(string path, byte[] bytes, string containRoot, CancellationToken cancellationToken)
+            => _inner.WriteAllBytesNoFollowAsync(path, bytes, containRoot, cancellationToken);
+
+        public IEnumerable<WalkEntry> Walk(string root, WalkOptions options, CancellationToken cancellationToken)
+            => _inner.Walk(root, options, cancellationToken);
     }
 }

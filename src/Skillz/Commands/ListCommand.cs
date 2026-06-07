@@ -3,7 +3,7 @@ using System.CommandLine;
 using System.Text.Json;
 using Skillz.Install;
 using Skillz.Interaction;
-using Skillz.Plugins;
+using Skillz.Paths;
 using Skillz.Skills;
 using Skillz.Utils;
 using Spectre.Console;
@@ -121,7 +121,7 @@ internal sealed class ListCommand(
 
             grid.AddRow(
                 $"[cyan]{Markup.Escape(skill.Name)}[/]",
-                $"[dim]{Markup.Escape(PathUtils.Shorten(skill.CanonicalPath, systemEnvironment.HomeDirectory, systemEnvironment.CurrentDirectory))}[/]",
+                $"[dim]{Markup.Escape(SafePath.AbbreviateForDisplay(skill.CanonicalPath, systemEnvironment.HomeDirectory, systemEnvironment.CurrentDirectory))}[/]",
                 agentCell);
         }
 
@@ -182,7 +182,7 @@ internal sealed class ListCommand(
             var agentDirFull = Path.GetFullPath(agentDir);
 
             // Skip if this agent's dir IS the canonical dir (universal agents)
-            if (string.Equals(agentDirFull, canonicalDirFull, PathContainment.Comparison))
+            if (string.Equals(agentDirFull, canonicalDirFull, SafePath.Comparison))
             {
                 continue;
             }

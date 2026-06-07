@@ -1,7 +1,7 @@
 using System.CommandLine;
 using Skillz.Install;
 using Skillz.Interaction;
-using Skillz.Plugins;
+using Skillz.Paths;
 using Skillz.Skills;
 using Skillz.Utils;
 using Spectre.Console;
@@ -49,7 +49,7 @@ internal sealed class InitCommand(
 
         // the sanitizer already neutralizes traversal, but verify the resolved directory stays
         // within cwd before writing.
-        if (hasName && !PathContainment.IsContainedInRealPath(skillDir, cwd))
+        if (hasName && !SafePath.Contains(cwd, skillDir, LeafPolicy.Preserve))
         {
             throw new CliException(
                 ExitCodeConstants.Failure,

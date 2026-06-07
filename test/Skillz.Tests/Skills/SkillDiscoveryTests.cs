@@ -9,12 +9,15 @@ namespace Skillz.Tests.Skills;
 public class SkillDiscoveryTests : IDisposable
 {
     private readonly string _testDir;
+    private readonly string _outsideDir;
     private readonly SkillDiscovery _discovery;
 
     public SkillDiscoveryTests()
     {
         _testDir = Path.Combine(Path.GetTempPath(), $"skillz-discovery-test-{Guid.NewGuid():N}");
+        _outsideDir = Path.Combine(Path.GetTempPath(), $"skillz-discovery-outside-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_testDir);
+        Directory.CreateDirectory(_outsideDir);
         var fileStore = new SystemFileStore();
         _discovery = new SkillDiscovery(
             new PluginManifest(fileStore),
@@ -29,6 +32,11 @@ public class SkillDiscoveryTests : IDisposable
         {
             Directory.Delete(_testDir, recursive: true);
         }
+
+        if (Directory.Exists(_outsideDir))
+        {
+            Directory.Delete(_outsideDir, recursive: true);
+        }
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -40,6 +48,43 @@ public class SkillDiscoveryTests : IDisposable
         File.WriteAllText(
             Path.Combine(dir, "SKILL.md"),
             $"---\nname: {name}\ndescription: {description}\n---\n\n# {name}\n");
+    }
+
+    private static string SkillMd(string name, string description)
+        => $"---\nname: {name}\ndescription: {description}\n---\n\n# {name}\n";
+
+    private static bool TryCreateDirectorySymlink(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryCreateFileSymlink(string link, string target)
+    {
+        try
+        {
+            File.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 
     [Fact]
@@ -176,6 +221,61 @@ public class SkillDiscoveryTests : IDisposable
         // Assert
         Assert.Single(skills);
         Assert.Equal("visible-skill", skills[0].Name);
+    }
+
+    [Fact]
+    public async Task Does_Not_Discover_Skill_Reached_Only_Through_OutOfTree_Directory_Symlink()
+    {
+        // Arrange: a valid skill lives OUTSIDE the repo tree; an in-tree directory symlink points
+        // at it. A malicious clone could plant exactly this to read e.g. ~/.ssh via discovery.
+        Directory.CreateDirectory(Path.Combine(_outsideDir, "secret-skill"));
+        File.WriteAllText(
+            Path.Combine(_outsideDir, "secret-skill", "SKILL.md"),
+            SkillMd("secret-skill", "Lives outside the repository tree"));
+
+        Directory.CreateDirectory(Path.Combine(_testDir, "skills"));
+        if (!TryCreateDirectorySymlink(Path.Combine(_testDir, "skills", "escape"), _outsideDir))
+        {
+            return; // platform refused symlink creation without privilege
+        }
+
+        // Act
+        var skills = await _discovery.DiscoverAsync(
+            _testDir,
+            subpath: null,
+            options: new SkillDiscoveryOptions(FullDepth: true),
+            cancellationToken: Token);
+
+        // Assert: the out-of-tree skill behind the symlink is never discovered.
+        Assert.DoesNotContain(skills, s => s.Name == "secret-skill");
+        Assert.Empty(skills);
+    }
+
+    [Fact]
+    public async Task Does_Not_Leak_OutOfTree_File_When_SkillMd_Is_A_Symlink_To_It()
+    {
+        // Arrange: a discovered, in-tree skill directory whose SKILL.md leaf is a symlink to an
+        // out-of-tree file. The symlinked leaf must be refused, not dereferenced into RawContent.
+        var secret = Path.Combine(_outsideDir, "secret.md");
+        File.WriteAllText(secret, SkillMd("leaked-secret", "This frontmatter must not be discovered"));
+
+        var skillDir = Path.Combine(_testDir, "skills", "leaky");
+        Directory.CreateDirectory(skillDir);
+        if (!TryCreateFileSymlink(Path.Combine(skillDir, "SKILL.md"), secret))
+        {
+            return; // platform refused symlink creation without privilege
+        }
+
+        // Act
+        var skills = await _discovery.DiscoverAsync(
+            _testDir,
+            subpath: null,
+            options: new SkillDiscoveryOptions(FullDepth: true),
+            cancellationToken: Token);
+
+        // Assert: the out-of-tree file's frontmatter never becomes a discovered skill.
+        Assert.DoesNotContain(skills, s => s.Name == "leaked-secret");
+        Assert.DoesNotContain(skills, s => s.RawContent is not null && s.RawContent.Contains("leaked-secret", StringComparison.Ordinal));
     }
 
     [Fact]

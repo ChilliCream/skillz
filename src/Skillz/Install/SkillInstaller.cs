@@ -1,4 +1,4 @@
-using Skillz.Plugins;
+using Skillz.Paths;
 using Skillz.Skills;
 using Skillz.Utils;
 
@@ -59,7 +59,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
         var canonicalBase = GetCanonicalSkillsDirectory(global, workingDirectory);
         var canonicalPath = Path.Combine(canonicalBase, sanitized);
 
-        if (!PathContainment.IsContainedInRealPath(canonicalPath, canonicalBase))
+        if (!SafePath.Contains(canonicalBase, canonicalPath, LeafPolicy.Preserve))
         {
             throw new InvalidOperationException("Invalid skill name: potential path traversal detected");
         }
@@ -73,7 +73,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
         var targetBase = GetAgentBaseDirectory(agentType, global, workingDirectory);
         var installPath = Path.Combine(targetBase, sanitized);
 
-        if (!PathContainment.IsContainedInRealPath(installPath, targetBase))
+        if (!SafePath.Contains(targetBase, installPath, LeafPolicy.Preserve))
         {
             throw new InvalidOperationException("Invalid skill name: potential path traversal detected");
         }
@@ -109,7 +109,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
         var agentBase = GetAgentBaseDirectory(agentType, isGlobal, workingDirectory);
         var agentDirectory = Path.Combine(agentBase, skillName);
 
-        if (!PathContainment.IsContainedInRealPath(canonicalDirectory, canonicalBase))
+        if (!SafePath.Contains(canonicalBase, canonicalDirectory, LeafPolicy.Preserve))
         {
             return new InstallResult(
                 false,
@@ -118,7 +118,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
                 Error: "Invalid skill name: potential path traversal detected");
         }
 
-        if (!PathContainment.IsContainedInRealPath(agentDirectory, agentBase))
+        if (!SafePath.Contains(agentBase, agentDirectory, LeafPolicy.Preserve))
         {
             return new InstallResult(
                 false,
@@ -149,7 +149,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
             {
                 var rootSegment = config.SkillsDirectory.Split('/', '\\')[0];
                 var agentRootDirectory = Path.Combine(workingDirectory, rootSegment);
-                if (!Directory.Exists(agentRootDirectory))
+                if (!fileStore.DirectoryExists(agentRootDirectory))
                 {
                     return new InstallResult(true, canonicalDirectory, canonicalDirectory, InstallMode.Symlink, Skipped: true);
                 }
@@ -177,20 +177,20 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
 
     private async Task MaterializeAsync(ResolvedSkill skill, string destinationDirectory, CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrEmpty(skill.SourcePath) && Directory.Exists(skill.SourcePath))
+        if (!string.IsNullOrEmpty(skill.SourcePath) && fileStore.DirectoryExists(skill.SourcePath))
         {
             await CopyDirectoryAsync(skill.SourcePath, destinationDirectory, cancellationToken);
         }
         else
         {
             var skillMd = Path.Combine(destinationDirectory, KnownConfigNames.SkillFileName);
-            await File.WriteAllTextAsync(skillMd, skill.Content, cancellationToken);
+            await fileStore.WriteAllTextAsync(skillMd, skill.Content, cancellationToken);
         }
     }
 
     private void CleanAndCreateDirectory(string path, string containmentBase)
     {
-        if (!PathContainment.IsContainedInRealPath(path, containmentBase))
+        if (!SafePath.Contains(containmentBase, path, LeafPolicy.Preserve))
         {
             throw new InvalidOperationException("Install destination escapes its expected root");
         }
@@ -233,7 +233,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
     private static async Task CopyDirectoryAsync(string src, string dest, CancellationToken cancellationToken)
     {
         var sourceRoot =
-            RealPath.TryGetRealPath(src)
+            SafePath.ResolveExisting(src)
             ?? throw new InvalidOperationException($"Source path cannot be resolved: {src}");
 
         await CopyDirectoryAsync(src, dest, sourceRoot, depth: 0, cancellationToken);
@@ -316,7 +316,7 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
             throw new InvalidOperationException($"Refusing to copy broken symlink: {entry.FullName}");
         }
 
-        if (!PathContainment.IsContainedInRealPath(resolved.FullName, sourceRoot))
+        if (!SafePath.Contains(sourceRoot, resolved.FullName, LeafPolicy.Preserve))
         {
             throw new InvalidOperationException($"Refusing to copy symlink outside source root: {entry.FullName}");
         }
@@ -357,22 +357,24 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
             var resolvedTarget = Path.GetFullPath(target);
             var resolvedLinkPath = Path.GetFullPath(linkPath);
 
-            // Fully resolve symlinks on both. If they already point at the same place, the
-            // link we want effectively exists - nothing to do.
-            var realTarget = RealPath.TryGetRealPath(resolvedTarget) ?? resolvedTarget;
-            var realLinkPath = RealPath.TryGetRealPath(resolvedLinkPath) ?? resolvedLinkPath;
+            // Resolve symlinks on both, resolving a missing leaf through its nearest existing
+            // parent so an absent target/link is not left as an unresolved lexical path.
+            // If they already point at the same place, the link we want effectively exists -
+            // nothing to do.
+            var realTarget = SafePath.ResolveForCreate(resolvedTarget) ?? resolvedTarget;
+            var realLinkPath = SafePath.ResolveForCreate(resolvedLinkPath) ?? resolvedLinkPath;
 
-            if (PathEquals(realTarget, realLinkPath))
+            if (SafePath.PathEquals(realTarget, realLinkPath))
             {
                 return true;
             }
 
-            // Same check, resolving only the nearest existing parents - handles the case where
-            // the leaf (link or target) does not exist on disk yet.
-            var realTargetWithParents = RealPath.ResolveWithNearestExistingParent(target) ?? resolvedTarget;
-            var realLinkPathWithParents = RealPath.ResolveWithNearestExistingParent(linkPath) ?? resolvedLinkPath;
+            // Same check from the original (un-normalized) endpoints, resolving the nearest
+            // existing parents - handles the case where the leaf does not exist on disk yet.
+            var realTargetWithParents = SafePath.ResolveForCreate(target) ?? resolvedTarget;
+            var realLinkPathWithParents = SafePath.ResolveForCreate(linkPath) ?? resolvedLinkPath;
 
-            if (PathEquals(realTargetWithParents, realLinkPathWithParents))
+            if (SafePath.PathEquals(realTargetWithParents, realLinkPathWithParents))
             {
                 return true;
             }
@@ -388,10 +390,10 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
             // Mixing a resolved dir with a raw target yields a link that breaks when a parent is
             // a symlink.
             var realLinkDir =
-                RealPath.ResolveWithNearestExistingParent(linkDir ?? string.Empty)
+                SafePath.ResolveForCreate(linkDir ?? string.Empty)
                 ?? Path.GetFullPath(linkDir ?? string.Empty);
             var realTargetForLink =
-                RealPath.ResolveWithNearestExistingParent(target) ?? Path.GetFullPath(target);
+                SafePath.ResolveForCreate(target) ?? Path.GetFullPath(target);
             var relativePath = Path.GetRelativePath(realLinkDir, realTargetForLink);
 
             // Create the relative symlink. This is the only filesystem mutation here:
@@ -427,9 +429,9 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
         // The destination already resolves to the canonical store (a universal agent whose skills
         // dir IS the store, or an agent skills dir that is itself a symlink into it). It already
         // holds the content - leave it untouched; the symlink step is then a no-op.
-        var realPath = RealPath.ResolveWithNearestExistingParent(path);
-        var realCanonical = RealPath.ResolveWithNearestExistingParent(canonicalDirectory);
-        if (realPath is not null && realCanonical is not null && PathEquals(realPath, realCanonical))
+        var realPath = SafePath.ResolveForCreate(path);
+        var realCanonical = SafePath.ResolveForCreate(canonicalDirectory);
+        if (realPath is not null && realCanonical is not null && SafePath.PathEquals(realPath, realCanonical))
         {
             return;
         }
@@ -475,10 +477,5 @@ internal sealed class SkillInstaller(AgentRegistry registry, ISystemEnvironment 
                 title: "Install destination could not be cleaned",
                 hint: "Remove or fix permissions on the destination and try again.");
         }
-    }
-
-    private static bool PathEquals(string a, string b)
-    {
-        return string.Equals(a, b, PathContainment.Comparison);
     }
 }

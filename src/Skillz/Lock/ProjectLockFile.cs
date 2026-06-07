@@ -1,6 +1,5 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json.Serialization.Metadata;
+using Skillz.Paths;
 
 namespace Skillz.Locking;
 
@@ -54,7 +53,9 @@ internal sealed class ProjectLockFile : JsonLockFile<LocalSkillLockFile>, IProje
 
     private static bool IsPoisoned(string key, LocalSkillLockEntry entry)
         => HasControl(key, entry.Source, entry.SkillPath, entry.Ref)
-            || IsUnsafeSkillPath(entry.SkillPath);
+            // A null/empty SkillPath is left untouched so existing lock entries are not
+            // retroactively invalidated.
+            || (!string.IsNullOrEmpty(entry.SkillPath) && SafePath.IsUnsafeStoredRelative(entry.SkillPath));
 
     public string GetLockPath(string? cwd = null)
         => Path.Combine(cwd ?? Directory.GetCurrentDirectory(), LockFileName);
@@ -93,62 +94,5 @@ internal sealed class ProjectLockFile : JsonLockFile<LocalSkillLockFile>, IProje
     }
 
     public Task<string> ComputeSkillFolderHashAsync(string skillDirectory, CancellationToken cancellationToken)
-    {
-        var relativePaths = new List<string>();
-        CollectFiles(skillDirectory, skillDirectory, relativePaths, cancellationToken);
-        relativePaths.Sort(StringComparer.Ordinal);
-
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        Span<byte> buffer = stackalloc byte[8192];
-        foreach (var relativePath in relativePaths)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            hash.AppendData(Encoding.UTF8.GetBytes(relativePath));
-
-            var fullPath = Path.Combine(skillDirectory, relativePath.Replace('/', Path.DirectorySeparatorChar));
-            using var handle = File.OpenHandle(fullPath);
-            long offset = 0;
-            int read;
-            while ((read = RandomAccess.Read(handle, buffer, offset)) > 0)
-            {
-                hash.AppendData(buffer[..read]);
-                offset += read;
-            }
-        }
-
-        var bytes = hash.GetHashAndReset();
-#if NET9_0_OR_GREATER
-        return Task.FromResult(Convert.ToHexStringLower(bytes));
-#else
-        return Task.FromResult(Convert.ToHexString(bytes).ToLowerInvariant());
-#endif
-    }
-
-    private static void CollectFiles(
-        string baseDir,
-        string currentDir,
-        List<string> results,
-        CancellationToken cancellationToken)
-    {
-        foreach (var entry in Directory.EnumerateFileSystemEntries(currentDir))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var name = Path.GetFileName(entry);
-
-            if (Directory.Exists(entry))
-            {
-                if (name.EqualsOrdinal(".git")
-                    || name.EqualsOrdinal("node_modules"))
-                {
-                    continue;
-                }
-
-                CollectFiles(baseDir, entry, results, cancellationToken);
-            }
-            else if (File.Exists(entry))
-            {
-                results.Add(Path.GetRelativePath(baseDir, entry).Replace('\\', '/'));
-            }
-        }
-    }
+        => Task.FromResult(SafeTreeHash.ComputeTreeHash(skillDirectory, cancellationToken));
 }

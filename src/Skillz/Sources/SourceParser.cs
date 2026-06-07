@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text.RegularExpressions;
+using Skillz.Paths;
 using Skillz.Skills;
 
 namespace Skillz.Sources;
@@ -114,7 +115,7 @@ internal sealed partial class SourceParser : ISourceParser
             return new SkillSource.GitHub(
                 Url: $"https://github.com/{owner}/{repo}.git",
                 Ref: !string.IsNullOrEmpty(refValue) ? refValue : fragmentRef,
-                Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.ValidateSubpath(subpath) : subpath);
+                Subpath: !string.IsNullOrEmpty(subpath) ? SafePath.ValidateNoTraversal(subpath) : subpath);
         }
 
         var githubTreeMatch = GitHubTreeRegex().Match(input);
@@ -150,7 +151,7 @@ internal sealed partial class SourceParser : ISourceParser
                 return new SkillSource.GitLab(
                     Url: $"{protocol}://{hostname}/{TrailingGitRegex().Replace(repoPath, string.Empty)}.git",
                     Ref: !string.IsNullOrEmpty(refValue) ? refValue : fragmentRef,
-                    Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.ValidateSubpath(subpath) : subpath);
+                    Subpath: !string.IsNullOrEmpty(subpath) ? SafePath.ValidateNoTraversal(subpath) : subpath);
             }
         }
 
@@ -206,7 +207,7 @@ internal sealed partial class SourceParser : ISourceParser
             return new SkillSource.GitHub(
                 Url: $"https://github.com/{owner}/{repo}.git",
                 Ref: fragmentRef,
-                Subpath: !string.IsNullOrEmpty(subpath) ? SubpathValidator.ValidateSubpath(subpath) : null,
+                Subpath: !string.IsNullOrEmpty(subpath) ? SafePath.ValidateNoTraversal(subpath) : null,
                 SkillFilter: !string.IsNullOrEmpty(fragmentSkillFilter) ? fragmentSkillFilter : null);
         }
 

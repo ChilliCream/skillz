@@ -3,7 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Skillz.Plugins;
+using Skillz.Paths;
 using Skillz.Skills;
 using Skillz.Utils;
 
@@ -305,7 +305,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
                         continue;
                     }
 
-                    if (!IsSafeLegacyFilePath(relativeFile))
+                    if (!SafePath.IsValidStoredRelative(relativeFile))
                     {
                         continue;
                     }
@@ -333,7 +333,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
                             skillDir,
                             normalizedRelative.Replace('/', Path.DirectorySeparatorChar));
 
-                        if (!PathContainment.IsContainedInRealPath(destination, skillDir))
+                        if (!SafePath.Contains(skillDir, destination, LeafPolicy.Preserve))
                         {
                             continue;
                         }
@@ -344,10 +344,14 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
                             fileStore.CreateDirectory(parent);
                         }
 
-                        await fileStore.WriteAllBytesAsync(destination, bytes, cancellationToken);
+                        // No-follow write: a destination whose leaf is a symlink pointing
+                        // outside skillDir is refused rather than written through. Skip that one
+                        // file on refusal, matching the containment-failure continue above.
+                        await fileStore.WriteAllBytesNoFollowAsync(destination, bytes, skillDir, cancellationToken);
                     }
                     catch (HttpRequestException) { }
                     catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested) { }
+                    catch (CliException) { }
                 }
             }
 
@@ -481,28 +485,6 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
         return true;
     }
 
-    private static bool IsSafeLegacyFilePath(string filePath)
-    {
-        if (string.IsNullOrEmpty(filePath))
-        {
-            return false;
-        }
-
-        if (filePath.StartsWith('/')
-            || filePath.StartsWith('\\')
-            || filePath.ContainsOrdinal(".."))
-        {
-            return false;
-        }
-
-        if (filePath.ContainsControlCharacter())
-        {
-            return false;
-        }
-
-        return true;
-    }
-
     private static bool IsValidSkillEntryV1(WellKnownIndexEntry entry)
     {
         if (!IsValidSkillName(entry.Name))
@@ -522,7 +504,7 @@ internal sealed partial class WellKnownProvider(IHttpClientFactory httpClientFac
 
         foreach (var file in entry.Files)
         {
-            if (!IsSafeLegacyFilePath(file))
+            if (!SafePath.IsValidStoredRelative(file))
             {
                 return false;
             }
