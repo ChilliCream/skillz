@@ -1,13 +1,14 @@
-using Skillz.Skills;
+using Skillz;
+using Skillz.Paths;
 using Xunit;
 
-namespace Skillz.Tests.Skills;
+namespace Skillz.Tests.Paths;
 
-public class SubpathValidatorTests : IDisposable
+public class SafePathTraversalTests : IDisposable
 {
     private readonly string _root;
 
-    public SubpathValidatorTests()
+    public SafePathTraversalTests()
     {
         _root = Path.Combine(Path.GetTempPath(), "skillz-subpath-validator-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(_root);
@@ -22,20 +23,27 @@ public class SubpathValidatorTests : IDisposable
                 Directory.Delete(_root, recursive: true);
             }
         }
-        catch
+        catch (IOException)
+        {
+            // best-effort cleanup
+        }
+        catch (UnauthorizedAccessException)
         {
             // best-effort cleanup
         }
     }
 
+    private static bool IsSubpathSafe(string basePath, string subpath)
+        => SafePath.Contains(basePath, Path.Combine(basePath, subpath), LeafPolicy.Follow);
+
     [Theory]
     [InlineData("skills/my-skill")]
     [InlineData("path/to/skill")]
     [InlineData("src")]
-    public void ValidateSubpath_Allows_Normal_Subpaths(string input)
+    public void ValidateNoTraversal_Allows_Normal_Subpaths(string input)
     {
         // Act & Assert
-        Assert.Equal(input, SubpathValidator.ValidateSubpath(input));
+        Assert.Equal(input, SafePath.ValidateNoTraversal(input));
     }
 
     [Theory]
@@ -43,10 +51,10 @@ public class SubpathValidatorTests : IDisposable
     [InlineData("../../etc/passwd")]
     [InlineData("skills/../../etc")]
     [InlineData("a/b/../../../etc")]
-    public void ValidateSubpath_Rejects_DotDot_Segments(string input)
+    public void ValidateNoTraversal_Rejects_DotDot_Segments(string input)
     {
         // Act
-        var ex = Assert.Throws<CliException>(() => SubpathValidator.ValidateSubpath(input));
+        var ex = Assert.Throws<CliException>(() => SafePath.ValidateNoTraversal(input));
 
         // Assert
         Assert.Contains("Unsafe subpath", ex.Message, StringComparison.Ordinal);
@@ -55,10 +63,10 @@ public class SubpathValidatorTests : IDisposable
     [Theory]
     [InlineData("..\\etc")]
     [InlineData("..\\..\\secret")]
-    public void ValidateSubpath_Rejects_Backslash_Traversal(string input)
+    public void ValidateNoTraversal_Rejects_Backslash_Traversal(string input)
     {
         // Act
-        var ex = Assert.Throws<CliException>(() => SubpathValidator.ValidateSubpath(input));
+        var ex = Assert.Throws<CliException>(() => SafePath.ValidateNoTraversal(input));
 
         // Assert
         Assert.Contains("Unsafe subpath", ex.Message, StringComparison.Ordinal);
@@ -70,20 +78,20 @@ public class SubpathValidatorTests : IDisposable
     [InlineData("path/to/.config")]
     [InlineData("..skill")]
     [InlineData("skill..")]
-    public void ValidateSubpath_Allows_Dots_That_Are_Not_Traversal(string input)
+    public void ValidateNoTraversal_Allows_Dots_That_Are_Not_Traversal(string input)
     {
         // Act & Assert
-        Assert.Equal(input, SubpathValidator.ValidateSubpath(input));
+        Assert.Equal(input, SafePath.ValidateNoTraversal(input));
     }
 
     [Theory]
     [InlineData("/tmp/repo", "skills")]
     [InlineData("/tmp/repo", "skills/my-skill")]
     [InlineData("/tmp/repo", "a/b/c")]
-    public void IsSubpathSafe_Returns_True_For_Subpaths_Within_BasePath(string basePath, string subpath)
+    public void Contains_Returns_True_For_Subpaths_Within_BasePath(string basePath, string subpath)
     {
         // Act & Assert
-        Assert.True(SubpathValidator.IsSubpathSafe(basePath, subpath));
+        Assert.True(IsSubpathSafe(basePath, subpath));
     }
 
     [Theory]
@@ -91,32 +99,31 @@ public class SubpathValidatorTests : IDisposable
     [InlineData("/tmp/repo", "../etc")]
     [InlineData("/tmp/repo", "../../etc/passwd")]
     [InlineData("/tmp/repo", "skills/../../..")]
-    public void IsSubpathSafe_Returns_False_For_Subpaths_Escaping_BasePath(string basePath, string subpath)
+    public void Contains_Returns_False_For_Subpaths_Escaping_BasePath(string basePath, string subpath)
     {
         // Act & Assert
-        Assert.False(SubpathValidator.IsSubpathSafe(basePath, subpath));
+        Assert.False(IsSubpathSafe(basePath, subpath));
     }
 
     [Fact]
-    public void IsSubpathSafe_Rejects_Any_DotDot_Segment_Even_When_It_Stays_Within()
+    public void Contains_Rejects_Any_DotDot_Segment_Even_When_It_Stays_Within()
     {
         // A ".." segment is rejected up front: it can never be trusted before
         // symlink resolution (Path.GetFullPath would collapse it lexically and
-        // hide an escaping symlinked parent), and the source spec already
-        // rejects ".." earlier via ValidateSubpath.
-        Assert.False(SubpathValidator.IsSubpathSafe("/tmp/repo", "skills/../other"));
-        Assert.False(SubpathValidator.IsSubpathSafe("/tmp/repo", "skills/.."));
+        // hide an escaping symlinked parent).
+        Assert.False(IsSubpathSafe("/tmp/repo", "skills/../other"));
+        Assert.False(IsSubpathSafe("/tmp/repo", "skills/.."));
     }
 
     [Fact]
-    public void IsSubpathSafe_Allows_Single_Dot_Resolving_To_BasePath()
+    public void Contains_Allows_Single_Dot_Resolving_To_BasePath()
     {
         // Act & Assert
-        Assert.True(SubpathValidator.IsSubpathSafe("/tmp/repo", "."));
+        Assert.True(IsSubpathSafe("/tmp/repo", "."));
     }
 
     [Fact]
-    public void IsSubpathSafe_Returns_False_When_Subpath_Is_Symlink_Escaping_BasePath()
+    public void Contains_Returns_False_When_Subpath_Is_Symlink_Escaping_BasePath()
     {
         // Arrange
         if (OperatingSystem.IsWindows())
@@ -132,11 +139,11 @@ public class SubpathValidatorTests : IDisposable
         Directory.CreateSymbolicLink(Path.Combine(baseDir, "link"), outside);
 
         // Act & Assert
-        Assert.False(SubpathValidator.IsSubpathSafe(baseDir, "link"));
+        Assert.False(IsSubpathSafe(baseDir, "link"));
     }
 
     [Fact]
-    public void IsSubpathSafe_Returns_False_When_Subpath_Passes_Through_Symlinked_Parent_Escaping_BasePath()
+    public void Contains_Returns_False_When_Subpath_Passes_Through_Symlinked_Parent_Escaping_BasePath()
     {
         // Arrange
         if (OperatingSystem.IsWindows())
@@ -152,33 +159,33 @@ public class SubpathValidatorTests : IDisposable
         Directory.CreateSymbolicLink(Path.Combine(baseDir, "link"), outside);
 
         // Act & Assert
-        Assert.False(SubpathValidator.IsSubpathSafe(baseDir, "link/skill"));
+        Assert.False(IsSubpathSafe(baseDir, "link/skill"));
     }
 
     [Fact]
-    public void IsSubpathSafe_Returns_True_When_Subpath_Is_Legitimate_Nested_RealSubdir()
+    public void Contains_Returns_True_When_Subpath_Is_Legitimate_Nested_RealSubdir()
     {
         // Arrange
         var baseDir = Path.Combine(_root, "repo");
         Directory.CreateDirectory(Path.Combine(baseDir, "skills", "my-skill"));
 
         // Act & Assert
-        Assert.True(SubpathValidator.IsSubpathSafe(baseDir, "skills/my-skill"));
+        Assert.True(IsSubpathSafe(baseDir, "skills/my-skill"));
     }
 
     [Fact]
-    public void IsSubpathSafe_Returns_False_When_Subpath_Contains_DotDot_Traversal()
+    public void Contains_Returns_False_When_Subpath_Contains_DotDot_Traversal()
     {
         // Arrange
         var baseDir = Path.Combine(_root, "repo");
         Directory.CreateDirectory(baseDir);
 
         // Act & Assert
-        Assert.False(SubpathValidator.IsSubpathSafe(baseDir, "../outside"));
+        Assert.False(IsSubpathSafe(baseDir, "../outside"));
     }
 
     [Fact]
-    public void IsSubpathSafe_Returns_True_When_Subpath_Is_Symlink_Staying_Within_BasePath()
+    public void Contains_Returns_True_When_Subpath_Is_Symlink_Staying_Within_BasePath()
     {
         // Arrange
         if (OperatingSystem.IsWindows())
@@ -192,6 +199,6 @@ public class SubpathValidatorTests : IDisposable
         Directory.CreateSymbolicLink(Path.Combine(baseDir, "link"), Path.Combine(baseDir, "real-skill"));
 
         // Act & Assert
-        Assert.True(SubpathValidator.IsSubpathSafe(baseDir, "link"));
+        Assert.True(IsSubpathSafe(baseDir, "link"));
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 using Skillz.Install;
+using Skillz.Paths;
 using Skillz.Plugins;
 using Skillz.Utils;
 
@@ -86,7 +87,10 @@ internal sealed class SkillDiscovery(
         options ??= SkillDiscoveryOptions.Default;
 
         // Reject a subpath that would resolve outside the base repository directory.
-        if (subpath is not null && !SubpathValidator.IsSubpathSafe(basePath, subpath))
+        // SafePath.Contains rejects any ".." segment before resolving, so the reject
+        // happens before any containment resolution.
+        if (subpath is not null
+            && !SafePath.Contains(basePath, Path.Combine(basePath, subpath), LeafPolicy.Follow))
         {
             throw new CliException(
                 ExitCodeConstants.Failure,
@@ -107,7 +111,7 @@ internal sealed class SkillDiscovery(
                 return;
             }
 
-            var skill = await ParseSkillMdAsync(Path.Combine(dir, KnownConfigNames.SkillFileName), cancellationToken);
+            var skill = await ParseSkillMdAsync(dir, cancellationToken);
 
             if (skill is null)
             {
@@ -142,7 +146,7 @@ internal sealed class SkillDiscovery(
         // If we found nothing and didn't do a full scan yet, fall back to a crawl of the entire tree up to a max depth.
         if (skills.Count == 0 || options.FullDepth)
         {
-            foreach (var dir in EnumerateCrawlSkillDirs(searchPath, depth: 0, cancellationToken))
+            foreach (var dir in EnumerateCrawlSkillDirs(searchPath, cancellationToken))
             {
                 await AddSkill(dir);
             }
@@ -176,80 +180,129 @@ internal sealed class SkillDiscovery(
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            IEnumerable<string> entries;
-            try
-            {
-                entries = fileStore.EnumerateDirectories(priorityRoot);
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
-            {
-                // Missing or inaccessible directory - nothing to scan here.
-                continue;
-            }
-
-            foreach (var dir in entries)
+            foreach (var dir in EnumerateContainedChildDirs(priorityRoot, cancellationToken))
             {
                 yield return dir;
             }
         }
     }
 
-    private IEnumerable<string> EnumerateCrawlSkillDirs(
-        string dir,
-        int depth,
+    /// <summary>
+    /// Yields the immediate child directories of <paramref name="root"/> through a contained
+    /// walk so that a directory whose real path escapes <paramref name="root"/> - for example a
+    /// planted in-tree symlink to <c>~/.ssh</c> - resolves out of root and is never yielded.
+    /// Returns nothing when the root is missing or unresolvable.
+    /// </summary>
+    private IEnumerable<string> EnumerateContainedChildDirs(string root, CancellationToken cancellationToken)
+    {
+        return EnumerateContainedDirs(root, maxRelativeDepth: 1, skipNames: null, cancellationToken)
+            // filter out the root as this is emmited at depth 0
+            .Where(dir =>
+            {
+                if (SafePath.PathEquals(dir, root))
+                {
+                    return true;
+                }
+
+                var dirReal = SafePath.ResolveExisting(dir);
+                var rootReal = SafePath.ResolveExisting(root);
+                return dirReal is not null && rootReal is not null && SafePath.PathEquals(dirReal, rootReal);
+            });
+    }
+
+    /// <summary>
+    /// Yields <paramref name="dir"/> and every directory beneath it - up to
+    /// <see cref="MaxDepth"/> levels deep and skipping <see cref="s_skipDirs"/> - through a
+    /// contained walk, so a directory whose real path escapes <paramref name="dir"/> (e.g. a
+    /// planted in-tree symlink to <c>~/.ssh</c>) is never yielded.
+    /// </summary>
+    private IEnumerable<string> EnumerateCrawlSkillDirs(string dir, CancellationToken cancellationToken)
+        => EnumerateContainedDirs(dir, maxRelativeDepth: MaxDepth, skipNames: s_skipDirs, cancellationToken);
+
+    /// <summary>
+    /// Contained directory enumeration shared by the priority and crawl paths. Walks
+    /// <paramref name="root"/> with <see cref="OnSymlink.FollowIfContained"/> so a child whose
+    /// real path escapes <paramref name="root"/> is dropped rather than descended into, yields
+    /// only directory entries within <paramref name="maxRelativeDepth"/> logical levels of the
+    /// root, and stops cleanly if the walk refuses (e.g. the root is unresolvable or a
+    /// pathological depth is hit). The walk's own depth bound is the cyclic-symlink guard; the
+    /// relative-depth filter bounds skill-finding without throwing on a legitimately deep real
+    /// tree.
+    /// </summary>
+    private IEnumerable<string> EnumerateContainedDirs(
+        string root,
+        int maxRelativeDepth,
+        IReadOnlySet<string>? skipNames,
         CancellationToken cancellationToken)
     {
-        if (depth > MaxDepth)
+        if (!fileStore.DirectoryExists(root))
         {
             yield break;
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
+        var options = WalkOptions.ContainedTo(root, OnSymlink.FollowIfContained, skip: skipNames);
 
-        yield return dir;
-
-        string[] subDirs;
-        try
+        foreach (var entry in fileStore.WalkBestEffort(root, options, cancellationToken))
         {
-            subDirs = fileStore.EnumerateDirectories(dir).ToArray();
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
-        {
-            subDirs = [];
-        }
-
-        foreach (var subDir in subDirs)
-        {
-            var name = Path.GetFileName(subDir);
-            if (s_skipDirs.Contains(name))
+            if (entry.Kind != WalkEntryKind.Directory)
             {
                 continue;
             }
 
-            foreach (var skillDir in EnumerateCrawlSkillDirs(subDir, depth + 1, cancellationToken))
+            if (RelativeDepth(root, entry.LogicalPath) <= maxRelativeDepth)
             {
-                yield return skillDir;
+                yield return entry.LogicalPath;
             }
         }
     }
 
+    private static int RelativeDepth(string root, string descendant)
+    {
+        var relative = Path.GetRelativePath(root, descendant);
+        if (relative.Length == 0 || relative.EqualsOrdinal("."))
+        {
+            return 0;
+        }
+
+        var depth = 1;
+        foreach (var ch in relative)
+        {
+            if (ch == Path.DirectorySeparatorChar || ch == Path.AltDirectorySeparatorChar)
+            {
+                depth++;
+            }
+        }
+
+        return depth;
+    }
+
     /// <summary>
-    /// Reads and parses a <c>SKILL.md</c> file into a <see cref="Skill"/>. Parsing is policy-free;
-    /// the caller decides whether to keep the result (e.g. internal-skill filtering).
+    /// Reads and parses the <c>SKILL.md</c> in <paramref name="skillDir"/> into a
+    /// <see cref="Skill"/>. Parsing is policy-free; the caller decides whether to keep the
+    /// result (e.g. internal-skill filtering).
     /// </summary>
+    /// <param name="skillDir">The directory holding the <c>SKILL.md</c>; also the containment root.</param>
+    /// <param name="cancellationToken">A token to cancel the read.</param>
     /// <returns>
     /// The parsed skill, or <see langword="null"/> when the file is unreadable, has invalid
-    /// frontmatter, or is missing a non-empty <c>name</c>/<c>description</c>. Name and description
-    /// are run through <see cref="TerminalSanitizer"/> to neutralize untrusted terminal escapes.
+    /// frontmatter, is missing a non-empty <c>name</c>/<c>description</c>, or is a symlinked leaf
+    /// pointing outside <paramref name="skillDir"/> (such a leaf is refused, never dereferenced
+    /// into <see cref="Skill.RawContent"/>). Name and description are run through
+    /// <see cref="TerminalSanitizer"/> to neutralize untrusted terminal escapes.
     /// </returns>
-    private async Task<Skill?> ParseSkillMdAsync(string skillMdPath, CancellationToken cancellationToken)
+    private async Task<Skill?> ParseSkillMdAsync(string skillDir, CancellationToken cancellationToken)
     {
+        var skillMdPath = Path.Combine(skillDir, KnownConfigNames.SkillFileName);
+
         string content;
         try
         {
-            content = await fileStore.ReadAllTextAsync(skillMdPath, cancellationToken);
+            // No-follow read contained against the skill directory: a SKILL.md whose leaf
+            // is a symlink to an out-of-tree file is refused rather than read through, so secret
+            // bytes never enter RawContent.
+            content = await fileStore.ReadAllTextNoFollowAsync(skillMdPath, skillDir, cancellationToken);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or CliException)
         {
             return null;
         }
@@ -299,8 +352,6 @@ internal sealed class SkillDiscovery(
             }
         }
 
-        var skillDir = Path.GetDirectoryName(skillMdPath) ?? skillMdPath;
-
         // Reject (do not sanitize) a directory containing control bytes: Skill.Path must stay
         // byte-exact for file I/O, so we skip the skill rather than rewrite the path.
         if (skillDir.ContainsControlCharacter())
@@ -327,5 +378,52 @@ file static class Extensions
             && metadata.TryGetValue("internal", out var flag)
             && flag is string value
             && value.EqualsOrdinalIgnoreCase("true");
+    }
+
+    /// <summary>
+    /// Walks <paramref name="root"/> like <see cref="IFileStore.Walk"/>, but treats a
+    /// <see cref="CliException"/> as "stop here" rather than propagating. A refusal raised while
+    /// starting the walk (root missing/unresolvable or escaping containment — it throws eagerly,
+    /// because <see cref="IFileStore.Walk"/> passes straight through to <see cref="SafeTreeWalker.Walk"/>)
+    /// yields an empty sequence; a refusal raised mid-walk (the cyclic-symlink depth bound)
+    /// truncates the sequence after the entries already produced. Cancellation is NOT suppressed.
+    /// Discovery is best-effort, so a pathological corner of the tree degrades the result instead
+    /// of aborting the command.
+    /// </summary>
+    public static IEnumerable<WalkEntry> WalkBestEffort(
+        this IFileStore fileStore,
+        string root,
+        WalkOptions options,
+        CancellationToken cancellationToken)
+    {
+        IEnumerator<WalkEntry> enumerator;
+        try
+        {
+            enumerator = fileStore.Walk(root, options, cancellationToken).GetEnumerator();
+        }
+        catch (CliException)
+        {
+            yield break;
+        }
+
+        using (enumerator)
+        {
+            while (true)
+            {
+                try
+                {
+                    if (!enumerator.MoveNext())
+                    {
+                        break;
+                    }
+                }
+                catch (CliException)
+                {
+                    yield break;
+                }
+
+                yield return enumerator.Current;
+            }
+        }
     }
 }

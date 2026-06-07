@@ -3,7 +3,7 @@ using System.CommandLine;
 using Skillz.Install;
 using Skillz.Interaction;
 using Skillz.Locking;
-using Skillz.Plugins;
+using Skillz.Paths;
 using Skillz.Skills;
 using Skillz.Utils;
 
@@ -147,7 +147,7 @@ internal sealed class RemoveCommand(
                     foreach (var agentType in targetAgents)
                     {
                         var installPath = installer.GetInstallPath(skillName, agentType, global, cwd);
-                        if (string.Equals(installPath, canonicalPath, PathContainment.Comparison))
+                        if (string.Equals(installPath, canonicalPath, SafePath.Comparison))
                         {
                             continue;
                         }
@@ -209,7 +209,7 @@ internal sealed class RemoveCommand(
     {
         var cwd = systemEnvironment.CurrentDirectory;
         var skills = new HashSet<string>(StringComparer.Ordinal);
-        var directoriesToScan = new HashSet<string>(PathContainment.Comparer)
+        var directoriesToScan = new HashSet<string>(SafePath.Comparer)
         {
             installer.GetCanonicalSkillsDirectory(global, cwd)
         };

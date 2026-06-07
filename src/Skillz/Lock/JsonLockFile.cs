@@ -55,39 +55,6 @@ internal abstract class JsonLockFile<TFile> where TFile : class
         return false;
     }
 
-    /// <summary>
-    /// Returns whether <paramref name="skillPath"/> is structurally unsafe: rooted (an absolute or
-    /// drive/UNC path), containing a <c>..</c> segment, or containing a backslash. A legitimate
-    /// relative path such as <c>skills/foo/SKILL.md</c> returns <see langword="false"/>.
-    /// </summary>
-    protected static bool IsUnsafeSkillPath(string? skillPath)
-    {
-        if (string.IsNullOrEmpty(skillPath))
-        {
-            return false;
-        }
-
-        if (skillPath.ContainsOrdinal('\\'))
-        {
-            return true;
-        }
-
-        if (Path.IsPathRooted(skillPath) || skillPath.StartsWithOrdinal("/"))
-        {
-            return true;
-        }
-
-        foreach (var segment in skillPath.Split('/'))
-        {
-            if (segment.EqualsOrdinal(".."))
-            {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
     /// <summary>Whether to append a trailing newline after the serialized JSON.</summary>
     protected virtual bool TrailingNewline => false;
 

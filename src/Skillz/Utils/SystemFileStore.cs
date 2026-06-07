@@ -1,3 +1,6 @@
+using Microsoft.Win32.SafeHandles;
+using Skillz.Paths;
+
 namespace Skillz.Utils;
 
 internal sealed class SystemFileStore : IFileStore
@@ -110,4 +113,16 @@ internal sealed class SystemFileStore : IFileStore
 
     public Task WriteAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken)
         => File.WriteAllBytesAsync(path, bytes, cancellationToken);
+
+    public SafeFileHandle OpenReadNoFollow(string path, string containRoot)
+        => SafePath.OpenReadNoFollow(path, containRoot);
+
+    public Task<string> ReadAllTextNoFollowAsync(string path, string containRoot, CancellationToken cancellationToken)
+        => SafePath.ReadAllTextNoFollowAsync(path, containRoot, cancellationToken);
+
+    public Task WriteAllBytesNoFollowAsync(string path, byte[] bytes, string containRoot, CancellationToken cancellationToken)
+        => SafePath.WriteAllBytesNoFollowAsync(path, bytes, containRoot, cancellationToken);
+
+    public IEnumerable<WalkEntry> Walk(string root, WalkOptions options, CancellationToken cancellationToken)
+        => SafeTreeWalker.Walk(root, options, cancellationToken);
 }

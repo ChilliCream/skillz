@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using Skillz.Paths;
 using Skillz.Skills;
 using Skillz.Utils;
 
@@ -31,7 +32,7 @@ internal sealed class PluginManifest(IFileStore fileStore)
 
     private static void AddPluginSkillPaths(string basePath, PluginEntry plugin, List<string> searchDirs)
     {
-        if (!PathContainment.IsContainedInRealPath(plugin.PluginBase, basePath))
+        if (!SafePath.Contains(basePath, plugin.PluginBase, LeafPolicy.Preserve))
         {
             return;
         }
@@ -40,7 +41,7 @@ internal sealed class PluginManifest(IFileStore fileStore)
         {
             foreach (var skillPath in plugin.Skills)
             {
-                if (!PathContainment.IsValidRelativePath(skillPath))
+                if (!SafePath.IsValidManifestRelativePath(skillPath))
                 {
                     continue;
                 }
@@ -51,14 +52,24 @@ internal sealed class PluginManifest(IFileStore fileStore)
                     continue;
                 }
 
-                if (PathContainment.IsContainedInRealPath(skillDir, basePath))
+                // Discovery descends INTO this directory, so the leaf is followed: a skill
+                // directory that is itself a symlink escaping base must not be added.
+                if (SafePath.Contains(basePath, skillDir, LeafPolicy.Follow))
                 {
                     searchDirs.Add(skillDir);
                 }
             }
         }
 
-        searchDirs.Add(Path.Combine(plugin.PluginBase, "skills"));
+        // Re-check the default "skills" directory for containment: a pluginBase/skills
+        // directory-symlink pointing outside base must not be added. Discovery descends INTO
+        // this directory, so the leaf is followed - a leaf-preserving check would miss a
+        // skills symlink whose target escapes base.
+        var defaultSkillsDir = Path.Combine(plugin.PluginBase, "skills");
+        if (SafePath.Contains(basePath, defaultSkillsDir, LeafPolicy.Follow))
+        {
+            searchDirs.Add(defaultSkillsDir);
+        }
     }
 
     /// <summary>
@@ -88,6 +99,7 @@ internal sealed class PluginManifest(IFileStore fileStore)
         var manifest = await TryDeserializeAsync(
             fileStore,
             Path.Combine(basePath, ".claude-plugin", "marketplace.json"),
+            basePath,
             JsonSourceGenerationContext.Default.MarketplaceManifest,
             cancellationToken);
 
@@ -97,7 +109,7 @@ internal sealed class PluginManifest(IFileStore fileStore)
         }
 
         var pluginRoot = manifest.Metadata?.PluginRoot;
-        if (pluginRoot is not null && !PathContainment.IsValidRelativePath(pluginRoot))
+        if (pluginRoot is not null && !SafePath.IsValidManifestRelativePath(pluginRoot))
         {
             return;
         }
@@ -114,7 +126,7 @@ internal sealed class PluginManifest(IFileStore fileStore)
             // Validate with the symlink-aware containment check (the same one downstream
             // consumers use) so the containment invariant holds where the entry is produced,
             // even if pluginBase resolves outside basePath through a symlinked parent.
-            if (!PathContainment.IsContainedInRealPath(pluginBase, basePath))
+            if (!SafePath.Contains(basePath, pluginBase, LeafPolicy.Preserve))
             {
                 continue;
             }
@@ -133,6 +145,7 @@ internal sealed class PluginManifest(IFileStore fileStore)
         var manifest = await TryDeserializeAsync(
             fileStore,
             Path.Combine(basePath, ".claude-plugin", "plugin.json"),
+            basePath,
             JsonSourceGenerationContext.Default.SinglePluginManifest,
             cancellationToken);
 
@@ -166,12 +179,13 @@ internal sealed class PluginManifest(IFileStore fileStore)
             }
         }
 
-        return sourceString is null || PathContainment.IsValidRelativePath(sourceString);
+        return sourceString is null || SafePath.IsValidManifestRelativePath(sourceString);
     }
 
     private static async Task<T?> TryDeserializeAsync<T>(
         IFileStore fileStore,
         string path,
+        string containRoot,
         JsonTypeInfo<T> typeInfo,
         CancellationToken cancellationToken)
         where T : class
@@ -179,7 +193,7 @@ internal sealed class PluginManifest(IFileStore fileStore)
         string json;
         try
         {
-            json = await fileStore.ReadAllTextAsync(path, cancellationToken);
+            json = await fileStore.ReadAllTextNoFollowAsync(path, containRoot, cancellationToken);
         }
         catch (FileNotFoundException)
         {
@@ -187,6 +201,12 @@ internal sealed class PluginManifest(IFileStore fileStore)
         }
         catch (DirectoryNotFoundException)
         {
+            return null;
+        }
+        catch (CliException)
+        {
+            // The manifest leaf is a symlink, or its path escapes the clone: refuse to read
+            // through it and treat the manifest as absent rather than following it out of tree.
             return null;
         }
 

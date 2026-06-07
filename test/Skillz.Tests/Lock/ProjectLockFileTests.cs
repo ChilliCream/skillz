@@ -27,6 +27,40 @@ public class ProjectLockFileTests : IDisposable
         catch { }
     }
 
+    private static bool TryCreateFileSymlink(string link, string target)
+    {
+        try
+        {
+            File.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryCreateDirectorySymlink(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
     [Fact]
     public void GetLockPath_Returns_SkillsLockJson_In_Given_Directory()
     {
@@ -684,6 +718,58 @@ public class ProjectLockFileTests : IDisposable
 
         // Assert
         Assert.Equal(hash1, hash2);
+    }
+
+    [Fact]
+    public async Task ComputeSkillFolderHashAsync_Does_Not_Depend_On_Secret_When_Tree_Has_Symlink_To_It()
+    {
+        // Arrange: a skill tree whose only content beyond SKILL.md is a symlink pointing
+        // at an out-of-tree secret. The digest must be a function of in-tree bytes only.
+        var skillDir = Path.Combine(_tempDir, "my-skill");
+        Directory.CreateDirectory(skillDir);
+        await File.WriteAllTextAsync(Path.Combine(skillDir, "SKILL.md"), "root", TestContext.Current.CancellationToken);
+
+        var secret = Path.Combine(_tempDir, "secret.txt");
+        await File.WriteAllTextAsync(secret, "TOP-SECRET-A", TestContext.Current.CancellationToken);
+
+        if (!TryCreateFileSymlink(Path.Combine(skillDir, "leak"), secret))
+        {
+            return; // platform refused symlink creation without privilege
+        }
+
+        var lockFile = new ProjectLockFile();
+
+        // Act
+        var hash1 = await lockFile.ComputeSkillFolderHashAsync(skillDir, TestContext.Current.CancellationToken);
+
+        // Change the secret's bytes; the symlink still points at it.
+        await File.WriteAllTextAsync(secret, "TOTALLY-DIFFERENT-B", TestContext.Current.CancellationToken);
+        var hash2 = await lockFile.ComputeSkillFolderHashAsync(skillDir, TestContext.Current.CancellationToken);
+
+        // Assert: the digest did not change, proving the secret's bytes never entered it.
+        Assert.Equal(hash1, hash2);
+    }
+
+    [Fact]
+    public async Task ComputeSkillFolderHashAsync_Terminates_When_Directory_Symlink_Cycle_Present()
+    {
+        // Arrange: a directory symlink pointing back at its own parent forms a cycle.
+        var skillDir = Path.Combine(_tempDir, "my-skill");
+        Directory.CreateDirectory(skillDir);
+        await File.WriteAllTextAsync(Path.Combine(skillDir, "SKILL.md"), "root", TestContext.Current.CancellationToken);
+
+        if (!TryCreateDirectorySymlink(Path.Combine(skillDir, "loop"), skillDir))
+        {
+            return; // platform refused symlink creation without privilege
+        }
+
+        var lockFile = new ProjectLockFile();
+
+        // Act: must return rather than recurse forever.
+        var hash = await lockFile.ComputeSkillFolderHashAsync(skillDir, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Matches("^[a-f0-9]{64}$", hash);
     }
 
     [Fact]

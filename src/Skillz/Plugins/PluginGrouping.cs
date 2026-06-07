@@ -1,3 +1,4 @@
+using Skillz.Paths;
 using Skillz.Utils;
 
 namespace Skillz.Plugins;
@@ -14,7 +15,7 @@ internal sealed class PluginGrouping(IFileStore fileStore)
         {
             if (string.IsNullOrEmpty(plugin.Name)
                 || plugin.Skills is not { Count: > 0 }
-                || !PathContainment.IsContainedInRealPath(plugin.PluginBase, basePath))
+                || !SafePath.Contains(basePath, plugin.PluginBase, LeafPolicy.Preserve))
             {
                 continue;
             }
@@ -35,7 +36,7 @@ internal sealed class PluginGrouping(IFileStore fileStore)
         string skillPath,
         string name)
     {
-        if (!PathContainment.IsValidRelativePath(skillPath))
+        if (!SafePath.IsValidManifestRelativePath(skillPath))
         {
             return;
         }
@@ -48,7 +49,7 @@ internal sealed class PluginGrouping(IFileStore fileStore)
             fullPath = Path.GetDirectoryName(fullPath) ?? fullPath;
         }
 
-        if (PathContainment.IsContainedInRealPath(skillDir, basePath))
+        if (SafePath.Contains(basePath, skillDir, LeafPolicy.Preserve))
         {
             groupings[fullPath] = name;
         }

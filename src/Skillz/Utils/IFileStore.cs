@@ -1,3 +1,6 @@
+using Microsoft.Win32.SafeHandles;
+using Skillz.Paths;
+
 namespace Skillz.Utils;
 
 /// <summary>
@@ -69,4 +72,36 @@ internal interface IFileStore
     Task WriteAllTextAsync(string path, string content, CancellationToken cancellationToken);
 
     Task WriteAllBytesAsync(string path, byte[] bytes, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Opens the file at <paramref name="path"/> for reading WITHOUT following a symlinked
+    /// leaf, after confirming it is contained in <paramref name="containRoot"/>. Throws when
+    /// the final path component is a reparse point or the path escapes the root. Backed by
+    /// <see cref="SafePath.OpenReadNoFollow"/>.
+    /// </summary>
+    SafeFileHandle OpenReadNoFollow(string path, string containRoot);
+
+    /// <summary>
+    /// Reads all text of <paramref name="path"/> WITHOUT following a symlinked leaf, after
+    /// confirming it is contained in <paramref name="containRoot"/>. Throws when the final path
+    /// component is a reparse point or the path escapes the root. Backed by
+    /// <see cref="SafePath.ReadAllTextNoFollowAsync"/>.
+    /// </summary>
+    Task<string> ReadAllTextNoFollowAsync(string path, string containRoot, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Writes <paramref name="bytes"/> to <paramref name="path"/> WITHOUT following a symlinked
+    /// leaf, after confirming it is contained in <paramref name="containRoot"/>. Throws when the
+    /// final path component is a reparse point or the path escapes the root. Backed by
+    /// <see cref="SafePath.WriteAllBytesNoFollowAsync"/>.
+    /// </summary>
+    Task WriteAllBytesNoFollowAsync(string path, byte[] bytes, string containRoot, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Enumerates the tree under <paramref name="root"/> with one uniform symlink policy.
+    /// Every yielded entry's real path is contained in <see cref="WalkOptions.ContainRoot"/>;
+    /// recursion is depth-bounded and real paths are de-duplicated. Backed by
+    /// <see cref="SafeTreeWalker.Walk"/>.
+    /// </summary>
+    IEnumerable<WalkEntry> Walk(string root, WalkOptions options, CancellationToken cancellationToken);
 }

@@ -1,3 +1,4 @@
+using Skillz.Paths;
 using Skillz.Plugins;
 using Skillz.Utils;
 using Xunit;
@@ -7,12 +8,15 @@ namespace Skillz.Tests.Plugins;
 public class PluginManifestTests : IDisposable
 {
     private readonly string _testDir;
+    private readonly string _outsideDir;
     private readonly PluginManifest _manifest = new(new SystemFileStore());
 
     public PluginManifestTests()
     {
         _testDir = Path.Combine(Path.GetTempPath(), $"skillz-manifest-test-{Guid.NewGuid():N}");
+        _outsideDir = Path.Combine(Path.GetTempPath(), $"skillz-manifest-outside-{Guid.NewGuid():N}");
         Directory.CreateDirectory(_testDir);
+        Directory.CreateDirectory(_outsideDir);
     }
 
     public void Dispose()
@@ -20,6 +24,45 @@ public class PluginManifestTests : IDisposable
         if (Directory.Exists(_testDir))
         {
             Directory.Delete(_testDir, recursive: true);
+        }
+
+        if (Directory.Exists(_outsideDir))
+        {
+            Directory.Delete(_outsideDir, recursive: true);
+        }
+    }
+
+    private static bool TryCreateDirectorySymlink(string link, string target)
+    {
+        try
+        {
+            Directory.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryCreateFileSymlink(string link, string target)
+    {
+        try
+        {
+            File.CreateSymbolicLink(link, target);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
         }
     }
 
@@ -54,6 +97,31 @@ public class PluginManifestTests : IDisposable
         // Assert
         var expected = Path.Combine(_testDir, "plugins", "test-plugin", "skills");
         Assert.Contains(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(expected));
+    }
+
+    [Fact]
+    public async Task GetPluginSkillPaths_Should_NotReadManifest_When_PluginJsonLeafIsASymlink()
+    {
+        // A plugin.json whose leaf is a symlink to an out-of-tree file must be refused, not
+        // followed, so the out-of-tree bytes are never read and deserialized into a manifest.
+        var outsideManifest = Path.Combine(_outsideDir, "plugin.json");
+        File.WriteAllText(outsideManifest, """{ "skills": ["./leaked/SKILL.md"] }""");
+
+        // The directory the planted manifest points at is itself in-tree, so the only thing
+        // that can keep it out of the result is the no-follow refusal of the symlinked leaf.
+        Directory.CreateDirectory(Path.Combine(_testDir, "leaked"));
+        Directory.CreateDirectory(Path.Combine(_testDir, ".claude-plugin"));
+        if (!TryCreateFileSymlink(Path.Combine(_testDir, ".claude-plugin", "plugin.json"), outsideManifest))
+        {
+            return; // platform refused symlink creation without privilege
+        }
+
+        // Act
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
+
+        // Assert
+        var leaked = Path.Combine(_testDir, "leaked");
+        Assert.DoesNotContain(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(leaked));
     }
 
     [Fact]
@@ -153,6 +221,33 @@ public class PluginManifestTests : IDisposable
     }
 
     [Fact]
+    public async Task GetPluginSkillPaths_Should_NotAddDefaultSkillsDir_When_It_Is_A_Symlink_Escaping_Base()
+    {
+        // Arrange: a single-plugin manifest with no explicit skills, whose default skills
+        // directory is a symlink pointing OUTSIDE the base. Discovery would descend into it, so
+        // it must be rejected by the containment re-check.
+        WriteManifest(
+            ".claude-plugin/plugin.json",
+            """
+            {
+              "name": "single-plugin"
+            }
+            """);
+
+        if (!TryCreateDirectorySymlink(Path.Combine(_testDir, "skills"), _outsideDir))
+        {
+            return; // platform refused symlink creation without privilege
+        }
+
+        // Act
+        var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
+
+        // Assert: the escaping default skills directory is not added.
+        var escaping = Path.Combine(_testDir, "skills");
+        Assert.DoesNotContain(dirs, d => Path.GetFullPath(d) == Path.GetFullPath(escaping));
+    }
+
+    [Fact]
     public async Task GetPluginSkillPaths_Should_ContainAllResultsWithinBase_When_SourceAttemptsTraversal()
     {
         // Arrange
@@ -170,7 +265,7 @@ public class PluginManifestTests : IDisposable
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         // Assert
-        Assert.All(dirs, d => Assert.True(PathContainment.IsContainedIn(d, _testDir)));
+        Assert.All(dirs, d => Assert.True(SafePath.Contains(_testDir, d, LeafPolicy.Follow)));
     }
 
     [Fact]
@@ -191,7 +286,7 @@ public class PluginManifestTests : IDisposable
         var dirs = await _manifest.GetPluginSkillPathsAsync(_testDir, TestContext.Current.CancellationToken);
 
         // Assert
-        Assert.All(dirs, d => Assert.True(PathContainment.IsContainedIn(d, _testDir)));
+        Assert.All(dirs, d => Assert.True(SafePath.Contains(_testDir, d, LeafPolicy.Follow)));
     }
 
     [Fact]
