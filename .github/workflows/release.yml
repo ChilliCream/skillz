@@ -157,7 +157,7 @@ jobs:
 
   nuget:
     name: 📦 Pack NuGet Tool
-    needs: version
+    needs: [version, build, release]
     runs-on: ubuntu-latest
     steps:
       - name: 📦 Checkout
