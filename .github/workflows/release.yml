@@ -114,13 +114,16 @@ jobs:
           subject-path: 'dist/skillz-*'
 
       - name: 📝 Create draft release
+        id: create_release
         shell: bash
         run: |
           set -euo pipefail
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "created=false" >> "$GITHUB_OUTPUT"
             echo "Release $TAG already exists; leaving it untouched."
             exit 0
           fi
+          echo "created=true" >> "$GITHUB_OUTPUT"
           prerelease_flag=()
           if [[ "$PRERELEASE" == "true" ]]; then prerelease_flag=(--prerelease); fi
           gh release create "$TAG" \
@@ -130,7 +133,6 @@ jobs:
             --title "$TAG" \
             --generate-notes \
             --target "$GITHUB_SHA"
-
       - name: 📤 Upload assets
         shell: bash
         run: |
