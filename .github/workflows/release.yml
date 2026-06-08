@@ -134,6 +134,7 @@ jobs:
             --generate-notes \
             --target "$GITHUB_SHA"
       - name: 📤 Upload assets
+        if: steps.create_release.outputs.created == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -145,6 +146,7 @@ jobs:
             --clobber
 
       - name: 🚀 Publish release
+        if: steps.create_release.outputs.created == 'true'
         shell: bash
         run: |
           set -euo pipefail
