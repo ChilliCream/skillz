@@ -1,65 +1,190 @@
-name: Release
+name: 🚀 Release
+
+run-name: Release ${{ github.ref_name }}
 
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  publish:
-    name: Publish ${{ matrix.rid }}
+  version:
+    name: 🧮 Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+    steps:
+      - id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF_TYPE" = tag ]; then v="${GITHUB_REF_NAME#v}"; else v="0.0.0-dev"; fi
+          # command-injection guard: tag names may carry shell metacharacters, so the
+          # version must be reduced to semver-safe characters before any downstream shell uses it.
+          if [[ ! "$v" =~ ^[0-9A-Za-z.+-]+$ ]]; then echo "::error::invalid version '$v'"; exit 1; fi
+          if [[ "$v" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then prerelease=false; else prerelease=true; fi
+          {
+            echo "version=$v"
+            echo "prerelease=$prerelease"
+          } | tee -a "$GITHUB_OUTPUT"
+
+  build:
+    name: 🧱 Build ${{ matrix.rid }}
+    needs: version
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            rid: linux-x64
-          - os: ubuntu-24.04-arm
-            rid: linux-arm64
-          - os: windows-latest
-            rid: win-x64
-          - os: windows-11-arm
-            rid: win-arm64
-          - os: macos-latest
-            rid: osx-x64
-          - os: macos-latest
-            rid: osx-arm64
+          - { os: ubuntu-latest,    rid: linux-x64 }
+          - { os: ubuntu-24.04-arm, rid: linux-arm64 }
+          - { os: windows-latest,   rid: win-x64 }
+          - { os: windows-11-arm,   rid: win-arm64 }
+          - { os: macos-latest,     rid: osx-x64 }
+          - { os: macos-latest,     rid: osx-arm64 }
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - name: 📦 Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: actions/setup-dotnet@v4
+      - name: 🛠 Install .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
         with:
           global-json-file: global.json
 
-      - name: Publish
-        run: dotnet publish src/Skillz/Skillz.csproj -c Release -f net10.0 -r ${{ matrix.rid }} --self-contained -o ./publish/${{ matrix.rid }}
+      - name: 📦 Publish
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: dotnet publish src/Skillz/Skillz.csproj -c Release -f net10.0 -r ${{ matrix.rid }} --self-contained -o ./publish/${{ matrix.rid }} -p:Version="$VERSION"
 
-      - uses: actions/upload-artifact@v4
+      - name: 📦 Package (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: tar -czf skillz-${{ matrix.rid }}.tar.gz -C ./publish/${{ matrix.rid }} skillz
+
+      - name: 📦 Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path publish/${{ matrix.rid }}/skillz.exe -DestinationPath skillz-${{ matrix.rid }}.zip
+
+      - name: 📤 Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: skillz-${{ matrix.rid }}
-          path: ./publish/${{ matrix.rid }}/
+          path: skillz-${{ matrix.rid }}.*
+          if-no-files-found: error
+
+  release:
+    name: 🚀 Publish Release
+    needs: [version, build]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write          # create the release + upload assets
+      id-token: write          # build-provenance attestation
+      attestations: write      # build-provenance attestation
+    env:
+      TAG: ${{ github.ref_name }}
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: 📥 Download artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: 🔐 Checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist && sha256sum skillz-* > SHA256SUMS.txt
+
+      - name: 🔏 Attest build provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: 'dist/skillz-*'
+
+      - name: 📝 Create draft release
+        id: create_release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "created=false" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already exists; leaving it untouched."
+            exit 0
+          fi
+          echo "created=true" >> "$GITHUB_OUTPUT"
+          prerelease_flag=()
+          if [[ "$PRERELEASE" == "true" ]]; then prerelease_flag=(--prerelease); fi
+          gh release create "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            "${prerelease_flag[@]}" \
+            --title "$TAG" \
+            --generate-notes \
+            --target "$GITHUB_SHA"
+      - name: 📤 Upload assets
+        if: steps.create_release.outputs.created == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" \
+            dist/skillz-*.tar.gz \
+            dist/skillz-*.zip \
+            dist/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --clobber
+
+      - name: 🚀 Publish release
+        if: steps.create_release.outputs.created == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --prerelease="$PRERELEASE"
 
   nuget:
-    name: Pack NuGet Tool
+    name: 📦 Pack NuGet Tool
+    needs: version
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: 📦 Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - uses: actions/setup-dotnet@v4
+      - name: 🛠 Install .NET
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
         with:
           global-json-file: global.json
 
-      - name: Pack
-        run: dotnet pack src/Skillz.Tool/Skillz.Tool.csproj -c Release -o ./nupkg
+      - name: 📦 Pack
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: dotnet pack src/Skillz.Tool/Skillz.Tool.csproj -c Release -o ./nupkg -p:Version="$VERSION"
 
-      - uses: actions/upload-artifact@v4
+      - name: 📤 Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: nuget-package
           path: ./nupkg/*.nupkg
 
-      - name: Push to NuGet
+      - name: 🚀 Push to NuGet
         if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
         env:
           NUGET_API_KEY: ${{ secrets.SKILLZ_NUGET_KEY }}
-        run: dotnet nuget push ./nupkg/*.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: |
+          set -euo pipefail
+          dotnet nuget push ./nupkg/*.nupkg --api-key "$NUGET_API_KEY" --source https://api.nuget.org/v3/index.json --skip-duplicate
