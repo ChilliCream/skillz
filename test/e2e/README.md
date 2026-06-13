@@ -77,12 +77,6 @@ fonts are baked into the pinned container.
 Rebuild Container** once, then `./test/e2e/run.sh` works as above. Docker-in-Docker
 needs a host that permits privileged containers.
 
-From the test suite (opt-in, Linux + docker only; runs every flow):
-
-```bash
-SKILLZ_E2E=1 dotnet test test/Skillz.SmokeTests --filter "Category=E2E"
-```
-
 ## What makes it deterministic
 
 Two independent runs produce a **byte-identical** final frame. The levers:
