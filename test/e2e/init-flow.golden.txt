@@ -1,0 +1,23 @@
+$ skillz init my-skill
+
+  /$$$$$$  /$$       /$$ /$$ /$$
+ /$$__  $$| $$      |__/| $$| $$
+| $$  \__/| $$   /$$ /$$| $$| $$ /$$$$$$$$
+|  $$$$$$ | $$  /$$/| $$| $$| $$|____ /$$/
+ \____  $$| $$$$$$/ | $$| $$| $$   /$$$$/
+ /$$  \ $$| $$_  $$ | $$| $$| $$  /$$__/
+|  $$$$$$/| $$ \  $$| $$| $$| $$ /$$$$$$$$
+ \______/ |__/  \__/|__/|__/|__/|________/
+Initialized skill: my-skill
+
+Created:
+  my-skill/SKILL.md
+
+Next steps:
+  1. Edit my-skill/SKILL.md to define your skill instructions
+  2. Update the name and description in the frontmatter
+
+Publishing:
+  GitHub: Push to a repo, then skillz add <owner>/<repo>
+  URL:    Host the file, then skillz add https://example.com/my-skill/SKILL.md
+$
