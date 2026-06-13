@@ -4,6 +4,8 @@ using Skillz.Locking;
 using Skillz.Net;
 using Skillz.Tests.TestServices;
 using Skillz.Tests.Utils;
+using Spectre.Console;
+using Spectre.Console.Testing;
 using Xunit;
 
 namespace Skillz.Tests.Commands;
@@ -45,7 +47,7 @@ public class UpdateCommandTests : IDisposable
         var globalLock = services.GetRequiredService<TestGlobalLockFile>();
         globalLock.OnRead = () =>
             new SkillLockFile { Version = 3, Skills = new Dictionary<string, SkillLockEntry>(StringComparer.Ordinal) };
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -54,9 +56,7 @@ public class UpdateCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exit);
-        Assert.Contains(
-            interaction.Output,
-            line => line.Contains("No global skills tracked", StringComparison.Ordinal));
+        Assert.Contains("No global skills tracked", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -95,7 +95,7 @@ public class UpdateCommandTests : IDisposable
                         Sha = "abc123"
                     }
                 ]);
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -104,7 +104,7 @@ public class UpdateCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("up to date", StringComparison.Ordinal));
+        Assert.Contains("up to date", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -143,7 +143,7 @@ public class UpdateCommandTests : IDisposable
                         Sha = "xyz789"
                     }
                 ]);
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -152,12 +152,10 @@ public class UpdateCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("Found 1 global update", StringComparison.Ordinal));
-        Assert.Contains(interaction.Output, line => line.Contains("Update available", StringComparison.Ordinal));
-        Assert.Contains(
-            interaction.Output,
-            line => line.Contains("Updates available for 1 skill", StringComparison.Ordinal));
-        Assert.DoesNotContain(interaction.Output, line => line.Contains("Updated 1 skill", StringComparison.Ordinal));
+        Assert.Contains("Found 1 global update", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("Update available", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("Updates available for 1 skill", interaction.OutputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Updated 1 skill", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -200,7 +198,7 @@ public class UpdateCommandTests : IDisposable
                         Sha = "xyz789"
                     }
                 ]);
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -209,16 +207,15 @@ public class UpdateCommandTests : IDisposable
 
         // Assert: the update is still detected (tree matching uses the byte-exact path)...
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("Found 1 global update", StringComparison.Ordinal));
+        Assert.Contains("Found 1 global update", interaction.OutputText, StringComparison.Ordinal);
 
         // ...but no raw ESC (0x1b) byte reaches the terminal output, while the visible
         // suggestion line is still shown.
-        Assert.All(interaction.Output, line => Assert.DoesNotContain('\x1b', line));
+        Assert.DoesNotContain('\x1b', interaction.OutputText);
         Assert.Contains(
-            interaction.Output,
-            line =>
-                line.Contains("Run: skillz add", StringComparison.Ordinal)
-                && line.Contains("owner/repo/tools/inner", StringComparison.Ordinal));
+            "Run: skillz add owner/repo/tools/inner",
+            interaction.OutputText,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -246,7 +243,7 @@ public class UpdateCommandTests : IDisposable
 
         var blob = services.GetRequiredService<TestBlobClient>();
         blob.OnFetchTree = (_, _, _) => throw new BlobFetchTimeoutException("https://api.github.com/owner/repo");
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -255,11 +252,9 @@ public class UpdateCommandTests : IDisposable
 
         // Assert: a timeout is reported as a timeout, not bucketed under the missing/access-error message.
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("timed out", StringComparison.Ordinal));
-        Assert.DoesNotContain(
-            interaction.Output,
-            line => line.Contains("network or access error", StringComparison.Ordinal));
-        Assert.Contains(interaction.Output, line => line.Contains("Failed to check 1 skill", StringComparison.Ordinal));
+        Assert.Contains("timed out", interaction.OutputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("network or access error", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("Failed to check 1 skill", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -287,7 +282,7 @@ public class UpdateCommandTests : IDisposable
 
         var blob = services.GetRequiredService<TestBlobClient>();
         blob.OnFetchTree = (_, _, _) => null;
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -296,8 +291,8 @@ public class UpdateCommandTests : IDisposable
 
         // Assert: a missing/unreachable repo uses the network-or-access-error bucket, not the timeout one.
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("network or access error", StringComparison.Ordinal));
-        Assert.DoesNotContain(interaction.Output, line => line.Contains("timed out", StringComparison.Ordinal));
+        Assert.Contains("network or access error", interaction.OutputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("timed out", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -322,7 +317,7 @@ public class UpdateCommandTests : IDisposable
                     }
                 }
             };
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -331,9 +326,7 @@ public class UpdateCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exit);
-        Assert.Contains(
-            interaction.Output,
-            line => line.Contains("cannot be checked automatically", StringComparison.Ordinal));
+        Assert.Contains("cannot be checked automatically", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -347,7 +340,7 @@ public class UpdateCommandTests : IDisposable
             Version = 1,
             Skills = new Dictionary<string, LocalSkillLockEntry>(StringComparer.Ordinal)
         };
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -356,7 +349,7 @@ public class UpdateCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("No project skills", StringComparison.Ordinal));
+        Assert.Contains("No project skills", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -380,7 +373,7 @@ public class UpdateCommandTests : IDisposable
                 }
             }
         };
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -389,11 +382,9 @@ public class UpdateCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("can be refreshed", StringComparison.Ordinal));
-        Assert.Contains(interaction.Output, line => line.Contains("Refresh:", StringComparison.Ordinal));
-        Assert.DoesNotContain(
-            interaction.Output,
-            line => line.Contains("Updates available for", StringComparison.Ordinal));
+        Assert.Contains("can be refreshed", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("Refresh:", interaction.OutputText, StringComparison.Ordinal);
+        Assert.DoesNotContain("Updates available for", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -421,7 +412,7 @@ public class UpdateCommandTests : IDisposable
                 }
             }
         };
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -430,7 +421,7 @@ public class UpdateCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("No project skills", StringComparison.Ordinal));
+        Assert.Contains("No project skills", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -448,7 +439,7 @@ public class UpdateCommandTests : IDisposable
             Version = 1,
             Skills = new Dictionary<string, LocalSkillLockEntry>(StringComparer.Ordinal)
         };
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -457,8 +448,8 @@ public class UpdateCommandTests : IDisposable
 
         // Assert: both scopes were checked, so both empty-scope messages appear.
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("No global skills", StringComparison.Ordinal));
-        Assert.Contains(interaction.Output, line => line.Contains("No project skills", StringComparison.Ordinal));
+        Assert.Contains("No global skills", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("No project skills", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -475,7 +466,7 @@ public class UpdateCommandTests : IDisposable
             Version = 1,
             Skills = new Dictionary<string, LocalSkillLockEntry>(StringComparer.Ordinal)
         };
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -484,8 +475,8 @@ public class UpdateCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exit);
-        Assert.Contains(interaction.Output, line => line.Contains("Global Skills", StringComparison.Ordinal));
-        Assert.Contains(interaction.Output, line => line.Contains("Project Skills", StringComparison.Ordinal));
+        Assert.Contains("Global Skills", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("Project Skills", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -544,7 +535,7 @@ public class UpdateCommandTests : IDisposable
                 }
             }
         };
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
 
         // Act: non-interactive, no scope flag.
         var cmd = services.GetRequiredService<UpdateCommand>();
@@ -553,16 +544,8 @@ public class UpdateCommandTests : IDisposable
 
         // Assert: project skills were NOT silently skipped, and global was checked too.
         Assert.Equal(0, exit);
-        Assert.Contains(
-            interaction.Output,
-            line =>
-                line.Contains("Refresh:", StringComparison.Ordinal)
-                && line.Contains("project-skill", StringComparison.Ordinal));
-        Assert.Contains(
-            interaction.Output,
-            line =>
-                line.Contains("Update available:", StringComparison.Ordinal)
-                && line.Contains("global-skill", StringComparison.Ordinal));
+        Assert.Contains("Refresh: project-skill", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("Update available: global-skill", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -575,5 +558,32 @@ public class UpdateCommandTests : IDisposable
         // Assert
         Assert.Contains("upgrade", cmd.Aliases);
         Assert.Contains("check", cmd.Aliases);
+    }
+
+    // A redirected/headless stream is not Interactive; a real TTY with TERM=dumb is Interactive but
+    // not Ansi. Both make the "Update scope" picker unshowable, so it must default to Both, not crash.
+    [Theory]
+    [InlineData(false, false)] // fully headless (stdin redirected, no ANSI)
+    [InlineData(true, false)] // real TTY with TERM=dumb (no ANSI)
+    [InlineData(false, true)] // stdin redirected but ANSI-capable
+    public async Task Update_DefaultsToBothScopes_When_NoFlag_And_Console_CannotPrompt(bool interactive, bool ansi)
+    {
+        // Arrange: no scope flag, no -y, stdin not redirected -> ResolveScopeAsync reaches the scope
+        // SelectPrompt. With no tracked skills both scopes simply report "none".
+        var console = new TestConsole();
+        console.Profile.Capabilities.Interactive = interactive;
+        console.Profile.Capabilities.Ansi = ansi;
+        var services = CliTestHelper.CreateServiceProvider(
+            configure: s => s.AddSingleton<IAnsiConsole>(console));
+
+        // Act
+        var cmd = services.GetRequiredService<UpdateCommand>();
+        var exitCode = await cmd.Parse(Array.Empty<string>())
+            .InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: degraded to UpdateScope.Both (both scopes checked) instead of crashing.
+        Assert.Equal(0, exitCode);
+        Assert.Contains("No global skills", console.Output, StringComparison.Ordinal);
+        Assert.Contains("No project skills", console.Output, StringComparison.Ordinal);
     }
 }

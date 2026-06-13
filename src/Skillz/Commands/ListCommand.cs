@@ -6,6 +6,7 @@ using Skillz.Interaction;
 using Skillz.Paths;
 using Skillz.Skills;
 using Skillz.Utils;
+using Skillz.Views;
 using Spectre.Console;
 
 namespace Skillz.Commands;
@@ -13,10 +14,10 @@ namespace Skillz.Commands;
 internal sealed class ListCommand(
     ISkillInstaller installer,
     AgentRegistry registry,
-    IInteractionService interaction,
+    IAnsiConsole console,
     IFileStore fileStore,
     ISystemEnvironment systemEnvironment,
-    CliExecutionContext executionContext) : BaseCommand("list", "List installed skills")
+    CliExecutionContext executionContext) : BaseCommand(console, "list", "List installed skills")
 {
     private readonly Option<bool> _globalOption = new(CommonOptionNames.Global, "-g")
     {
@@ -47,7 +48,7 @@ internal sealed class ListCommand(
         Options.Add(_jsonOption);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(
+    protected override async Task<int> ExecuteAsync(
         ParseResult parseResult,
         CancellationToken cancellationToken)
     {
@@ -65,8 +66,8 @@ internal sealed class ListCommand(
             var invalid = agents.Where(a => !valid.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
-                interaction.WriteError($"Invalid agents: {invalid.Join(", ")}");
-                return new CommandResult.Failure(ExitCodeConstants.Failure);
+                Output.Error($"Invalid agents: {invalid.Join(", ")}");
+                return ExitCodeConstants.Failure;
             }
         }
 
@@ -77,57 +78,34 @@ internal sealed class ListCommand(
             var payload = skills.Select(s => s.ToJsonType(global, registry)).ToArray();
 
             var json = JsonSerializer.Serialize(payload, JsonSourceGenerationContext.Default.InstalledSkillJsonArray);
-            Console.WriteLine(json);
-            return new CommandResult.Success();
+            System.Console.WriteLine(json);
+            return ExitCodeConstants.Success;
         }
 
         if (skills.Length == 0)
         {
-            interaction.WriteDim(global ? "No global skills found." : "No project skills found.");
+            Output.Dim(global ? "No global skills found." : "No project skills found.");
             if (!global)
             {
-                interaction.WriteDim("Try listing global skills with -g");
+                Output.Dim("Try listing global skills with -g");
             }
-            return new CommandResult.Success();
+            return ExitCodeConstants.Success;
         }
 
         var scopeLabel = global ? "Global" : "Project";
-        interaction.WriteMarkupLine($"[bold]{scopeLabel} Skills[/]");
-        interaction.WriteLine();
+        var rows = skills
+            .Select(skill => new InstalledSkillRow(
+                skill.Name,
+                SafePath.AbbreviateForDisplay(
+                    skill.CanonicalPath,
+                    systemEnvironment.HomeDirectory,
+                    systemEnvironment.CurrentDirectory),
+                skill.Agents.GetDisplayNames(registry).ToList()))
+            .ToList();
 
-        var grid = new Grid();
-        grid.AddColumn(new GridColumn().PadRight(2));
-        grid.AddColumn(new GridColumn().PadRight(2));
-        grid.AddColumn(new GridColumn().PadRight(0));
-        grid.AddRow("[grey66]Skill[/]", "[grey66]Path[/]", "[grey66]Agents[/]");
+        Output.Write(InstalledSkillsView.Create(scopeLabel, rows));
 
-        foreach (var skill in skills)
-        {
-            var agentNames = skill.Agents.GetDisplayNames(registry).ToList();
-
-            string agentCell;
-            if (agentNames.Count == 0)
-            {
-                agentCell = "[yellow]not linked[/]";
-            }
-            else
-            {
-                var display =
-                    agentNames.Count > 5
-                        ? agentNames.Take(5).Join(", ") + $" +{agentNames.Count - 5} more"
-                        : agentNames.Join(", ");
-                agentCell = $"[dim]{Markup.Escape(display)}[/]";
-            }
-
-            grid.AddRow(
-                $"[cyan]{Markup.Escape(skill.Name)}[/]",
-                $"[dim]{Markup.Escape(SafePath.AbbreviateForDisplay(skill.CanonicalPath, systemEnvironment.HomeDirectory, systemEnvironment.CurrentDirectory))}[/]",
-                agentCell);
-        }
-
-        interaction.WriteRenderable(grid);
-
-        return new CommandResult.Success();
+        return ExitCodeConstants.Success;
     }
 
     private ImmutableArray<InstalledSkill> CollectInstalledSkills(

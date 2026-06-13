@@ -8,6 +8,8 @@ using Skillz.Skills;
 using Skillz.Sources;
 using Skillz.Tests.TestServices;
 using Skillz.Tests.Utils;
+using Spectre.Console;
+using Spectre.Console.Testing;
 using Xunit;
 
 namespace Skillz.Tests.Commands;
@@ -54,12 +56,14 @@ public class AddCommandTests : IDisposable
     private IServiceProvider BuildServices(
         Action<TestSourceParser>? configureParser = null,
         Action<TestSkillDiscovery>? configureDiscovery = null,
-        Action<TestAddCommandPrompter>? configurePrompter = null,
+        Action<TestSkillSelector>? configureSkillSelector = null,
+        Action<TestAgentSelector>? configureAgentSelector = null,
         Action<TestInstaller>? configureInstaller = null,
         Action<TestProjectLockFile>? configureProjectLock = null,
-        Action<TestGlobalLockFile>? configureGlobalLock = null)
+        Action<TestGlobalLockFile>? configureGlobalLock = null,
+        Action<IServiceCollection>? configureServices = null)
     {
-        var services = CliTestHelper.CreateServiceProvider();
+        var services = CliTestHelper.CreateServiceProvider(configure: configureServices);
 
         // The real LocalProvider guards on the source directory existing; register the workspace
         // so local-source installs proceed to the (faked) discovery step.
@@ -67,7 +71,8 @@ public class AddCommandTests : IDisposable
 
         configureParser?.Invoke(services.GetRequiredService<TestSourceParser>());
         configureDiscovery?.Invoke(services.GetRequiredService<TestSkillDiscovery>());
-        configurePrompter?.Invoke(services.GetRequiredService<TestAddCommandPrompter>());
+        configureSkillSelector?.Invoke(services.GetRequiredService<TestSkillSelector>());
+        configureAgentSelector?.Invoke(services.GetRequiredService<TestAgentSelector>());
         configureInstaller?.Invoke(services.GetRequiredService<TestInstaller>());
         configureProjectLock?.Invoke(services.GetRequiredService<TestProjectLockFile>());
         configureGlobalLock?.Invoke(services.GetRequiredService<TestGlobalLockFile>());
@@ -279,7 +284,7 @@ public class AddCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
         Assert.Equal(0, exitCode);
         Assert.DoesNotContain("s3cr3t", interaction.OutputText);
         Assert.Contains(
@@ -313,26 +318,28 @@ public class AddCommandTests : IDisposable
         Assert.Equal(0, exitCode);
         Assert.Empty(installed);
 
-        var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
-        var output = string.Join("\n", interaction.Output);
-        Assert.Contains("alpha", output);
-        Assert.Contains("beta", output);
+        var interaction = services.GetRequiredService<CapturingConsole>();
+        Assert.Contains("alpha", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("beta", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Add_Uses_Prompter_For_Skill_Selection_When_Interactive()
+    public async Task Add_Uses_SkillSelector_For_Skill_Selection_When_Interactive()
     {
         // Arrange
         var installed = new List<string>();
 
+        // --global skips the install-scope prompt; a single agent skips the install-mode prompt, so the
+        // only live prompt is the final confirmation, which we answer "y".
+        var console = InteractiveConsole.Create();
+        console.Input.PushTextWithEnter("y");
+
         var services = BuildServices(
+            configureServices: s => s.AddSingleton<IAnsiConsole>(console),
             configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha"), CreateSkill("beta") },
-            configurePrompter: p =>
-            {
-                p.OnSelectSkills = skills => skills.Where(s => s.InstallName == "beta").ToList();
-                p.OnConfirmInstallation = (_, _, _) => true;
-            },
+            configureSkillSelector: s =>
+                s.OnSelectSkills = skills => skills.Where(skill => skill.InstallName == "beta").ToList(),
             configureInstaller: i =>
                 i.OnInstallRemoteSkill = (skill, _, _) =>
                 {
@@ -342,7 +349,7 @@ public class AddCommandTests : IDisposable
 
         // Act
         var cmd = services.GetRequiredService<AddCommand>();
-        var parseResult = cmd.Parse(["./local-path", "--agent", "claude-code"]);
+        var parseResult = cmd.Parse(["./local-path", "--global", "--agent", "claude-code"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
@@ -354,17 +361,17 @@ public class AddCommandTests : IDisposable
     [Fact]
     public async Task Add_Interactive_Confirmation_Includes_Existing_Canonical_Path()
     {
-        // Arrange
+        // Arrange: --global skips the scope prompt and a single agent skips the mode prompt, so the
+        // overwrite summary is rendered straight to the live confirmation prompt, which we accept ("y").
         var canonical = Path.Combine(_workspace, ".skillz", "skills", "alpha");
 
+        var console = InteractiveConsole.Create();
+        console.Input.PushTextWithEnter("y");
+
         var services = BuildServices(
+            configureServices: s => s.AddSingleton<IAnsiConsole>(console),
             configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
-            configurePrompter: p =>
-            {
-                p.OnConfirmInstallation = (_, _, overwrites) =>
-                    overwrites.Count == 1 && overwrites[0].DestinationPath == canonical;
-            },
             configureInstaller: i =>
             {
                 i.OnGetCanonicalPath = (skill, _, _) => Path.Combine(_workspace, ".skillz", "skills", skill);
@@ -374,27 +381,29 @@ public class AddCommandTests : IDisposable
 
         // Act
         var cmd = services.GetRequiredService<AddCommand>();
-        var parseResult = cmd.Parse(["./local-path", "--agent", "claude-code"]);
+        var parseResult = cmd.Parse(["./local-path", "--global", "--agent", "claude-code"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
-        // Assert
-        var prompter = services.GetRequiredService<TestAddCommandPrompter>();
+        // Assert: the confirmation summary named the existing canonical path that will be overwritten.
         Assert.Equal(0, exitCode);
-        Assert.Single(prompter.LastOverwriteTargets);
-        Assert.Equal(canonical, prompter.LastOverwriteTargets[0].DestinationPath);
+        Assert.Contains("Existing installs will be overwritten:", console.Output, StringComparison.Ordinal);
+        Assert.Contains($"alpha: {canonical}", console.Output, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task Add_Interactive_Cancel_With_Overwrite_Does_Not_Install()
     {
-        // Arrange
+        // Arrange: decline the live confirmation prompt ("n") and prove nothing is installed.
         var canonical = Path.Combine(_workspace, ".skillz", "skills", "alpha");
         var installed = false;
 
+        var console = InteractiveConsole.Create();
+        console.Input.PushTextWithEnter("n");
+
         var services = BuildServices(
+            configureServices: s => s.AddSingleton<IAnsiConsole>(console),
             configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
-            configurePrompter: p => p.OnConfirmInstallation = (_, _, _) => false,
             configureInstaller: i =>
             {
                 i.OnGetCanonicalPath = (skill, _, _) => Path.Combine(_workspace, ".skillz", "skills", skill);
@@ -408,7 +417,7 @@ public class AddCommandTests : IDisposable
 
         // Act
         var cmd = services.GetRequiredService<AddCommand>();
-        var parseResult = cmd.Parse(["./local-path", "--agent", "claude-code"]);
+        var parseResult = cmd.Parse(["./local-path", "--global", "--agent", "claude-code"]);
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
@@ -426,12 +435,12 @@ public class AddCommandTests : IDisposable
             configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") });
         services.GetRequiredService<FakeFileStore>().CreateDirectory(canonical);
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var console = services.GetRequiredService<CapturingConsole>();
         var installer = services.GetRequiredService<TestInstaller>();
         installer.OnGetCanonicalPath = (skill, _, _) => Path.Combine(_workspace, ".skillz", "skills", skill);
         installer.OnInstallRemoteSkill = (_, _, _) =>
         {
-            interaction.WriteLine("INSTALL ACTION");
+            console.WriteLine("INSTALL ACTION");
             return new InstallResult(true, canonical);
         };
 
@@ -441,14 +450,93 @@ public class AddCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
-        var output = services.GetRequiredService<TestInteractionService>().Output.ToList();
-        var warningIndex = output.FindIndex(line =>
-            line.Contains("Overwriting existing skill", StringComparison.Ordinal)
-        );
-        var installIndex = output.FindIndex(line => line.Contains("INSTALL ACTION", StringComparison.Ordinal));
+        var output = console.OutputText;
+        var warningIndex = output.IndexOf("Overwriting existing skill", StringComparison.Ordinal);
+        var installIndex = output.IndexOf("INSTALL ACTION", StringComparison.Ordinal);
         Assert.Equal(0, exitCode);
         Assert.True(warningIndex >= 0);
         Assert.True(installIndex > warningIndex);
+    }
+
+    // Spectre's selection prompts need BOTH Interactive (stdin a TTY) AND Ansi (TERM detected); they
+    // throw on either gap. These are the three non-promptable combinations: fully headless (false,false),
+    // a real TTY with TERM=dumb (true,false), and a redirected-but-ANSI-capable stream (false,true).
+    // Each must degrade the scope/mode/confirm prompts to their defaults rather than crash Spectre.
+    public static TheoryData<bool, bool> NonPromptableConsoles =>
+        new() { { false, false }, { true, false }, { false, true } };
+
+    private static TestConsole ConsoleWith(bool interactive, bool ansi)
+    {
+        var console = new TestConsole();
+        console.Profile.Capabilities.Interactive = interactive;
+        console.Profile.Capabilities.Ansi = ansi;
+        console.Profile.Width = 200;
+        return console;
+    }
+
+    [Theory]
+    [MemberData(nameof(NonPromptableConsoles))]
+    public async Task Add_Proceeds_With_Project_Defaults_When_Console_CannotPrompt(bool interactive, bool ansi)
+    {
+        // A single skill with an explicit agent reaches the install-scope and confirm prompts. On a
+        // non-promptable console these previously crashed Spectre; now they degrade to their defaults
+        // (project scope, proceed) so the install completes.
+        var installed = new List<string>();
+        bool? installedGlobal = null;
+
+        var services = BuildServices(
+            configureServices: s => s.AddSingleton<IAnsiConsole>(ConsoleWith(interactive, ansi)),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, _, options) =>
+                {
+                    installed.Add(skill.InstallName);
+                    installedGlobal = options.Global;
+                    return new InstallResult(true, $"/installed/{skill.InstallName}");
+                });
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var exitCode = await cmd.Parse(["./local-path", "--agent", "claude-code"])
+            .InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: installed without a crash, defaulting to project scope (not global).
+        Assert.Equal(0, exitCode);
+        Assert.Contains("alpha", installed);
+        Assert.False(installedGlobal);
+    }
+
+    [Theory]
+    [MemberData(nameof(NonPromptableConsoles))]
+    public async Task Add_AutoSelectsInstalledAgents_When_NoAgent_And_Console_CannotPrompt(bool interactive, bool ansi)
+    {
+        // With no --agent on a non-promptable console, the agent picker is a branch (not a prompt), so
+        // it must auto-select the installed agents + universals exactly like -y, NOT fall through to the
+        // interactive selector's last-used pre-selection (which can name agents no longer installed).
+        var installedAgents = new List<string>();
+
+        var services = BuildServices(
+            configureServices: s => s.AddSingleton<IAnsiConsole>(ConsoleWith(interactive, ansi)),
+            configureParser: p => p.OnParse = _ => new SkillSource.Local(_workspace, _workspace),
+            configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
+            configureInstaller: i =>
+                i.OnInstallRemoteSkill = (skill, agent, _) =>
+                {
+                    installedAgents.Add(agent);
+                    return new InstallResult(true, $"/installed/{agent}/{skill.InstallName}");
+                });
+
+        // Act
+        var cmd = services.GetRequiredService<AddCommand>();
+        var exitCode = await cmd.Parse(["./local-path"])
+            .InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: installed to the universal agents via the auto-select branch; the interactive selector
+        // (which would apply last-used pre-selection) was never consulted.
+        Assert.Equal(0, exitCode);
+        Assert.NotEmpty(installedAgents);
+        Assert.Null(services.GetRequiredService<TestAgentSelector>().LastDefaults);
     }
 
     [Fact]
@@ -482,21 +570,12 @@ public class AddCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var output = services.GetRequiredService<CapturingConsole>().OutputText;
         Assert.Equal(ExitCodeConstants.Failure, exitCode);
-        Assert.Contains(
-            interaction.Output,
-            line =>
-                line.Contains("Invalid agents", StringComparison.Ordinal)
-                && line.Contains("bogus", StringComparison.Ordinal));
-        Assert.Contains(
-            interaction.Output,
-            line =>
-                line.Contains("TIP:", StringComparison.Ordinal)
-                && line.Contains("Valid agents", StringComparison.Ordinal));
-        Assert.DoesNotContain(
-            interaction.Output,
-            line => line.Contains("No agents selected", StringComparison.Ordinal));
+        Assert.Contains("Invalid agents", output, StringComparison.Ordinal);
+        Assert.Contains("bogus", output, StringComparison.Ordinal);
+        Assert.Contains("Valid agents", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("No agents selected", output, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -521,7 +600,7 @@ public class AddCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
         Assert.Equal(ExitCodeConstants.Failure, exitCode);
         Assert.Contains("alpha", lockEntries);
         Assert.DoesNotContain("beta", lockEntries);
@@ -548,7 +627,7 @@ public class AddCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
         Assert.Equal(ExitCodeConstants.Failure, exitCode);
         Assert.Empty(lockEntries);
         Assert.Contains("Installation failed", interaction.OutputText, StringComparison.Ordinal);
@@ -572,7 +651,7 @@ public class AddCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
         Assert.Equal(0, exitCode);
         Assert.Contains("Symlinked:", interaction.OutputText, StringComparison.Ordinal);
         Assert.DoesNotContain("Copied:", interaction.OutputText, StringComparison.Ordinal);
@@ -602,7 +681,7 @@ public class AddCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
         Assert.Equal(0, exitCode);
         Assert.Contains("Copied:", interaction.OutputText, StringComparison.Ordinal);
         Assert.DoesNotContain("Symlinked:", interaction.OutputText, StringComparison.Ordinal);
@@ -630,7 +709,7 @@ public class AddCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
         Assert.Equal(0, exitCode);
         Assert.Contains("Copied:", interaction.OutputText, StringComparison.Ordinal);
         Assert.DoesNotContain("Canonical:", interaction.OutputText, StringComparison.Ordinal);
@@ -663,7 +742,7 @@ public class AddCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
         Assert.Equal(0, exitCode);
         Assert.Contains("Symlinked:", interaction.OutputText, StringComparison.Ordinal);
         Assert.Contains("Canonical:", interaction.OutputText, StringComparison.Ordinal);
@@ -687,13 +766,12 @@ public class AddCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
         Assert.Equal(0, exitCode);
         Assert.Contains(
-            interaction.Output,
-            line =>
-                line.Contains("Could not record lock entry", StringComparison.Ordinal)
-                && line.Contains("lock file is read-only", StringComparison.Ordinal));
+            "Could not record lock entry for 'alpha': lock file is read-only",
+            interaction.OutputText,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -712,7 +790,7 @@ public class AddCommandTests : IDisposable
         var exitCode = await parseResult.InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert: the throw becomes a failed entry, the command reports failure instead of unwinding.
-        var interaction = services.GetRequiredService<TestInteractionService>();
+        var interaction = services.GetRequiredService<CapturingConsole>();
         Assert.Equal(ExitCodeConstants.Failure, exitCode);
         Assert.Contains("Installation failed", interaction.OutputText, StringComparison.Ordinal);
         Assert.Contains("installer exploded", interaction.OutputText, StringComparison.Ordinal);
@@ -727,21 +805,13 @@ public class AddCommandTests : IDisposable
             configureDiscovery: d => d.OnDiscover = (_, _, _) => new[] { CreateSkill("alpha") },
             configureInstaller: i => i.OnInstallRemoteSkill = (_, _, _) => throw new OperationCanceledException());
 
-        var executor = services.GetRequiredService<AddCommandExecutor>();
-        var options = new AddCommandOptions(
-            Source: "./local-path",
-            Global: false,
-            Agents: ["claude-code"],
-            SkillFilters: [],
-            Yes: true,
-            All: false,
-            Copy: false,
-            FullDepth: false,
-            List: false);
+        // Act: the installer throws OperationCanceledException, which must propagate past the per-skill
+        // failure aggregation (not become a failed entry) and surface as a cancelled exit.
+        var cmd = services.GetRequiredService<AddCommand>();
+        var exitCode = await cmd.Parse(["./local-path", "--yes", "--agent", "claude-code"])
+            .InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
-        // Act & Assert: cancellation is not swallowed by the per-skill failure aggregation.
-        await Assert.ThrowsAsync<OperationCanceledException>(() =>
-            executor.RunAsync(options, TestContext.Current.CancellationToken)
-        );
+        // Assert
+        Assert.Equal(ExitCodeConstants.Cancelled, exitCode);
     }
 }

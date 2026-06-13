@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Skillz.Commands;
+using Skillz.Commands.Selection;
 using Skillz.Git;
 using Skillz.Install;
 using Skillz.Interaction;
@@ -11,6 +12,8 @@ using Skillz.Sources;
 using Skillz.Sources.Providers;
 using Skillz.Tests.TestServices;
 using Skillz.Utils;
+using Skillz.Views;
+using Spectre.Console;
 
 namespace Skillz.Tests.Utils;
 
@@ -27,8 +30,8 @@ internal static class CliTestHelper
         services.AddSingleton<ConsoleEnvironment>(sp => sp.GetRequiredService<TestConsoleEnvironment>());
         services.AddSingleton<CliExecutionContext>();
 
-        services.AddSingleton<TestInteractionService>();
-        services.AddSingleton<IInteractionService>(sp => sp.GetRequiredService<TestInteractionService>());
+        services.AddSingleton<CapturingConsole>();
+        services.AddSingleton<IAnsiConsole>(sp => sp.GetRequiredService<CapturingConsole>());
 
         services.AddSingleton<TestGitClient>();
         services.AddSingleton<IGitClient>(sp => sp.GetRequiredService<TestGitClient>());
@@ -60,8 +63,11 @@ internal static class CliTestHelper
         services.AddSingleton<AgentRegistry>();
         services.AddSingleton<AgentEnvironment>();
 
+        services.AddSingleton(TimeProvider.System);
+
         services.AddSingleton<TestInstaller>();
         services.AddSingleton<ISkillInstaller>(sp => sp.GetRequiredService<TestInstaller>());
+        services.AddTransient<InstallRecorder>();
 
         services.AddSingleton<TestSkillDiscovery>();
         services.AddSingleton<ISkillDiscovery>(sp => sp.GetRequiredService<TestSkillDiscovery>());
@@ -75,10 +81,11 @@ internal static class CliTestHelper
         services.AddSingleton<TestGlobalLockFile>();
         services.AddSingleton<IGlobalLockFile>(sp => sp.GetRequiredService<TestGlobalLockFile>());
 
-        services.AddSingleton<TestAddCommandPrompter>();
-        services.AddSingleton<IAddCommandPrompter>(sp => sp.GetRequiredService<TestAddCommandPrompter>());
-        services.AddSingleton<TestRemoveCommandPrompter>();
-        services.AddSingleton<IRemoveCommandPrompter>(sp => sp.GetRequiredService<TestRemoveCommandPrompter>());
+        services.AddSingleton<TestSkillSelector>();
+        services.AddSingleton<ISkillSelector>(sp => sp.GetRequiredService<TestSkillSelector>());
+
+        services.AddSingleton<TestAgentSelector>();
+        services.AddSingleton<IAgentSelector>(sp => sp.GetRequiredService<TestAgentSelector>());
 
         services.AddSingleton<IProvider>(sp => new GitHubProvider(
             sp.GetRequiredService<IGitClient>(),
@@ -94,7 +101,6 @@ internal static class CliTestHelper
             sp.GetRequiredService<IFileStore>()));
         services.AddSingleton<ProviderRegistry>();
 
-        services.AddTransient<AddCommandExecutor>();
         services.AddTransient<AddCommand>();
         services.AddTransient<RemoveCommand>();
         services.AddTransient<ListCommand>();

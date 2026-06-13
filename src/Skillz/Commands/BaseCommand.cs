@@ -1,36 +1,53 @@
 using System.CommandLine;
-using System.CommandLine.Help;
+using Skillz.Interaction;
+using Skillz.Views;
+using Spectre.Console;
 
 namespace Skillz.Commands;
 
 internal abstract class BaseCommand : Command
 {
-    protected BaseCommand(string name, string? description = null) : base(name, description)
+    protected BaseCommand(
+        IAnsiConsole console,
+        string name,
+        string? description = null)
+        : base(name, description)
     {
+        Output = console;
+
         Configure();
 
         SetAction(
             async (parseResult, cancellationToken) =>
             {
-                var result = await ExecuteAsync(parseResult, cancellationToken);
-
-                if (result is CommandResult.DisplayHelp)
+                try
                 {
-                    new HelpAction().Invoke(parseResult);
-                    return ExitCodeConstants.Success;
+                    return await ExecuteAsync(parseResult, cancellationToken);
                 }
-
-                if (result is CommandResult.Failure { Message: { } message }
-                    && !string.IsNullOrWhiteSpace(message))
+                catch (CliException ex)
                 {
-                    Console.Error.WriteLine(message);
-                }
+                    if (ex.Title is { } title)
+                    {
+                        console.WriteLine();
+                        console.Write(ErrorView.Create(title, ex.Message, ex.Hint));
+                    }
+                    else
+                    {
+                        console.Error(ex.Message);
+                    }
 
-                return result.ExitCode;
+                    return ex.ExitCode;
+                }
+                catch (OperationCanceledException)
+                {
+                    return ExitCodeConstants.Cancelled;
+                }
             });
     }
 
+    protected IAnsiConsole Output { get; }
+
     protected virtual void Configure() { }
 
-    protected abstract Task<CommandResult> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken);
+    protected abstract Task<int> ExecuteAsync(ParseResult parseResult, CancellationToken cancellationToken);
 }

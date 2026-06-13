@@ -2,7 +2,6 @@ using System.Text;
 using Microsoft.Extensions.DependencyInjection;
 using Skillz.Commands;
 using Skillz.Install;
-using Skillz.Interaction;
 using Skillz.Tests.TestServices;
 using Xunit;
 
@@ -25,7 +24,7 @@ internal static class CommandSnapshot
     public static async Task<string> RunAsync(IServiceProvider services, params string[] args)
     {
         var root = services.GetRequiredService<SkillzRootCommand>();
-        var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
+        var console = services.GetRequiredService<CapturingConsole>();
 
         // Scrub absolute paths back to stable tokens using the SAME ambient state the command builds
         // its paths from - the injected ISystemEnvironment - rather than the real process. On macOS the
@@ -56,7 +55,7 @@ internal static class CommandSnapshot
             Console.SetError(originalError);
         }
 
-        return Render(args, exitCode, interaction.OutputText, stdout.ToString(), stderr.ToString(), cwd, home);
+        return Render(args, exitCode, console.OutputText, stdout.ToString(), stderr.ToString(), cwd, home);
     }
 
     private static string Render(

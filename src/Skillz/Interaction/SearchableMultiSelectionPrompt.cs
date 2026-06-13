@@ -11,7 +11,8 @@ namespace Skillz.Interaction;
 /// duplicate labels never cross-select; mandatory items (e.g. universal agents) start selected, render
 /// their marker in blue, and cannot be toggled off.
 /// </summary>
-internal sealed class SearchableMultiSelectionPrompt<T> where T : notnull
+internal sealed class SearchableMultiSelectionPrompt<T> : IPrompt<ImmutableArray<T>>
+    where T : notnull
 {
     // Hard cap on the query length so a pathological paste cannot grow state unboundedly.
     private const int MaxQueryLength = 256;

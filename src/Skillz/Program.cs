@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Skillz.Commands;
+using Skillz.Commands.Selection;
 using Skillz.Git;
 using Skillz.Install;
 using Skillz.Interaction;
@@ -11,6 +12,7 @@ using Skillz.Skills;
 using Skillz.Sources;
 using Skillz.Sources.Providers;
 using Skillz.Utils;
+using Skillz.Views;
 using Spectre.Console;
 
 namespace Skillz;
@@ -43,8 +45,6 @@ internal static class Program
         builder.Services.AddSingleton(AnsiConsole.Console);
         builder.Services.AddSingleton<ConsoleEnvironment>();
         builder.Services.AddSingleton<CliExecutionContext>();
-        builder.Services.AddSingleton<IInteractionService, ConsoleInteractionService>();
-        builder.Services.AddSingleton<BannerService>();
 
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
@@ -65,6 +65,7 @@ internal static class Program
         builder.Services.AddSingleton<AgentEnvironment>();
         builder.Services.AddSingleton<XdgPaths>();
         builder.Services.AddSingleton<ISkillInstaller, SkillInstaller>();
+        builder.Services.AddTransient<InstallRecorder>();
 
         builder.Services.AddSingleton<PluginManifest>();
         builder.Services.AddSingleton<PluginGrouping>();
@@ -83,10 +84,9 @@ internal static class Program
         builder.Services.AddSingleton<IProjectLockFile, ProjectLockFile>();
         builder.Services.AddSingleton<IGlobalLockFile, GlobalLockFile>();
 
-        builder.Services.AddSingleton<IAddCommandPrompter, AddCommandPrompter>();
-        builder.Services.AddSingleton<IRemoveCommandPrompter, RemoveCommandPrompter>();
+        builder.Services.AddSingleton<ISkillSelector, SkillSelector>();
+        builder.Services.AddSingleton<IAgentSelector, AgentSelector>();
 
-        builder.Services.AddTransient<AddCommandExecutor>();
         builder.Services.AddTransient<AddCommand>();
         builder.Services.AddTransient<RemoveCommand>();
         builder.Services.AddTransient<ListCommand>();
@@ -104,27 +104,31 @@ internal static class Program
 
             if (args.Length == 0)
             {
-                var banner = host.Services.GetRequiredService<BannerService>();
-                banner.ShowBanner();
+                if (ShouldShowBanner(host.Services))
+                {
+                    host.Services.GetRequiredService<IAnsiConsole>().Write(BannerView.Create());
+                }
                 return ExitCodeConstants.Success;
             }
 
             // Curated root help: short-circuit when user asks for top-level help only
             if (args.Length == 1 && args[0] is "--help" or "-h" or "-?")
             {
-                var banner = host.Services.GetRequiredService<BannerService>();
-                banner.ShowLogo();
-                banner.ShowCuratedHelp();
+                var console = host.Services.GetRequiredService<IAnsiConsole>();
+                if (ShouldShowBanner(host.Services))
+                {
+                    console.Write(LogoView.Create());
+                }
+                console.Write(CuratedHelpView.Create());
                 return ExitCodeConstants.Success;
             }
 
             var parseResult = rootCommand.Parse(args);
 
             var commandName = parseResult.CommandResult.Command.Name;
-            if (commandName is "add" or "init")
+            if (commandName is "add" or "init" && ShouldShowBanner(host.Services))
             {
-                var banner = host.Services.GetRequiredService<BannerService>();
-                banner.ShowLogo();
+                host.Services.GetRequiredService<IAnsiConsole>().Write(LogoView.Create());
             }
 
             return await parseResult.InvokeAsync(cancellationToken: cts.Token);
@@ -132,11 +136,6 @@ internal static class Program
         catch (OperationCanceledException)
         {
             return ExitCodeConstants.Cancelled;
-        }
-        catch (CliException ex)
-        {
-            Console.Error.WriteLine(ex.Message);
-            return ex.ExitCode;
         }
         catch (Exception ex)
         {
@@ -152,4 +151,13 @@ internal static class Program
     }
 
     internal static string[] StripBareTerminators(string[] args) => args.Where(a => a != "--").ToArray();
+
+    // The banner and logo are chrome: skip them for machine-readable JSON output and when running
+    // inside an agent host, matching the old BannerView.ShouldSkip guard.
+    private static bool ShouldShowBanner(IServiceProvider services)
+    {
+        var context = services.GetRequiredService<CliExecutionContext>();
+        var agentEnvironment = services.GetRequiredService<AgentEnvironment>();
+        return !context.IsJsonOutput && !agentEnvironment.IsRunningInsideAgent;
+    }
 }

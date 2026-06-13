@@ -10,10 +10,10 @@ using static Skillz.KnownConfigNames;
 namespace Skillz.Commands;
 
 internal sealed class InitCommand(
-    IInteractionService interaction,
+    IAnsiConsole console,
     IFileStore fileStore,
     ISystemEnvironment systemEnvironment)
-    : BaseCommand("init", "Initialize a new skill (creates SKILL.md)")
+    : BaseCommand(console, "init", "Initialize a new skill (creates SKILL.md)")
 {
     private readonly Argument<string?> _nameArgument = new("name")
     {
@@ -26,7 +26,7 @@ internal sealed class InitCommand(
         Arguments.Add(_nameArgument);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(
+    protected override async Task<int> ExecuteAsync(
         ParseResult parseResult,
         CancellationToken cancellationToken)
     {
@@ -61,8 +61,8 @@ internal sealed class InitCommand(
 
         if (fileStore.FileExists(skillFile))
         {
-            interaction.WriteWarning($"Skill already exists at {displayPath}");
-            return new CommandResult.Success();
+            Output.Warning($"Skill already exists at {displayPath}");
+            return ExitCodeConstants.Success;
         }
 
         if (hasName)
@@ -73,7 +73,7 @@ internal sealed class InitCommand(
         var content = BuildSkillTemplate(skillName);
         await fileStore.WriteAllTextAsync(skillFile, content, cancellationToken);
 
-        interaction.WriteMarkupLine(
+        Output.MarkupLineRaw(
             $"""
             [green]Initialized skill: {Markup.Escape(skillName)}[/]
 
@@ -89,7 +89,7 @@ internal sealed class InitCommand(
               URL:    Host the file, then skillz add https://example.com/{Markup.Escape(displayPath)}
             """);
 
-        return new CommandResult.Success();
+        return ExitCodeConstants.Success;
     }
 
     private static string BuildSkillTemplate(string skillName)

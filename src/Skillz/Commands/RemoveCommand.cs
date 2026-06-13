@@ -2,24 +2,26 @@ using System.Collections.Immutable;
 using System.CommandLine;
 using Skillz.Install;
 using Skillz.Interaction;
+using Skillz.Interaction.Decorators;
+using Skillz.Interaction.Prompts;
 using Skillz.Locking;
 using Skillz.Paths;
 using Skillz.Skills;
 using Skillz.Utils;
+using Spectre.Console;
 
 namespace Skillz.Commands;
 
 internal sealed class RemoveCommand(
     ISkillInstaller installer,
     AgentRegistry registry,
-    IInteractionService interaction,
-    IRemoveCommandPrompter prompter,
+    IAnsiConsole console,
     IProjectLockFile projectLock,
     IGlobalLockFile globalLock,
     AgentEnvironment agentEnvironment,
     IFileStore fileStore,
     ISystemEnvironment systemEnvironment,
-    ConsoleEnvironment consoleEnvironment) : BaseCommand("remove", "Remove installed skills")
+    ConsoleEnvironment consoleEnvironment) : BaseCommand(console, "remove", "Remove installed skills")
 {
     private readonly Argument<string[]> _skillsArgument = new("skills")
     {
@@ -57,7 +59,7 @@ internal sealed class RemoveCommand(
         Options.Add(_allOption);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(
+    protected override async Task<int> ExecuteAsync(
         ParseResult parseResult,
         CancellationToken cancellationToken)
     {
@@ -73,8 +75,8 @@ internal sealed class RemoveCommand(
             var invalid = agents.Where(a => !valid.Contains(a)).ToList();
             if (invalid.Count > 0)
             {
-                interaction.WriteError($"Invalid agents: {invalid.Join(", ")}");
-                return new CommandResult.Failure(ExitCodeConstants.Failure);
+                Output.Error($"Invalid agents: {invalid.Join(", ")}");
+                return ExitCodeConstants.Failure;
             }
         }
 
@@ -83,8 +85,8 @@ internal sealed class RemoveCommand(
 
         if (installed.Length == 0)
         {
-            interaction.WriteWarning("No skills found to remove.");
-            return new CommandResult.Success();
+            Output.Warning("No skills found to remove.");
+            return ExitCodeConstants.Success;
         }
 
         var nonInteractive =
@@ -101,22 +103,30 @@ internal sealed class RemoveCommand(
 
             if (selected.Length == 0)
             {
-                interaction.WriteDim($"No matching skills found for: {requestedSkills.Join(", ")}");
-                return new CommandResult.Success();
+                Output.Dim($"No matching skills found for: {requestedSkills.Join(", ")}");
+                return ExitCodeConstants.Success;
             }
         }
         else if (nonInteractive)
         {
-            interaction.WriteDim("No skills specified for removal.");
-            return new CommandResult.Success();
+            Output.Dim("No skills specified for removal.");
+            return ExitCodeConstants.Success;
         }
         else
         {
-            selected = await prompter.SelectSkillsAsync(installed, cancellationToken);
+            var choices = installed.Select(s => (s, s));
+
+            // WithDefault degrades to an empty selection when the console cannot drive the key loop
+            // (e.g. output is redirected while stdin is still a TTY), so the run cancels gracefully
+            // below instead of throwing from Spectre.
+            selected = await new MultiSelectPrompt<string>("Select skills to remove", choices)
+                .RequireNonEmpty()
+                .WithDefault(ImmutableArray<string>.Empty)
+                .ShowAsync(new VimNavConsole(Output), cancellationToken);
             if (selected.Length == 0)
             {
-                interaction.WriteWarning("Removal cancelled");
-                return new CommandResult.Cancelled();
+                Output.Warning("Removal cancelled");
+                return ExitCodeConstants.Cancelled;
             }
         }
 
@@ -124,18 +134,24 @@ internal sealed class RemoveCommand(
 
         if (!nonInteractive)
         {
-            var confirmed = await prompter.ConfirmRemovalAsync(selected, cancellationToken);
+            var message = $"Are you sure you want to remove {selected.Length} skill(s) [{selected.Join(", ")}]?";
+            // Removal is destructive, so when the console cannot show the confirm (redirected or
+            // non-ANSI) WithDefault DECLINES rather than proceeds - the user must pass -y to remove
+            // non-interactively. This matches the prompt's own decline-by-default.
+            var confirmed = await new ConfirmPrompt(message, defaultValue: false)
+                .WithDefault(defaultValue: false)
+                .ShowAsync(Output, cancellationToken);
             if (!confirmed)
             {
-                interaction.WriteWarning("Removal cancelled");
-                return new CommandResult.Cancelled();
+                Output.Warning("Removal cancelled");
+                return ExitCodeConstants.Cancelled;
             }
         }
 
         var failures = new List<(string Skill, string Error)>();
         var removed = 0;
 
-        await interaction.StatusAsync("Removing skills...", async () =>
+        await Output.StatusAsync("Removing skills...", async () =>
         {
             foreach (var skillName in selected)
             {
@@ -185,21 +201,21 @@ internal sealed class RemoveCommand(
 
         if (removed > 0)
         {
-            interaction.WriteSuccess($"Successfully removed {removed} skill(s)");
+            Output.Success($"Successfully removed {removed} skill(s)");
         }
 
         if (failures.Count > 0)
         {
-            interaction.WriteError($"Failed to remove {failures.Count} skill(s)");
+            Output.Error($"Failed to remove {failures.Count} skill(s)");
             foreach (var (skill, error) in failures)
             {
-                interaction.WriteError($"  {skill}: {error}");
+                Output.Error($"  {skill}: {error}");
             }
 
-            return new CommandResult.Failure(ExitCodeConstants.Failure);
+            return ExitCodeConstants.Failure;
         }
 
-        return new CommandResult.Success();
+        return ExitCodeConstants.Success;
     }
 
     private ImmutableArray<string> CollectInstalledSkills(
