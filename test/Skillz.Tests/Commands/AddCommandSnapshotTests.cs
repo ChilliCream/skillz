@@ -118,6 +118,7 @@ public class AddCommandSnapshotTests : IDisposable
             # exit 1
 
             Source: /skillz-test/local
+            Fetching skills...
             No valid skills found. Skills require a SKILL.md with name and description.
             """);
     }
@@ -140,6 +141,7 @@ public class AddCommandSnapshotTests : IDisposable
             # exit 1
 
             Source: /skillz-test/local
+            Fetching skills...
             Found 1 skill(s)
 
             ┌─Invalid agents───────────────────────────────────────────────────────────────┐
@@ -178,6 +180,7 @@ public class AddCommandSnapshotTests : IDisposable
             $ skillz add ./local-path --list
 
             Source: /skillz-test/local
+            Fetching skills...
             Found 2 skill(s)
 
             Available Skills
@@ -216,6 +219,7 @@ public class AddCommandSnapshotTests : IDisposable
             # exit 1
 
             Source: /skillz-test/local
+            Fetching skills...
             Found 2 skill(s)
             No matching skills found for: nope
             Available skills:
@@ -246,7 +250,9 @@ public class AddCommandSnapshotTests : IDisposable
             $ skillz add ./local-path --yes --agent claude-code
 
             Source: /skillz-test/local
+            Fetching skills...
             Found 1 skill(s)
+            Installing skills...
 
             ┌─Installation Summary─────────────────────────────────────────────────────────┐
             │ Copied:  Claude Code                                                         │
@@ -283,7 +289,9 @@ public class AddCommandSnapshotTests : IDisposable
             # exit 1
 
             Source: /skillz-test/local
+            Fetching skills...
             Found 1 skill(s)
+            Installing skills...
 
             ┌─Installation failed for 1 skill(s)───────────────────────────────────────────┐
             │ ✗ alpha → Claude Code: disk is full                                          │

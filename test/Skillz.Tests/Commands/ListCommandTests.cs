@@ -82,8 +82,8 @@ public class ListCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exitCode);
-        var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
-        Assert.Contains(interaction.Output, o => o.Contains("No project skills", StringComparison.OrdinalIgnoreCase));
+        var output = services.GetRequiredService<CapturingConsole>().OutputText;
+        Assert.Contains("No project skills", output, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -106,8 +106,7 @@ public class ListCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exitCode);
-        var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
-        var output = interaction.OutputText;
+        var output = services.GetRequiredService<CapturingConsole>().OutputText;
         Assert.Contains("alpha", output);
         Assert.Contains("beta", output);
     }

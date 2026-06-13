@@ -1,20 +1,23 @@
 using System.Collections.Immutable;
 using System.CommandLine;
 using Skillz.Interaction;
+using Skillz.Interaction.Decorators;
+using Skillz.Interaction.Prompts;
 using Skillz.Locking;
 using Skillz.Net;
 using Skillz.Skills;
 using Skillz.Utils;
+using Skillz.Views;
 using Spectre.Console;
 
 namespace Skillz.Commands;
 
 internal sealed class UpdateCommand(
-    IInteractionService interaction,
+    IAnsiConsole console,
     IGlobalLockFile globalLockFile,
     IProjectLockFile projectLockFile,
     IBlobClient blobClient,
-    ConsoleEnvironment consoleEnvironment) : BaseCommand("update", "Check for skill updates.")
+    ConsoleEnvironment consoleEnvironment) : BaseCommand(console, "update", "Check for skill updates.")
 {
     private readonly Argument<string[]> _skillsArgument = new("skills")
     {
@@ -41,7 +44,7 @@ internal sealed class UpdateCommand(
         Options.Add(_yesOption);
     }
 
-    protected override async Task<CommandResult> ExecuteAsync(
+    protected override async Task<int> ExecuteAsync(
         ParseResult parseResult,
         CancellationToken cancellationToken)
     {
@@ -58,14 +61,14 @@ internal sealed class UpdateCommand(
 
         if (skillFilter is not null)
         {
-            interaction.WriteMarkupLine($"Checking {Markup.Escape(skillFilter.Join(", "))}...");
+            Output.WriteLine($"Checking {skillFilter.Join(", ")}...");
         }
         else
         {
-            interaction.WriteLine("Checking for skill updates...");
+            Output.WriteLine("Checking for skill updates...");
         }
 
-        interaction.WriteLine();
+        Output.WriteLine();
 
         var totalUpdatesAvailable = 0;
         var totalFail = 0;
@@ -75,7 +78,7 @@ internal sealed class UpdateCommand(
         {
             if (scope == UpdateScope.Both && skillFilter is null)
             {
-                interaction.WriteMarkupLine("[bold]Global Skills[/]");
+                Output.MarkupLineRaw("[bold]Global Skills[/]");
             }
 
             var globalResult = await CheckGlobalSkillsAsync(skillFilter, cancellationToken);
@@ -85,7 +88,7 @@ internal sealed class UpdateCommand(
 
             if (scope == UpdateScope.Both && skillFilter is null)
             {
-                interaction.WriteLine();
+                Output.WriteLine();
             }
         }
 
@@ -93,7 +96,7 @@ internal sealed class UpdateCommand(
         {
             if (scope == UpdateScope.Both && skillFilter is null)
             {
-                interaction.WriteMarkupLine("[bold]Project Skills[/]");
+                Output.MarkupLineRaw("[bold]Project Skills[/]");
             }
 
             var projectResult = await CheckProjectSkillsAsync(skillFilter, cancellationToken);
@@ -103,24 +106,24 @@ internal sealed class UpdateCommand(
 
         if (skillFilter is not null && totalFound == 0)
         {
-            interaction.WriteDim($"No installed skills found matching: {skillFilter.Join(", ")}");
+            Output.Dim($"No installed skills found matching: {skillFilter.Join(", ")}");
         }
 
-        interaction.WriteLine();
+        Output.WriteLine();
 
         if (totalUpdatesAvailable > 0)
         {
-            interaction.WriteWarning(
+            Output.Warning(
                 $"Updates available for {totalUpdatesAvailable} skill(s); no updates were applied.");
         }
 
         if (totalFail > 0)
         {
-            interaction.WriteDim($"Failed to check {totalFail} skill(s)");
+            Output.Dim($"Failed to check {totalFail} skill(s)");
         }
 
-        interaction.WriteLine();
-        return new CommandResult.Success();
+        Output.WriteLine();
+        return ExitCodeConstants.Success;
     }
 
     private async Task<UpdateScope> ResolveScopeAsync(UpdateCheckOptions options, CancellationToken cancellationToken)
@@ -159,15 +162,18 @@ internal sealed class UpdateCommand(
             return UpdateScope.Both;
         }
 
-        return await interaction.SelectAsync(
-            "Update scope",
-            new[]
-            {
-                ("Project (update skills in current directory)", UpdateScope.Project),
-                ("Global (update skills in home directory)", UpdateScope.Global),
-                ("Both (update all skills)", UpdateScope.Both)
-            },
-            cancellationToken);
+        // WithDefault checks both scopes when the console cannot show the picker (redirected or
+        // non-ANSI), matching the default taken on the non-interactive path above.
+        return await new SelectPrompt<UpdateScope>(
+                "Update scope",
+                new[]
+                {
+                    ("Project (update skills in current directory)", UpdateScope.Project),
+                    ("Global (update skills in home directory)", UpdateScope.Global),
+                    ("Both (update all skills)", UpdateScope.Both)
+                })
+            .WithDefault(defaultValue: UpdateScope.Both)
+            .ShowAsync(Output, cancellationToken);
     }
 
     private async Task<(int UpdatesAvailableCount, int FailCount, int CheckedCount)> CheckGlobalSkillsAsync(
@@ -180,8 +186,8 @@ internal sealed class UpdateCommand(
         {
             if (skillFilter is null)
             {
-                interaction.WriteDim("No global skills tracked in lock file.");
-                interaction.WriteDim("Install skills with: skillz add <package> -g");
+                Output.Dim("No global skills tracked in lock file.");
+                Output.Dim("Install skills with: skillz add <package> -g");
             }
             return (0, 0, 0);
         }
@@ -224,11 +230,11 @@ internal sealed class UpdateCommand(
                     $"Checking global skill {i + 1}/{checkable.Count}: {TerminalSanitizer.SanitizeMetadata(skillName)}";
                 if (inlineProgress)
                 {
-                    Console.Write($"\r\x1b[K{progressText}");
+                    System.Console.Write($"\r\x1b[K{progressText}");
                 }
                 else
                 {
-                    interaction.WriteDim(progressText);
+                    Output.Dim(progressText);
                 }
 
                 var check = await TryFetchSkillFolderHashAsync(
@@ -255,7 +261,7 @@ internal sealed class UpdateCommand(
         {
             if (inlineProgress)
             {
-                Console.Write("\r\x1b[K");
+                System.Console.Write("\r\x1b[K");
             }
         }
 
@@ -265,7 +271,7 @@ internal sealed class UpdateCommand(
         {
             if (skillFilter is null)
             {
-                interaction.WriteDim("No global skills to check.");
+                Output.Dim("No global skills to check.");
             }
             return (0, 0, 0);
         }
@@ -278,20 +284,20 @@ internal sealed class UpdateCommand(
 
         if (updates.Count == 0 && failed.Count == 0 && timedOut.Count == 0)
         {
-            interaction.WriteSuccess("All global skills are up to date");
+            Output.Success("All global skills are up to date");
             PrintSkippedSkills(skipped);
             return (0, 0, checkedCount);
         }
 
         if (updates.Count > 0)
         {
-            interaction.WriteMarkupLine($"Found {updates.Count} global update(s)");
-            interaction.WriteLine();
+            Output.WriteLine($"Found {updates.Count} global update(s)");
+            Output.WriteLine();
 
             foreach (var (name, _) in updates)
             {
-                interaction.WriteMarkupLine($"[grey85]Update available:[/] {Markup.Escape(name)}");
-                interaction.WriteDim($"  Run: skillz add {BuildInstallSource(lockFile.Skills[name])} -g -y");
+                Output.MarkupLineRaw($"[grey85]Update available:[/] {Markup.Escape(name)}");
+                Output.Dim($"  Run: skillz add {BuildInstallSource(lockFile.Skills[name])} -g -y");
             }
         }
 
@@ -327,8 +333,8 @@ internal sealed class UpdateCommand(
         {
             if (skillFilter is null)
             {
-                interaction.WriteDim("No project skills to update.");
-                interaction.WriteDim("Install project skills with: skillz add <package>");
+                Output.Dim("No project skills to update.");
+                Output.Dim("Install project skills with: skillz add <package>");
             }
             return (0, 0);
         }
@@ -338,19 +344,19 @@ internal sealed class UpdateCommand(
 
         if (updatable.Count == 0)
         {
-            interaction.WriteDim("No project skills can be updated in place.");
+            Output.Dim("No project skills can be updated in place.");
             PrintLegacyProjectSkills(legacy);
             return (0, projectSkills.Count);
         }
 
-        interaction.WriteDim($"{updatable.Count} project skill(s) can be refreshed (re-install to update):");
-        interaction.WriteLine();
+        Output.Dim($"{updatable.Count} project skill(s) can be refreshed (re-install to update):");
+        Output.WriteLine();
 
         foreach (var (name, entry) in updatable)
         {
             var installUrl = BuildLocalInstallSource(entry);
-            interaction.WriteMarkupLine($"[grey85]Refresh:[/] {Markup.Escape(name)}");
-            interaction.WriteDim($"  Run: skillz add {installUrl} --skill {name} -y");
+            Output.MarkupLineRaw($"[grey85]Refresh:[/] {Markup.Escape(name)}");
+            Output.Dim($"  Run: skillz add {installUrl} --skill {name} -y");
         }
 
         PrintLegacyProjectSkills(legacy);
@@ -488,15 +494,16 @@ internal sealed class UpdateCommand(
             return;
         }
 
-        interaction.WriteLine();
-        interaction.WriteDim($"{skipped.Count} skill(s) cannot be checked automatically:");
-        foreach (var skill in skipped)
-        {
-            interaction.WriteMarkupLine(
-                $"  [grey85]*[/] {Markup.Escape(skill.Name)} [dim]({Markup.Escape(skill.Reason)})[/]");
-            var manual = FormatSourceInput(GetInstallSource(skill), skill.Ref);
-            interaction.WriteDim($"    To update: skillz add {manual} -g -y");
-        }
+        var items = skipped
+            .Select(skill => new UpdateNotice(
+                skill.Name,
+                skill.Reason,
+                $"To update: skillz add {FormatSourceInput(GetInstallSource(skill), skill.Ref)} -g -y"))
+            .ToList();
+
+        Output.WriteLine();
+        Output.Write(UpdateNoticeView.Create(
+            $"{skipped.Count} skill(s) cannot be checked automatically:", items));
     }
 
     private void PrintFailedSkills(IReadOnlyList<string> failed)
@@ -506,12 +513,10 @@ internal sealed class UpdateCommand(
             return;
         }
 
-        interaction.WriteLine();
-        interaction.WriteDim($"{failed.Count} skill(s) could not be checked (network or access error):");
-        foreach (var name in failed)
-        {
-            interaction.WriteMarkupLine($"  [grey85]*[/] {Markup.Escape(name)}");
-        }
+        Output.WriteLine();
+        Output.Write(UpdateNoticeView.Create(
+            $"{failed.Count} skill(s) could not be checked (network or access error):",
+            failed.Select(name => new UpdateNotice(name)).ToList()));
     }
 
     private void PrintTimedOutSkills(List<string> timedOut)
@@ -521,12 +526,10 @@ internal sealed class UpdateCommand(
             return;
         }
 
-        interaction.WriteLine();
-        interaction.WriteDim($"{timedOut.Count} skill(s) timed out before they could be checked:");
-        foreach (var name in timedOut)
-        {
-            interaction.WriteMarkupLine($"  [grey85]*[/] {Markup.Escape(name)}");
-        }
+        Output.WriteLine();
+        Output.Write(UpdateNoticeView.Create(
+            $"{timedOut.Count} skill(s) timed out before they could be checked:",
+            timedOut.Select(name => new UpdateNotice(name)).ToList()));
     }
 
     private void PrintLegacyProjectSkills(IReadOnlyList<(string Name, LocalSkillLockEntry Entry)> legacy)
@@ -536,15 +539,16 @@ internal sealed class UpdateCommand(
             return;
         }
 
-        interaction.WriteLine();
-        interaction.WriteDim(
-            $"{legacy.Count} project skill(s) cannot be updated automatically (installed before skillPath tracking):");
-        foreach (var (name, entry) in legacy)
-        {
-            var reinstall = FormatSourceInput(entry.Source, entry.Ref);
-            interaction.WriteMarkupLine($"  [grey85]*[/] {Markup.Escape(name)}");
-            interaction.WriteDim($"    To refresh: skillz add {reinstall} -y");
-        }
+        var items = legacy
+            .Select(skill => new UpdateNotice(
+                skill.Name,
+                Action: $"To refresh: skillz add {FormatSourceInput(skill.Entry.Source, skill.Entry.Ref)} -y"))
+            .ToList();
+
+        Output.WriteLine();
+        Output.Write(UpdateNoticeView.Create(
+            $"{legacy.Count} project skill(s) cannot be updated automatically (installed before skillPath tracking):",
+            items));
     }
 
     private static string GetInstallSource(SkippedSkill skill)
@@ -565,7 +569,7 @@ internal sealed class UpdateCommand(
     private static string FormatSourceInput(string sourceUrl, string? @ref)
     {
         var input = string.IsNullOrEmpty(@ref) ? sourceUrl : $"{sourceUrl}#{@ref}";
-        // Display-only: the result is only ever printed via WriteDim, so strip any terminal
+        // Display-only: the result is only ever printed as dimmed text, so strip any terminal
         // escapes (the source can embed an untrusted, caller-derived skill path).
         return TerminalSanitizer.SanitizeMetadata(input);
     }
@@ -575,7 +579,7 @@ internal sealed class UpdateCommand(
         var folder = DeriveSkillFolder(skillPath);
         var withFolder = string.IsNullOrEmpty(folder) ? source : $"{source}/{folder}";
         var input = string.IsNullOrEmpty(@ref) ? withFolder : $"{withFolder}#{@ref}";
-        // Display-only: the result is only ever printed via WriteDim. skillPath is untrusted
+        // Display-only: the result is only ever printed as dimmed text. skillPath is untrusted
         // (it round-trips from an on-disk directory name), so strip terminal escapes here.
         return TerminalSanitizer.SanitizeMetadata(input);
     }

@@ -8,24 +8,13 @@ using Skillz.Plugins;
 using Skillz.Skills;
 using Skillz.Sources;
 using Skillz.Tests.TestServices;
+using Spectre.Console;
 using Xunit;
 
 namespace Skillz.Tests.Utils;
 
 public class CliTestHelperTests
 {
-    [Fact]
-    public void CreateServiceProvider_Returns_Valid_Provider()
-    {
-        // Act
-        var provider = CliTestHelper.CreateServiceProvider();
-        var interaction = provider.GetRequiredService<IInteractionService>();
-
-        // Assert
-        Assert.NotNull(interaction);
-        Assert.IsType<TestInteractionService>(interaction);
-    }
-
     [Fact]
     public void CreateServiceProvider_Registers_All_TestDoubles()
     {
@@ -84,52 +73,20 @@ public class CliTestHelperTests
     }
 
     [Fact]
-    public async Task TestInteractionService_Records_Output()
+    public async Task CapturingConsole_Records_ExtensionOutput()
     {
         // Arrange
         var provider = CliTestHelper.CreateServiceProvider();
-        var interaction = (TestInteractionService)provider.GetRequiredService<IInteractionService>();
+        var console = provider.GetRequiredService<CapturingConsole>();
 
         // Act
-        interaction.WriteLine("hello");
-        interaction.WriteError("oops");
-        await interaction.StatusAsync("loading", () => Task.CompletedTask);
+        console.WriteLine("hello");
+        console.Error("oops");
+        await console.StatusAsync("loading", () => Task.CompletedTask);
 
         // Assert
-        Assert.Contains("hello", interaction.Output);
-        Assert.Contains("ERROR: oops", interaction.Output);
-        Assert.Contains("STATUS: loading", interaction.Output);
-    }
-
-    [Fact]
-    public async Task TestInteractionService_Uses_Callback_For_Confirm()
-    {
-        // Arrange
-        var ct = TestContext.Current.CancellationToken;
-        var provider = CliTestHelper.CreateServiceProvider();
-        var interaction = (TestInteractionService)provider.GetRequiredService<IInteractionService>();
-
-        interaction.OnConfirm = (_, _) => true;
-
-        // Act
-        var confirm = await interaction.ConfirmAsync("ok?", defaultValue: false, ct);
-
-        // Assert
-        Assert.True(confirm);
-    }
-
-    [Fact]
-    public async Task TestInteractionService_Returns_Default_When_No_Callback()
-    {
-        // Arrange
-        var ct = TestContext.Current.CancellationToken;
-        var provider = CliTestHelper.CreateServiceProvider();
-        var interaction = (TestInteractionService)provider.GetRequiredService<IInteractionService>();
-
-        // Act
-        var confirm = await interaction.ConfirmAsync("ok?", defaultValue: true, cancellationToken: ct);
-
-        // Assert
-        Assert.True(confirm);
+        Assert.Contains("hello", console.OutputText, StringComparison.Ordinal);
+        Assert.Contains("oops", console.OutputText, StringComparison.Ordinal);
+        Assert.Contains("loading", console.OutputText, StringComparison.Ordinal);
     }
 }

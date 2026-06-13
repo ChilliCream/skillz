@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Skillz.Utils;
 
 internal static class FileLock
@@ -39,7 +41,7 @@ internal static class FileLock
             Directory.CreateDirectory(lockDir);
         }
 
-        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        var startTimestamp = Stopwatch.GetTimestamp();
 
         while (true)
         {
@@ -62,7 +64,7 @@ internal static class FileLock
             }
             catch (IOException)
             {
-                if (DateTime.UtcNow >= deadline)
+                if (Stopwatch.GetElapsedTime(startTimestamp).TotalMilliseconds >= timeoutMs)
                 {
                     throw new TimeoutException($"Timed out acquiring lock for '{targetPath}' after {timeoutMs}ms.");
                 }
@@ -71,7 +73,7 @@ internal static class FileLock
                 {
                     var info = new FileInfo(lockPath);
                     if (info.Exists
-                        && (DateTime.UtcNow - info.CreationTimeUtc).TotalMilliseconds > staleLockTimeoutMs)
+                        && (TimeProvider.System.GetUtcNow().UtcDateTime - info.CreationTimeUtc).TotalMilliseconds > staleLockTimeoutMs)
                     {
                         File.Delete(lockPath);
                         continue;

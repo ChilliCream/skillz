@@ -6,6 +6,8 @@ using Skillz.Locking;
 using Skillz.Skills;
 using Skillz.Tests.TestServices;
 using Skillz.Tests.Utils;
+using Spectre.Console;
+using Spectre.Console.Testing;
 using Xunit;
 
 namespace Skillz.Tests.Commands;
@@ -73,8 +75,8 @@ public class RemoveCommandTests : IDisposable
 
         // Assert
         Assert.Equal(0, exitCode);
-        var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
-        Assert.Contains(interaction.Output, o => o.Contains("No skills", StringComparison.OrdinalIgnoreCase));
+        var interaction = services.GetRequiredService<CapturingConsole>();
+        Assert.Contains("No skills", interaction.OutputText, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -163,13 +165,13 @@ public class RemoveCommandTests : IDisposable
         // Assert: nothing was deleted and the command reported a failure (did not claim success).
         Assert.NotEqual(0, exitCode);
         Assert.True(Directory.Exists(onDiskFolder));
-        var interaction = (TestInteractionService)services.GetRequiredService<IInteractionService>();
-        Assert.DoesNotContain(interaction.Output, o => o.Contains("Successfully removed", StringComparison.Ordinal));
-        Assert.Contains(interaction.Output, o => o.Contains("Failed to remove", StringComparison.Ordinal));
+        var interaction = services.GetRequiredService<CapturingConsole>();
+        Assert.DoesNotContain("Successfully removed", interaction.OutputText, StringComparison.Ordinal);
+        Assert.Contains("Failed to remove", interaction.OutputText, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task Remove_Uses_Prompter_When_Interactive()
+    public async Task Remove_Uses_Interactive_Selection_When_Interactive()
     {
         // Arrange
         var canonical = Path.Combine(_workspace, ".agents", "skills");
@@ -177,16 +179,22 @@ public class RemoveCommandTests : IDisposable
         CreateSkill(canonical, "alpha");
         CreateSkill(canonical, "beta");
 
+        // Drive the real prompts over an interactive console: the multiselect lists [alpha, beta]; move
+        // down to beta, toggle it, confirm, then answer the removal confirmation with "y".
+        var console = InteractiveConsole.Create();
+        console.Input.PushKey(ConsoleKey.DownArrow); // alpha -> beta
+        console.Input.PushKey(ConsoleKey.Spacebar); // select beta
+        console.Input.PushKey(ConsoleKey.Enter); // confirm selection
+        console.Input.PushTextWithEnter("y"); // confirm removal
+
         var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true, configure: s =>
-            s.AddSingleton<ConsoleEnvironment>(new TestConsoleEnvironment { InputRedirected = false })
-        );
+        {
+            s.AddSingleton<ConsoleEnvironment>(new TestConsoleEnvironment { InputRedirected = false });
+            s.AddSingleton<IAnsiConsole>(console);
+        });
 
         var installer = (TestInstaller)services.GetRequiredService<ISkillInstaller>();
         ConfigureInstaller(installer);
-
-        var prompter = services.GetRequiredService<TestRemoveCommandPrompter>();
-        prompter.OnSelectSkills = installed => installed.Where(s => s == "beta").ToList();
-        prompter.OnConfirmRemoval = _ => true;
 
         // Act
         var cmd = services.GetRequiredService<RemoveCommand>();
@@ -197,5 +205,67 @@ public class RemoveCommandTests : IDisposable
         Assert.Equal(0, exitCode);
         Assert.True(Directory.Exists(Path.Combine(canonical, "alpha")));
         Assert.False(Directory.Exists(Path.Combine(canonical, "beta")));
+    }
+
+    [Fact]
+    public async Task Remove_Cancels_Gracefully_When_Output_NonInteractive()
+    {
+        // Arrange: stdin is a TTY (IsInputRedirected=false) so the command tries to prompt, but the
+        // console cannot drive the key loop (the default CapturingConsole is non-interactive, as a
+        // redirected stdout would be). The multi-select must degrade to "cancelled", not crash Spectre.
+        var canonical = Path.Combine(_workspace, ".agents", "skills");
+        Directory.CreateDirectory(canonical);
+        CreateSkill(canonical, "alpha");
+        CreateSkill(canonical, "beta");
+
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
+        ConfigureInstaller((TestInstaller)services.GetRequiredService<ISkillInstaller>());
+
+        // Act
+        var cmd = services.GetRequiredService<RemoveCommand>();
+        var exitCode = await cmd.Parse(Array.Empty<string>())
+            .InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: graceful cancellation, nothing removed.
+        Assert.Equal(ExitCodeConstants.Cancelled, exitCode);
+        Assert.Contains(
+            "Removal cancelled",
+            services.GetRequiredService<CapturingConsole>().OutputText,
+            StringComparison.Ordinal);
+        Assert.True(Directory.Exists(Path.Combine(canonical, "alpha")));
+        Assert.True(Directory.Exists(Path.Combine(canonical, "beta")));
+    }
+
+    // Removal is destructive: when a NAMED skill is given but the console cannot show the confirm
+    // (redirected stream -> not Interactive; TERM=dumb -> not Ansi), the user must pass -y. Otherwise
+    // WithDefault DECLINES so nothing is silently deleted.
+    // The three capability combinations Spectre cannot show a prompt on (anything but Interactive+Ansi):
+    [Theory]
+    [InlineData(false, false)] // fully headless (stdin redirected, no ANSI)
+    [InlineData(true, false)] // real TTY with TERM=dumb (no ANSI)
+    [InlineData(false, true)] // stdin redirected but ANSI-capable (e.g. `echo y | skillz remove ...`)
+    public async Task Remove_Named_Skill_Declines_When_Console_CannotPrompt(bool interactive, bool ansi)
+    {
+        // Arrange
+        var canonical = Path.Combine(_workspace, ".agents", "skills");
+        Directory.CreateDirectory(canonical);
+        CreateSkill(canonical, "alpha");
+
+        var console = new TestConsole();
+        console.Profile.Capabilities.Interactive = interactive;
+        console.Profile.Capabilities.Ansi = ansi;
+        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true, configure: s =>
+            s.AddSingleton<IAnsiConsole>(console));
+        ConfigureInstaller((TestInstaller)services.GetRequiredService<ISkillInstaller>());
+
+        // Act
+        var cmd = services.GetRequiredService<RemoveCommand>();
+        var exitCode = await cmd.Parse(["alpha"])
+            .InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert: declined -> cancelled, skill untouched (no silent destructive delete).
+        Assert.Equal(ExitCodeConstants.Cancelled, exitCode);
+        Assert.True(Directory.Exists(Path.Combine(canonical, "alpha")));
+        Assert.Contains("Removal cancelled", console.Output, StringComparison.Ordinal);
     }
 }

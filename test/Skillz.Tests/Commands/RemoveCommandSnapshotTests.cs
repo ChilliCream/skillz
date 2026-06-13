@@ -1,9 +1,11 @@
 using CookieCrumble;
 using Microsoft.Extensions.DependencyInjection;
+using Skillz.Commands;
 using Skillz.Install;
 using Skillz.Locking;
 using Skillz.Tests.TestServices;
 using Skillz.Tests.Utils;
+using Spectre.Console;
 using Xunit;
 
 namespace Skillz.Tests.Commands;
@@ -53,9 +55,12 @@ public class RemoveCommandSnapshotTests : IDisposable
         installer.OnGetInstallPath = (name, _, _, cwd) => Path.Combine(cwd ?? _workspace, ".agents", "skills", name);
     }
 
-    private IServiceProvider BuildServices()
+    private IServiceProvider BuildServices(Action<IServiceCollection>? configure = null)
     {
-        var services = CliTestHelper.CreateServiceProvider(workspace: _workspace, useRealFileStore: true);
+        var services = CliTestHelper.CreateServiceProvider(
+            workspace: _workspace,
+            useRealFileStore: true,
+            configure: configure);
         ConfigureInstaller((TestInstaller)services.GetRequiredService<ISkillInstaller>());
         return services;
     }
@@ -97,6 +102,7 @@ public class RemoveCommandSnapshotTests : IDisposable
             """
             $ skillz remove alpha --yes
 
+            Removing skills...
             Successfully removed 1 skill(s)
             """);
     }
@@ -141,6 +147,7 @@ public class RemoveCommandSnapshotTests : IDisposable
             """
             $ skillz remove --all
 
+            Removing skills...
             Successfully removed 1 skill(s)
             """);
     }
@@ -188,25 +195,27 @@ public class RemoveCommandSnapshotTests : IDisposable
     [Fact]
     public async Task Remove_Interactive_Decline_Confirmation_Cancels()
     {
-        // Arrange
+        // Arrange: a named skill arg skips the multiselect, so the only prompt is the removal
+        // confirmation. Drive the real ConfirmationPrompt over an interactive console and decline ("n").
+        // This drives a live prompt, so it asserts on behavior rather than a clean snapshot (the prompt's
+        // own rendering would otherwise pollute the captured output).
         var canonical = Path.Combine(_workspace, ".agents", "skills");
         Directory.CreateDirectory(canonical);
         CreateSkill(canonical, "alpha");
-        var services = BuildServices();
-        var prompter = services.GetRequiredService<TestRemoveCommandPrompter>();
-        prompter.OnConfirmRemoval = _ => false;
+
+        var console = InteractiveConsole.Create();
+        console.Input.PushTextWithEnter("n");
+        var services = BuildServices(s => s.AddSingleton<IAnsiConsole>(console));
 
         // Act
-        var output = await CommandSnapshot.RunAsync(services, "remove", "alpha");
+        var cmd = services.GetRequiredService<RemoveCommand>();
+        var exitCode = await cmd.Parse(["alpha"])
+            .InvokeAsync(cancellationToken: TestContext.Current.CancellationToken);
 
-        // Assert
-        output.MatchInlineSnapshot(
-            """
-            $ skillz remove alpha
-            # exit 130
-
-            Removal cancelled
-            """);
+        // Assert: declining cancels with the cancellation exit code, nothing is removed, and the user is told.
+        Assert.Equal(ExitCodeConstants.Cancelled, exitCode);
+        Assert.True(Directory.Exists(Path.Combine(canonical, "alpha")));
+        Assert.Contains("Removal cancelled", console.Output, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -229,6 +238,7 @@ public class RemoveCommandSnapshotTests : IDisposable
             $ skillz remove alpha --yes
             # exit 1
 
+            Removing skills...
             Failed to remove 1 skill(s)
               alpha: lock file is read-only
             """);
