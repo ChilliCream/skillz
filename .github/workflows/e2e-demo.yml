@@ -1,0 +1,190 @@
+name: e2e-demo
+
+# Records every skillz CLI flow with VHS (test/e2e/*-flow.tape), verifies each
+# rendered final frame against its committed golden, uploads the GIFs + frames as
+# build artifacts, and — on pull requests — posts a collapsed, per-flow comment
+# with the recordings of any flow that changed or is new. Linux only (the VHS
+# toolchain — ttyd + ffmpeg — ships in the pinned container).
+
+on:
+  push:
+    paths:
+      - 'src/Skillz/**'
+      - 'test/e2e/**'
+      - 'test/fixtures/sample-skills/**'
+      - '.github/workflows/e2e-demo.yml'
+  pull_request:
+    paths:
+      - 'src/Skillz/**'
+      - 'test/e2e/**'
+      - 'test/fixtures/sample-skills/**'
+      - '.github/workflows/e2e-demo.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write        # push changed/new GIFs to the e2e-snapshots branch so they render inline
+  pull-requests: write   # upsert the snapshot comment on the PR
+
+jobs:
+  record-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # Publishes the binary, runs the pinned VHS container per flow, extracts each
+      # deterministic final frame, and diffs it against the golden. Exits non-zero
+      # if any flow changed or is new — captured here, asserted in the last step so
+      # the artifact upload and PR comment still run.
+      - name: Record + verify all flows
+        id: record
+        continue-on-error: true
+        run: ./test/e2e/run.sh
+
+      # GIFs render inline on the run summary; the report/ dir carries the changed
+      # frames, diffs, and per-flow status for triage.
+      - name: Upload snapshot artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: skillz-e2e-snapshots
+          path: |
+            test/e2e/out/*.gif
+            test/e2e/out/report/**
+          if-no-files-found: warn
+
+      # On a PR, host the changed/new GIFs on a side branch (so GitHub renders them
+      # inline) and upsert a single collapsed comment — one expandable <details> per
+      # flow. No-op when nothing changed (the comment is reset to a ✅ line).
+      - name: Comment changed snapshots on PR
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          RUN_ID: ${{ github.run_id }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const { owner, repo } = context.repo;
+            const pr = context.issue.number;
+            const runId = process.env.RUN_ID;
+            const MARKER = '<!-- skillz-e2e-snapshots -->';
+            const reportDir = 'test/e2e/out/report';
+            const branch = 'e2e-snapshots';
+
+            // Forks get a read-only token: we can neither push hosted GIFs nor
+            // (usually) comment. Bail gracefully — the artifact still has the GIFs.
+            const head = context.payload.pull_request?.head?.repo?.full_name;
+            const base = context.payload.pull_request?.base?.repo?.full_name;
+            const sameRepo = head && base && head === base;
+
+            // Which flows changed or are new (FAIL | NEW)?
+            const statusPath = path.join(reportDir, 'status.tsv');
+            let changed = [];
+            if (fs.existsSync(statusPath)) {
+              for (const line of fs.readFileSync(statusPath, 'utf8').split('\n')) {
+                const [flow, status] = line.split('\t');
+                if (flow && (status === 'FAIL' || status === 'NEW')) {
+                  changed.push({ flow, status });
+                }
+              }
+            }
+
+            async function upsertComment(body) {
+              const { data: comments } = await github.rest.issues.listComments(
+                { owner, repo, issue_number: pr, per_page: 100 });
+              const existing = comments.find(c => c.body && c.body.includes(MARKER));
+              if (existing) {
+                await github.rest.issues.updateComment(
+                  { owner, repo, comment_id: existing.id, body });
+              } else {
+                await github.rest.issues.createComment(
+                  { owner, repo, issue_number: pr, body });
+              }
+            }
+
+            if (changed.length === 0) {
+              await upsertComment(`${MARKER}\n✅ **E2E snapshots** — all flows match their golden.`);
+              return;
+            }
+
+            // Ensure the hosting branch exists (created off the default branch).
+            async function ensureBranch() {
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+              } catch (e) {
+                if (e.status !== 404) throw e;
+                const { data: r } = await github.rest.repos.get({ owner, repo });
+                const { data: ref } = await github.rest.git.getRef(
+                  { owner, repo, ref: `heads/${r.default_branch}` });
+                await github.rest.git.createRef(
+                  { owner, repo, ref: `refs/heads/${branch}`, sha: ref.object.sha });
+              }
+            }
+
+            // Push one GIF onto the hosting branch, return its raw URL (cache-busted
+            // with the run id so GitHub's image proxy refreshes between runs).
+            async function hostGif(flow) {
+              const file = path.join(reportDir, `${flow}-flow.gif`);
+              if (!fs.existsSync(file)) return null;
+              const repoPath = `pr-${pr}/${flow}-flow.gif`;
+              let sha;
+              try {
+                const { data } = await github.rest.repos.getContent(
+                  { owner, repo, path: repoPath, ref: branch });
+                sha = data.sha;
+              } catch (e) { /* new file */ }
+              await github.rest.repos.createOrUpdateFileContents({
+                owner, repo, path: repoPath, branch, sha,
+                message: `e2e: ${flow} snapshot for PR #${pr} (run ${runId})`,
+                content: fs.readFileSync(file).toString('base64'),
+              });
+              return `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${repoPath}?run=${runId}`;
+            }
+
+            const icon = s => (s === 'NEW' ? '🆕' : '🔴');
+            const note = s => (s === 'NEW' ? 'new (no golden yet)' : 'changed');
+
+            let hosted = sameRepo;
+            if (hosted) {
+              try { await ensureBranch(); } catch (e) { core.warning(`branch setup failed: ${e}`); hosted = false; }
+            }
+
+            const blocks = [];
+            for (const { flow, status } of changed) {
+              let url = null;
+              if (hosted) {
+                try { url = await hostGif(flow); }
+                catch (e) { core.warning(`hosting ${flow} failed: ${e}`); }
+              }
+              const inner = url
+                ? `\n\n![${flow}-flow](${url})\n`
+                : `\n\n_Recording in the **skillz-e2e-snapshots** build artifact (inline preview unavailable${sameRepo ? '' : ' on forks'})._\n`;
+              blocks.push(`<details><summary>${icon(status)} ${flow} — ${note(status)}</summary>${inner}</details>`);
+            }
+
+            const body = [
+              MARKER,
+              '### 🎬 E2E snapshots changed',
+              '',
+              'These VHS flows differ from their committed golden (or are new) on this PR. '
+                + 'Expand a flow to view its recording. If a change is intended, run '
+                + '`./test/e2e/run.sh --update <flow>` and commit the refreshed golden + GIF.',
+              '',
+              ...blocks,
+              '',
+              `<sub>Run ${runId} · full set in the <b>skillz-e2e-snapshots</b> artifact.</sub>`,
+            ].join('\n');
+
+            try { await upsertComment(body); }
+            catch (e) { core.warning(`comment failed (expected on forks): ${e}`); }
+
+      # Surface the regression as a job failure AFTER artifacts + comment are posted.
+      - name: Fail if any flow changed or is new
+        if: always() && steps.record.outcome == 'failure'
+        run: |
+          echo "::error::E2E snapshots changed or new — review the PR comment / skillz-e2e-snapshots artifact, then run ./test/e2e/run.sh --update <flow> if intended." >&2
+          exit 1

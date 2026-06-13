@@ -11,7 +11,18 @@
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": true,
       "configureZshAsDefaultShell": true
-    }
+    },
+    // The base image (dotnet:1-9.0-bookworm) ships only .NET 9, but global.json
+    // pins SDK 10.0.100 and test/e2e/run.sh publishes -f net10.0. A bookworm-based
+    // .NET 10 image isn't published, so layer the SDK in here instead of changing
+    // the distro. .NET 9 stays available from the base for the net9.0 test projects.
+    "ghcr.io/devcontainers/features/dotnet:2": {
+      "version": "10.0"
+    },
+    // Docker engine inside the devcontainer so the e2e VHS recording
+    // (test/e2e/run.sh) can run the pinned VHS image locally, byte-for-byte
+    // identical to CI. Requires a host that permits privileged containers.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
   "customizations": {
     "vscode": {
@@ -28,6 +39,6 @@
       }
     }
   },
-  "postCreateCommand": "dotnet --info && node --version && npm --version",
+  "postCreateCommand": "dotnet --info && node --version && npm --version && docker --version",
   "remoteUser": "vscode"
 }

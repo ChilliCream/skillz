@@ -1,0 +1,6 @@
+$ skillz list
+Project Skills
+
+Skill          Path                            Agents
+commit-helper  ./.claude/skills/commit-helper  Claude Code
+$

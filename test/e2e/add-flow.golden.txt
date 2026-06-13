@@ -1,0 +1,32 @@
+$ skillz add ./sample-skills
+
+  /$$$$$$  /$$       /$$ /$$ /$$
+ /$$__  $$| $$      |__/| $$| $$
+| $$  \__/| $$   /$$ /$$| $$| $$ /$$$$$$$$
+|  $$$$$$ | $$  /$$/| $$| $$| $$|____ /$$/
+ \____  $$| $$$$$$/ | $$| $$| $$   /$$$$/
+ /$$  \ $$| $$_  $$ | $$| $$| $$  /$$__/
+|  $$$$$$/| $$ \  $$| $$| $$| $$ /$$$$$$$$
+ \______/ |__/  \__/|__/|__/|__/|________/
+Source: /tmp/work/sample-skills
+Found 3 skill(s)
+Which agents do you want to install to? Selected: Claude Code (claude-code)
+Install 2 skill(s) [commit-helper, pr-describer] to 16 agent(s) [amp, antigravity, claude-code,
+cline, codex, cursor, deepagents, dexto, firebender, gemini-cli, github-copilot, kimi-cli,
+opencode, replit, universal, warp] [y/n] (y): y
+
+┌─Installation Summary────────────────────────────────────────────────────────────────────────┐
+│ Canonical: /tmp/work/.agents/skills                                                         │
+│ Universal:  Amp, Antigravity, Cline, Codex, Cursor, Deep Agents, Dexto, Firebender, Gemini  │
+│ CLI, GitHub Copilot, Kimi Code CLI, OpenCode, Replit, Universal, Warp                       │
+│ Symlinked:  Claude Code                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+┌─Installed 2 skill(s)────────────────────────────────────────────────────────────────────────┐
+│ ✓ commit-helper                                                                             │
+│   → /tmp/work/.agents/skills/commit-helper                                                  │
+│ ✓ pr-describer                                                                              │
+│   → /tmp/work/.agents/skills/pr-describer                                                   │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+
+Done!  Review skills before use; they run with full agent permissions.
+$

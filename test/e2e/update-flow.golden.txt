@@ -1,0 +1,13 @@
+$ skillz update
+Checking for skill updates...
+
+Global Skills
+No global skills tracked in lock file.
+Install skills with: skillz add <package> -g
+
+Project Skills
+No project skills to update.
+Install project skills with: skillz add <package>
+
+
+$
